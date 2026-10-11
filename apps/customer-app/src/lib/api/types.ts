@@ -70,6 +70,24 @@ export interface BookingResult {
   totalPaise: Paise;
 }
 
+export type BookingStatus = 'matching' | 'confirmed' | 'completed' | 'cancelled';
+
+export interface Booking {
+  id: string;
+  serviceSlug: string;
+  serviceName: string;
+  formatName: string;
+  mode: BookingMode;
+  status: BookingStatus;
+  startsAt: string | null; // null for instant bookings until a coach accepts
+  whenLabel: string;
+  addressLabel: string;
+  areaLabel: string;
+  totalPaise: Paise;
+  // Decided by the server (rule lives in the API, never in the app).
+  canChange: boolean;
+}
+
 export interface UpcomingSessionSummary {
   id: string;
   serviceName: string;
@@ -96,4 +114,8 @@ export interface Api {
   addAddress(input: NewAddress): Promise<Address>;
   getSlots(serviceSlug: string, isoDate: string): Promise<TimeSlot[]>;
   createBooking(input: BookingInput): Promise<BookingResult>;
+  getBooking(id: string): Promise<Booking>;
+  listBookings(): Promise<Booking[]>;
+  rescheduleBooking(id: string, startsAt: string): Promise<Booking>;
+  cancelBooking(id: string): Promise<Booking>;
 }

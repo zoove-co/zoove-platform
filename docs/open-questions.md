@@ -14,6 +14,7 @@ These block the booking, pricing and matching tables (migration 0002). Everythin
    Couple. One name please. Does a Loved One booking need the other person's phone number?
 6. Trainer payout: percentage or fixed amount per session, and per SKU?
 7. Cancellation and reschedule policy (designs say reschedule up to 2 hours before). Fees? No-show rules?
+   The app currently allows reschedule and cancel up to 2 hours before (placeholder, enforced in the mock API).
 8. Health data. Onboarding collects age, gender, height, weight and medical issues. Who may see it
    (assigned trainer, admin, both)? Consent wording and retention?
 9. Insurance and liability for at-home injuries. Gender-preference matching?

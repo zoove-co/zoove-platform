@@ -11,6 +11,7 @@ import { AppText } from '@/components/ui/AppText';
 import { Icon } from '@/components/ui/Icon';
 import { InfoPill } from '@/components/ui/InfoPill';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import { TabFooter } from '@/components/ui/TabFooter';
 import { useService } from '@/features/booking/hooks';
 import { useHomeData } from '@/features/home/useHomeData';
 import { track } from '@/lib/analytics/track';
@@ -55,7 +56,7 @@ export default function ServiceDetailScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView style={styles.screen} edges={['top']}>
       <ScreenHeader title={service.name} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <LinearGradient
@@ -123,6 +124,7 @@ export default function ServiceDetailScreen() {
           onPress={() => startBooking('scheduled')}
         />
       </ScrollView>
+      <TabFooter />
     </SafeAreaView>
   );
 }

@@ -32,3 +32,38 @@ export function useCreateBooking() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['home'] }),
   });
 }
+
+export function useBooking(id: string) {
+  return useQuery({ queryKey: ['booking', id], queryFn: () => api.getBooking(id) });
+}
+
+export function useBookings() {
+  return useQuery({ queryKey: ['bookings'], queryFn: () => api.listBookings() });
+}
+
+function useRefreshBookings() {
+  const queryClient = useQueryClient();
+  return async (id: string) => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['booking', id] }),
+      queryClient.invalidateQueries({ queryKey: ['bookings'] }),
+      queryClient.invalidateQueries({ queryKey: ['home'] }),
+    ]);
+  };
+}
+
+export function useRescheduleBooking(id: string) {
+  const refresh = useRefreshBookings();
+  return useMutation({
+    mutationFn: (startsAt: string) => api.rescheduleBooking(id, startsAt),
+    onSuccess: () => refresh(id),
+  });
+}
+
+export function useCancelBooking(id: string) {
+  const refresh = useRefreshBookings();
+  return useMutation({
+    mutationFn: () => api.cancelBooking(id),
+    onSuccess: () => refresh(id),
+  });
+}

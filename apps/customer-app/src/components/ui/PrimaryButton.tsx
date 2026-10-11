@@ -8,11 +8,14 @@ type Props = {
   onPress: () => void;
   disabled?: boolean;
   loading?: boolean;
-  variant?: 'solid' | 'soft';
+  variant?: 'solid' | 'soft' | 'danger';
 };
 
 export function PrimaryButton({ label, onPress, disabled = false, loading = false, variant = 'solid' }: Props) {
-  const solid = variant === 'solid';
+  const filled = variant !== 'soft';
+  const background =
+    variant === 'danger' ? colors.danger : variant === 'solid' ? colors.purple : colors.lavender;
+  const foreground = filled ? colors.white : colors.purple;
   const inactive = disabled || loading;
   return (
     <Pressable
@@ -22,12 +25,12 @@ export function PrimaryButton({ label, onPress, disabled = false, loading = fals
       onPress={onPress}
       style={({ pressed }) => [
         styles.base,
-        { backgroundColor: solid ? colors.purple : colors.lavender, opacity: disabled ? 0.45 : pressed ? 0.85 : 1 },
+        { backgroundColor: background, opacity: disabled ? 0.45 : pressed ? 0.85 : 1 },
       ]}>
       {loading ? (
-        <ActivityIndicator color={solid ? colors.white : colors.purple} />
+        <ActivityIndicator color={foreground} />
       ) : (
-        <AppText variant="heading" color={solid ? colors.white : colors.purple} style={styles.label}>
+        <AppText variant="heading" color={foreground} style={styles.label}>
           {label}
         </AppText>
       )}

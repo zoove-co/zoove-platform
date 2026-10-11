@@ -7,9 +7,11 @@ export const api: Api = mockApi;
 export type {
   Address,
   Api,
+  Booking,
   BookingInput,
   BookingMode,
   BookingResult,
+  BookingStatus,
   HomeData,
   NewAddress,
   Participant,

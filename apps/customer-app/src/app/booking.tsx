@@ -15,6 +15,7 @@ import { AppText } from '@/components/ui/AppText';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { StepHeading } from '@/components/ui/StepHeading';
+import { TabFooter } from '@/components/ui/TabFooter';
 import { useAddresses, useCreateBooking, useService } from '@/features/booking/hooks';
 import { useHomeData } from '@/features/home/useHomeData';
 import { track } from '@/lib/analytics/track';
@@ -131,9 +132,9 @@ export default function BookingScreen() {
 
   if (result) {
     return (
-      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.screen} edges={['top']}>
         <ScreenHeader title={t('booking.confirmed')} />
-        <View style={styles.content}>
+        <View style={styles.successWrap}>
           <BookingSuccess
             title={t('booking.confirmed')}
             body={
@@ -144,14 +145,20 @@ export default function BookingScreen() {
           />
         </View>
         <View style={styles.footer}>
+          <PrimaryButton
+            label={t('booking.viewBooking')}
+            variant="soft"
+            onPress={() => router.replace({ pathname: '/session/[id]', params: { id: result.id } })}
+          />
           <PrimaryButton label={t('booking.backHome')} onPress={() => router.replace('/home')} />
         </View>
+        <TabFooter />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.screen} edges={['top']}>
       <ScreenHeader title={t('booking.title')} />
       <ScrollView
         ref={scrollRef}
@@ -240,6 +247,7 @@ export default function BookingScreen() {
           onPress={onPrimary}
         />
       </View>
+      <TabFooter />
     </SafeAreaView>
   );
 }
@@ -248,9 +256,11 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: 17, paddingBottom: spacing.xxl, gap: 22 },
   instantBox: { gap: 10 },
+  successWrap: { flex: 1 },
   footer: {
     paddingHorizontal: 18,
     paddingVertical: 10,
+    gap: 10,
     borderTopWidth: 0.5,
     borderTopColor: colors.line,
     backgroundColor: colors.background,

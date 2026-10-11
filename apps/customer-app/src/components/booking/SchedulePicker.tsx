@@ -14,9 +14,17 @@ type Props = {
   onDayChange: (iso: string) => void;
   slotStartsAt: string | undefined;
   onSlotChange: (startsAt: string) => void;
+  firstNumber?: number;
 };
 
-export function SchedulePicker({ serviceSlug, dayIso, onDayChange, slotStartsAt, onSlotChange }: Props) {
+export function SchedulePicker({
+  serviceSlug,
+  dayIso,
+  onDayChange,
+  slotStartsAt,
+  onSlotChange,
+  firstNumber = 2,
+}: Props) {
   const { t } = useTranslation();
   const days = useMemo(() => nextDays(7), []);
   const { data: slots, isPending } = useSlots(serviceSlug, dayIso);
@@ -24,7 +32,7 @@ export function SchedulePicker({ serviceSlug, dayIso, onDayChange, slotStartsAt,
 
   return (
     <View style={styles.wrap}>
-      <StepHeading number="2" title={t('booking.dateTitle')} />
+      <StepHeading number={String(firstNumber)} title={t('booking.dateTitle')} />
       <View style={styles.dayRow}>
         {days.map((day) => {
           const selected = day.iso === dayIso;
@@ -49,7 +57,7 @@ export function SchedulePicker({ serviceSlug, dayIso, onDayChange, slotStartsAt,
         })}
       </View>
 
-      <StepHeading number="3" title={t('booking.slotTitle')} detail={t('booking.slotDetail')} />
+      <StepHeading number={String(firstNumber + 1)} title={t('booking.slotTitle')} detail={t('booking.slotDetail')} />
       {isPending ? (
         <ActivityIndicator color={colors.purple} />
       ) : (

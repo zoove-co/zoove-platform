@@ -25,7 +25,7 @@ export function TextField({ label, value, onChangeText, onBlur, placeholder, err
         onChangeText={onChangeText}
         onBlur={onBlur}
         placeholder={placeholder}
-        placeholderTextColor={colors.muted}
+        placeholderTextColor="rgba(8, 11, 15, 0.3)"
         keyboardType={keyboardType}
         style={[styles.input, error ? styles.inputError : null]}
       />

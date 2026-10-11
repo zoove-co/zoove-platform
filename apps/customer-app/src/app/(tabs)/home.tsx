@@ -142,7 +142,7 @@ export default function HomeScreen() {
           whenLabel={session.whenLabel}
           done={session.sessionsDoneThisWeek}
           goal={session.weeklyGoal}
-          onPress={() => openSoon('Upcoming session')}
+          onPress={() => router.push({ pathname: '/session/[id]', params: { id: session.id } })}
         />
       ) : null}
     </SafeAreaView>
