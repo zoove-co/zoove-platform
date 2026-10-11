@@ -74,7 +74,7 @@ export default function HomeScreen() {
               price={formatInr(data.instant.pricePaise)}
               onPress={() => {
                 track('booking_started', { mode: 'instant' });
-                openSoon(t('home.instantTitle'));
+                router.push({ pathname: '/booking', params: { mode: 'instant' } });
               }}
             />
             <ActionTile
@@ -85,7 +85,7 @@ export default function HomeScreen() {
               price={formatInr(data.scheduled.pricePaise)}
               onPress={() => {
                 track('booking_started', { mode: 'scheduled' });
-                openSoon(t('home.scheduleTitle'));
+                router.push({ pathname: '/booking', params: { mode: 'scheduled' } });
               }}
             />
           </View>
@@ -112,7 +112,7 @@ export default function HomeScreen() {
                 imageSource={serviceImages[service.slug]}
                 onPress={() => {
                   track('service_viewed', { service_slug: service.slug });
-                  openSoon(service.name);
+                  router.push({ pathname: '/service/[slug]', params: { slug: service.slug } });
                 }}
               />
             ))}
@@ -124,7 +124,7 @@ export default function HomeScreen() {
           originalPriceLabel={formatInr(data.demo.originalPricePaise)}
           onPress={() => {
             track('booking_started', { mode: 'demo' });
-            openSoon(t('home.demoTitle'));
+            router.push({ pathname: '/booking', params: { mode: 'demo' } });
           }}
         />
 
