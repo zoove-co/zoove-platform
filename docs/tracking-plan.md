@@ -29,6 +29,10 @@ Rules
 | packages_viewed | Packages entry tapped on Home | none |
 | academy_viewed | Academy card tapped | section (certified, programs, verified) |
 | notifications_opened | Bell tapped | none |
+| orders_viewed | Orders & History opened | none |
+| booking_repeated | Book again tapped on a past session | booking_id, service_slug |
+| streak_viewed | Streak tab opened | none |
+| account_viewed | Account tab opened | none |
 
 Retention triggers planned in CleverTap: started but not confirmed within 30 minutes; no booking within
 10 to 11 days of the last completed session; streak about to break.

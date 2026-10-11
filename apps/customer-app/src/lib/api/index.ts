@@ -7,6 +7,7 @@ export const api: Api = mockApi;
 export { ApiError } from './types';
 export type {
   ApiErrorCode,
+  AppNotification,
   Address,
   Api,
   Booking,

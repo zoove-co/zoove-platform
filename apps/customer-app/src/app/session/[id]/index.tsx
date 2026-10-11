@@ -77,7 +77,7 @@ export default function SessionDetailScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
-      <ScreenHeader title={t('session.title')} />
+      <ScreenHeader title={active ? t('session.title') : t('session.statusLabelTitleDone')} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <View style={styles.card}>
           <LinearGradient
@@ -108,6 +108,21 @@ export default function SessionDetailScreen() {
           />
           <DetailRow icon="location-outline" text={`${booking.addressLabel} · ${booking.areaLabel}`} />
         </View>
+
+        {!active ? (
+          <View style={styles.actions}>
+            <PrimaryButton
+              label={t('orders.bookAgain')}
+              onPress={() => {
+                track('booking_repeated', { booking_id: booking.id, service_slug: booking.serviceSlug });
+                router.push({
+                  pathname: '/service/[slug]',
+                  params: { slug: booking.serviceSlug },
+                });
+              }}
+            />
+          </View>
+        ) : null}
 
         {active ? (
           <View style={styles.actions}>

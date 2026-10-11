@@ -23,3 +23,7 @@ These block the booking, pricing and matching tables (migration 0002). Everythin
 12-18. New questions from the v1 prototype: see section 6 of `prototype-v1-analysis.md`
     (final visual direction, coach continuity, Online/Studio formats, instant 4-hour promise,
     package expiry, streak rules, Pilates vs HIIT).
+19. Demo offer (₹500): first booking only, once per customer, or unlimited? The mock allows it every time.
+20. Operating hours: can "Instant, within 4 hrs" be booked at night? Earliest and latest slot? Minimum lead time for scheduled slots (the mock only requires the slot to be in the future).
+21. Can a customer hold two instant bookings at once, and can they book two sessions in overlapping times for different services? The mock only blocks the exact same start time.
+22. Address delete: allowed while a session at that address is upcoming? The mock blocks it.

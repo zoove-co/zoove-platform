@@ -8,6 +8,7 @@ export type ApiErrorCode =
   | 'SLOT_CONFLICT'
   | 'NOT_SERVICEABLE'
   | 'ADDRESS_NOT_FOUND'
+  | 'ADDRESS_IN_USE'
   | 'NOT_FOUND'
   | 'CHANGE_WINDOW_CLOSED'
   | 'INVALID_REQUEST';
@@ -126,6 +127,16 @@ export interface HomeData {
   demo: { pricePaise: Paise; originalPricePaise: Paise };
   services: ServiceSummary[];
   upcomingSession: UpcomingSessionSummary | null;
+  weekly: { done: number; goal: number };
+}
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  body: string;
+  createdAt: string; // ISO 8601
+  read: boolean;
+  bookingId: string | null;
 }
 
 export interface Api {
@@ -133,6 +144,10 @@ export interface Api {
   getService(slug: string): Promise<ServiceDetail>;
   listAddresses(): Promise<Address[]>;
   addAddress(input: NewAddress): Promise<Address>;
+  setDefaultAddress(id: string): Promise<Address[]>;
+  deleteAddress(id: string): Promise<Address[]>;
+  listNotifications(): Promise<AppNotification[]>;
+  markNotificationsRead(): Promise<void>;
   getSlots(serviceSlug: string, isoDate: string): Promise<TimeSlot[]>;
   createBooking(input: BookingInput): Promise<BookingResult>;
   getBooking(id: string): Promise<Booking>;

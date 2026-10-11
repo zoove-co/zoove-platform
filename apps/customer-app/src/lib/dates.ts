@@ -29,6 +29,17 @@ export function formatClock(date: Date): string {
   return `${hours12}:${pad(date.getMinutes())} ${suffix}`;
 }
 
+// "5 min ago", "3 hrs ago", "2 days ago"
+export function formatAgo(iso: string, now: number = Date.now()): string {
+  const minutes = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000));
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} hr${hours === 1 ? '' : 's'} ago`;
+  const days = Math.round(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
+}
+
 // "Tue, 14 Oct · 7:00 AM"
 export function formatWhen(startsAt: string): string {
   const date = new Date(startsAt);

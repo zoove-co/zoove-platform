@@ -33,6 +33,7 @@ export function useCreateBooking() {
       Promise.all([
         queryClient.invalidateQueries({ queryKey: ['home'] }),
         queryClient.invalidateQueries({ queryKey: ['bookings'] }),
+        queryClient.invalidateQueries({ queryKey: ['notifications'] }),
       ]),
     // Slots may have changed under us (someone else took one); refetch either way.
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['slots'] }),
@@ -59,6 +60,7 @@ function useRefreshBookings() {
       queryClient.invalidateQueries({ queryKey: ['booking', id] }),
       queryClient.invalidateQueries({ queryKey: ['bookings'] }),
       queryClient.invalidateQueries({ queryKey: ['home'] }),
+      queryClient.invalidateQueries({ queryKey: ['notifications'] }),
     ]);
   };
 }

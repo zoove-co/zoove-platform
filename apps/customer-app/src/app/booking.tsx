@@ -1,6 +1,6 @@
 import { formatInr } from '@zoove/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -48,6 +48,22 @@ export default function BookingScreen() {
   const [step, setStep] = useState(0);
   const [result, setResult] = useState<BookingResult | null>(null);
 
+  // booking_abandoned: the customer got past step 0 but left without confirming.
+  const progress = useRef({ step: 0, confirmed: false });
+  useEffect(() => {
+    progress.current.step = step;
+    progress.current.confirmed = result !== null;
+  }, [step, result]);
+  useEffect(() => {
+    const current = progress.current;
+    return () => {
+      if (current.step > 0 && !current.confirmed) {
+        track('booking_abandoned', { last_step: current.step, mode });
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const scrollRef = useRef<ScrollView>(null);
   const scrollToEndNext = useRef(false);
 
@@ -56,7 +72,9 @@ export default function BookingScreen() {
   const idempotencyKey = useRef<string | null>(null);
   const format = service?.formats.find((item) => item.slug === formatSlug) ?? service?.formats[0];
   const defaultAddressId = addresses?.find((address) => address.isDefault)?.id ?? addresses?.[0]?.id;
-  const selectedAddress = addresses?.find((address) => address.id === (pickedAddressId ?? defaultAddressId));
+  const selectedAddress =
+    addresses?.find((address) => address.id === pickedAddressId) ??
+    addresses?.find((address) => address.id === defaultAddressId);
   const hours = home?.instant.etaHours ?? 4;
   const instant = mode === 'instant';
   const totalPaise = service?.pricePaise[mode];

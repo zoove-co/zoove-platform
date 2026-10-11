@@ -57,10 +57,10 @@ export default function HomeScreen() {
           hasUnread={data.hasUnreadNotifications}
           onBell={() => {
             track('notifications_opened');
-            openSoon('Notifications');
+            router.push('/notifications');
           }}
           onAvatar={() => router.navigate('/account')}
-          onLocation={() => openSoon('Addresses')}
+          onLocation={() => router.push('/addresses')}
         />
 
         <View style={styles.block}>

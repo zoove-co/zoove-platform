@@ -5,6 +5,7 @@ import { formatClock, formatWhen } from '@/lib/dates';
 import {
   ApiError,
   type Address,
+  type AppNotification,
   type Api,
   type Booking,
   type BookingMode,
@@ -27,7 +28,7 @@ const prices: Record<BookingMode, number> = {
 const home: HomeData = {
   customerFirstName: 'Pratik',
   locationLabel: 'Bandra West, Mumbai',
-  hasUnreadNotifications: true,
+  hasUnreadNotifications: false,
   instant: { etaHours: 4, pricePaise: prices.instant },
   scheduled: { pricePaise: prices.scheduled },
   demo: { pricePaise: prices.demo, originalPricePaise: rupeesToPaise(1500) },
@@ -38,6 +39,7 @@ const home: HomeData = {
     { slug: 'zumba', name: 'Zumba' },
   ],
   upcomingSession: null,
+  weekly: { done: 0, goal: 3 },
 };
 
 const serviceDetails: Record<string, ServiceDetail | undefined> = {
@@ -176,7 +178,7 @@ function slotsFor(isoDate: string): TimeSlot[] {
 // ---------------------------------------------------------------------------
 const CHANGE_WINDOW_MS = 2 * 60 * 60 * 1000;
 
-type BookingRecord = Omit<Booking, 'canChange'>;
+type BookingRecord = Omit<Booking, 'canChange'> & { addressId: string | null };
 
 const seedStart = new Date();
 seedStart.setDate(seedStart.getDate() + 2);
@@ -195,6 +197,7 @@ const bookingRecords: BookingRecord[] = [
     addressLabel: 'Home',
     areaLabel: 'Bandra West, Mumbai',
     totalPaise: prices.scheduled,
+    addressId: 'addr-home',
   },
 ];
 
@@ -222,6 +225,7 @@ function settle(): void {
         record.startsAt = startsAt;
         record.whenLabel = formatWhen(startsAt);
         matchTimers.delete(record.id);
+        notify('Coach matched', `Your ${record.serviceName} coach is on the way. ${record.whenLabel}.`, record.id);
       }
     }
   }
@@ -249,12 +253,47 @@ function isChangeable(record: BookingRecord): boolean {
   return new Date(record.startsAt).getTime() - Date.now() >= CHANGE_WINDOW_MS;
 }
 
-const toBooking = (record: BookingRecord): Booking => ({ ...record, canChange: isChangeable(record) });
+const toBooking = (record: BookingRecord): Booking => {
+  const { addressId: _addressId, ...rest } = record;
+  void _addressId;
+  return { ...rest, canChange: isChangeable(record) };
+};
+
+// ---------------------------------------------------------------------------
+// Notifications: the real backend writes these from outbox events (booking confirmed, coach
+// matched, cancelled). The mock does the same from inside the booking functions.
+// ---------------------------------------------------------------------------
+const notifications: AppNotification[] = [];
+
+function notify(title: string, body: string, bookingId: string | null): void {
+  notifications.unshift({
+    id: `ntf-${Date.now()}-${notifications.length}`,
+    title,
+    body,
+    createdAt: new Date().toISOString(),
+    read: false,
+    bookingId,
+  });
+}
 
 function findRecord(id: string): BookingRecord {
   const record = bookingRecords.find((item) => item.id === id);
   if (!record) throw new ApiError('NOT_FOUND', `Unknown booking: ${id}`);
   return record;
+}
+
+const WEEKLY_GOAL = 3;
+
+function completedThisWeek(): number {
+  const weekStart = new Date();
+  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7)); // Monday
+  return bookingRecords.filter(
+    (record) =>
+      record.status === 'completed' &&
+      record.startsAt !== null &&
+      new Date(record.startsAt).getTime() >= weekStart.getTime(),
+  ).length;
 }
 
 function upcomingFromBookings(): HomeData['upcomingSession'] {
@@ -268,28 +307,26 @@ function upcomingFromBookings(): HomeData['upcomingSession'] {
     });
   const next = active[0];
   if (!next) return null;
-  const weekStart = new Date();
-  weekStart.setHours(0, 0, 0, 0);
-  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7)); // Monday
-  const doneThisWeek = bookingRecords.filter(
-    (record) =>
-      record.status === 'completed' &&
-      record.startsAt !== null &&
-      new Date(record.startsAt).getTime() >= weekStart.getTime(),
-  ).length;
+  const doneThisWeek = completedThisWeek();
   return {
     id: next.id,
     serviceName: next.serviceName,
     whenLabel: next.whenLabel,
     sessionsDoneThisWeek: doneThisWeek,
-    weeklyGoal: 3,
+    weeklyGoal: WEEKLY_GOAL,
   };
 }
 
 export const mockApi: Api = {
   async getHome() {
     await wait(350);
-    return { ...home, upcomingSession: upcomingFromBookings() };
+    const upcomingSession = upcomingFromBookings();
+    return {
+      ...home,
+      hasUnreadNotifications: notifications.some((item) => !item.read),
+      upcomingSession,
+      weekly: { done: completedThisWeek(), goal: WEEKLY_GOAL },
+    };
   },
 
   async getService(slug) {
@@ -324,6 +361,39 @@ export const mockApi: Api = {
     };
     addresses.push(created);
     return created;
+  },
+
+  async setDefaultAddress(id) {
+    await wait(200);
+    if (!addresses.some((item) => item.id === id)) throw new ApiError('ADDRESS_NOT_FOUND');
+    for (const item of addresses) item.isDefault = item.id === id;
+    return [...addresses];
+  },
+
+  async deleteAddress(id) {
+    await wait(250);
+    settle();
+    const index = addresses.findIndex((item) => item.id === id);
+    if (index < 0) throw new ApiError('ADDRESS_NOT_FOUND');
+    const inUse = bookingRecords.some(
+      (record) => record.addressId === id && (record.status === 'confirmed' || record.status === 'matching'),
+    );
+    if (inUse) throw new ApiError('ADDRESS_IN_USE');
+    const [removed] = addresses.splice(index, 1);
+    // Never leave the customer without a default while addresses exist.
+    if (removed?.isDefault && addresses[0]) addresses[0].isDefault = true;
+    return [...addresses];
+  },
+
+  async listNotifications() {
+    await wait(150);
+    settle();
+    return notifications.map((item) => ({ ...item }));
+  },
+
+  async markNotificationsRead() {
+    await wait(100);
+    for (const item of notifications) item.read = true;
   },
 
   async getSlots(serviceSlug, isoDate) {
@@ -369,7 +439,15 @@ export const mockApi: Api = {
       addressLabel: address.label,
       areaLabel: address.area,
       totalPaise: result.totalPaise,
+      addressId: address.id,
     });
+    notify(
+      input.mode === 'instant' ? 'Finding your coach' : 'Booking confirmed',
+      input.mode === 'instant'
+        ? `We are matching you for ${detail.name}.`
+        : `${detail.name} on ${whenLabel}.`,
+      result.id,
+    );
     if (input.mode === 'instant') matchTimers.set(result.id, Date.now());
     createdByKey.set(input.idempotencyKey, result);
     return result;
@@ -395,6 +473,7 @@ export const mockApi: Api = {
     assertBookableSlot(startsAt, id);
     record.startsAt = startsAt;
     record.whenLabel = formatWhen(startsAt);
+    notify('Session rescheduled', `${record.serviceName} is now on ${record.whenLabel}.`, id);
     return toBooking(record);
   },
 
@@ -405,6 +484,7 @@ export const mockApi: Api = {
     if (!isChangeable(record)) throw new ApiError('CHANGE_WINDOW_CLOSED');
     record.status = 'cancelled';
     matchTimers.delete(id);
+    notify('Session cancelled', `Your ${record.serviceName} session was cancelled.`, id);
     return toBooking(record);
   },
 };

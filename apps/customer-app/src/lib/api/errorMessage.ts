@@ -13,6 +13,8 @@ export function bookingErrorMessage(error: unknown, t: TFunction): string {
         return t('booking.errorNotServiceable');
       case 'ADDRESS_NOT_FOUND':
         return t('booking.errorAddress');
+      case 'ADDRESS_IN_USE':
+        return t('addresses.inUse');
       case 'CHANGE_WINDOW_CLOSED':
         return t('session.changeError');
       default:
