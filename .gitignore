@@ -1,0 +1,29 @@
+node_modules/
+dist/
+build/
+.expo/
+.next/
+.turbo/
+coverage/
+*.log
+
+# Environment files: never commit real secrets
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Native build output (Expo prebuild)
+android/
+ios/
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/

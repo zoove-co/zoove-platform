@@ -1,0 +1,19 @@
+{
+  "name": "zoove-platform",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Zoove platform monorepo: customer app, trainer app, admin, API, shared packages, database migrations.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "pnpm -r --if-present run lint",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "test": "pnpm -r --if-present run test",
+    "build": "pnpm -r --if-present run build",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "prettier": "^3.3.0"
+  }
+}
