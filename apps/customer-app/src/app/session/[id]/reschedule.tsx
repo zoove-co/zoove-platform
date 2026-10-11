@@ -12,6 +12,8 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { TabFooter } from '@/components/ui/TabFooter';
 import { useBooking, useRescheduleBooking } from '@/features/booking/hooks';
 import { track } from '@/lib/analytics/track';
+import { ApiError } from '@/lib/api';
+import { bookingErrorMessage } from '@/lib/api/errorMessage';
 import { formatWhen, nextDays } from '@/lib/dates';
 import { colors, radius, spacing } from '@/theme';
 
@@ -19,17 +21,50 @@ export default function RescheduleScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data: booking, isPending } = useBooking(id);
+  const { data: booking, isPending, isError } = useBooking(id);
   const reschedule = useRescheduleBooking(id);
 
   const [dayIso, setDayIso] = useState(() => nextDays(1)[0]?.iso ?? '');
   const [slotStartsAt, setSlotStartsAt] = useState<string | undefined>();
   const [updatedLabel, setUpdatedLabel] = useState<string | null>(null);
 
+  if (isError && !booking) {
+    return (
+      <SafeAreaView style={styles.screen} edges={['top']}>
+        <ScreenHeader title={t('session.rescheduleTitle')} />
+        <View style={styles.center}>
+          <AppText variant="heading">{t('session.notFound')}</AppText>
+        </View>
+        <TabFooter />
+      </SafeAreaView>
+    );
+  }
+
   if (isPending || !booking) {
     return (
       <SafeAreaView style={styles.center}>
         <ActivityIndicator color={colors.purple} />
+      </SafeAreaView>
+    );
+  }
+
+  // Deep link or stale screen: only a changeable, scheduled session can be rescheduled.
+  if (!updatedLabel && (!booking.canChange || booking.mode === 'instant' || booking.status !== 'confirmed')) {
+    return (
+      <SafeAreaView style={styles.screen} edges={['top']}>
+        <ScreenHeader title={t('session.rescheduleTitle')} />
+        <View style={styles.center}>
+          <AppText variant="bodyStrong" style={styles.closedText}>
+            {t('session.changeError')}
+          </AppText>
+        </View>
+        <View style={styles.footer}>
+          <PrimaryButton
+            label={t('session.done')}
+            onPress={() => router.replace({ pathname: '/session/[id]', params: { id: booking.id } })}
+          />
+        </View>
+        <TabFooter />
       </SafeAreaView>
     );
   }
@@ -57,7 +92,13 @@ export default function RescheduleScreen() {
 
   const onConfirm = () => {
     if (!slotStartsAt) return;
+    if (reschedule.isPending) return;
     reschedule.mutate(slotStartsAt, {
+      onError: (error) => {
+        if (error instanceof ApiError && (error.code === 'SLOT_UNAVAILABLE' || error.code === 'SLOT_CONFLICT')) {
+          setSlotStartsAt(undefined);
+        }
+      },
       onSuccess: (updated) => {
         track('booking_rescheduled', { booking_id: updated.id });
         setUpdatedLabel(updated.whenLabel);
@@ -101,7 +142,7 @@ export default function RescheduleScreen() {
 
         {reschedule.isError ? (
           <AppText variant="caption" color={colors.danger}>
-            {t('session.changeError')}
+            {bookingErrorMessage(reschedule.error, t)}
           </AppText>
         ) : null}
       </ScrollView>
@@ -124,6 +165,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   content: { padding: 17, paddingBottom: spacing.xxl, gap: 22 },
   successWrap: { flex: 1 },
+  closedText: { textAlign: 'center', paddingHorizontal: 24 },
   current: {
     gap: 3,
     padding: 14,

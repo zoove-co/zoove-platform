@@ -3,6 +3,25 @@ import type { Paise } from '@zoove/shared';
 // The contract between the app and the backend. The mock implements it today;
 // an HTTP client generated from the NestJS OpenAPI spec will replace it (decision D11).
 
+export type ApiErrorCode =
+  | 'SLOT_UNAVAILABLE'
+  | 'SLOT_CONFLICT'
+  | 'NOT_SERVICEABLE'
+  | 'ADDRESS_NOT_FOUND'
+  | 'NOT_FOUND'
+  | 'CHANGE_WINDOW_CLOSED'
+  | 'INVALID_REQUEST';
+
+// Every API failure carries a stable code so screens can show a specific message.
+export class ApiError extends Error {
+  readonly code: ApiErrorCode;
+  constructor(code: ApiErrorCode, message?: string) {
+    super(message ?? code);
+    this.name = 'ApiError';
+    this.code = code;
+  }
+}
+
 export type BookingMode = 'instant' | 'scheduled' | 'demo';
 export type Participant = 'personal' | 'duo' | 'loved_one' | 'group';
 
@@ -59,6 +78,8 @@ export interface BookingInput {
   participant: Participant;
   addressId: string;
   startsAt?: string;
+  // Same key = same booking. A retry after a dropped connection must never double-book.
+  idempotencyKey: string;
 }
 
 export interface BookingResult {

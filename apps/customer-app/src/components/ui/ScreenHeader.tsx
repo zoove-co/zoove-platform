@@ -12,7 +12,7 @@ export function ScreenHeader({ title }: { title: string }) {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Back"
-        onPress={() => router.back()}
+        onPress={() => (router.canGoBack() ? router.back() : router.replace('/home'))}
         style={styles.back}>
         <Icon name="chevron-back" size={18} color={colors.ink} />
       </Pressable>

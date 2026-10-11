@@ -1,8 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Controller, useForm, type Control } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View, type KeyboardTypeOptions } from 'react-native';
+
+import { AppText } from '@/components/ui/AppText';
 
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { TextField } from '@/components/ui/TextField';
@@ -46,6 +48,7 @@ export function AddressForm({ onSaved, onCancel }: Props) {
   const { t } = useTranslation();
   const schema = useMemo(() => buildAddressSchema((key) => t(key)), [t]);
   const addAddress = useAddAddress();
+  const [failed, setFailed] = useState(false);
   const {
     control,
     handleSubmit,
@@ -56,8 +59,13 @@ export function AddressForm({ onSaved, onCancel }: Props) {
   });
 
   const submit = handleSubmit(async (values) => {
-    const created = await addAddress.mutateAsync(values);
-    onSaved(created);
+    setFailed(false);
+    try {
+      const created = await addAddress.mutateAsync(values);
+      onSaved(created);
+    } catch {
+      setFailed(true);
+    }
   });
 
   return (
@@ -73,6 +81,11 @@ export function AddressForm({ onSaved, onCancel }: Props) {
         error={errors.pincode?.message}
         keyboardType="number-pad"
       />
+      {failed ? (
+        <AppText variant="caption" color={colors.danger}>
+          {t('booking.addressError')}
+        </AppText>
+      ) : null}
       <PrimaryButton label={t('booking.saveAddress')} loading={addAddress.isPending} onPress={() => void submit()} />
       <PrimaryButton label={t('booking.cancelAddAddress')} variant="soft" onPress={onCancel} />
     </View>

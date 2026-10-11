@@ -23,7 +23,7 @@ export default function SoonScreen() {
           {title ?? t('soon.title')}
         </AppText>
         <AppText color={colors.muted}>{t('soon.body')}</AppText>
-        <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.button}>
+        <Pressable accessibilityRole="button" onPress={() => (router.canGoBack() ? router.back() : router.replace('/home'))} style={styles.button}>
           <AppText variant="bodyStrong" color={colors.white}>
             {t('soon.back')}
           </AppText>

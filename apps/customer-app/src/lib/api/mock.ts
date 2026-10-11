@@ -2,15 +2,16 @@ import { rupeesToPaise } from '@zoove/shared';
 
 import { formatClock, formatWhen } from '@/lib/dates';
 
-import type {
-  Address,
-  Api,
-  Booking,
-  BookingMode,
-  BookingResult,
-  HomeData,
-  ServiceDetail,
-  TimeSlot,
+import {
+  ApiError,
+  type Address,
+  type Api,
+  type Booking,
+  type BookingMode,
+  type BookingResult,
+  type HomeData,
+  type ServiceDetail,
+  type TimeSlot,
 } from './types';
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -197,6 +198,51 @@ const bookingRecords: BookingRecord[] = [
   },
 ];
 
+// A session is treated as done one hour after it starts.
+const SESSION_LENGTH_MS = 60 * 60 * 1000;
+// Mock matching: an instant booking is "accepted" by a coach after this delay.
+const MATCH_DELAY_MS = 15_000;
+const MATCH_ARRIVAL_MS = 90 * 60 * 1000;
+
+const matchTimers = new Map<string, number>();
+const createdByKey = new Map<string, BookingResult>();
+
+// Brings stored records up to date with the clock, the way the real API would.
+function settle(): void {
+  const now = Date.now();
+  for (const record of bookingRecords) {
+    if (record.status === 'confirmed' && record.startsAt) {
+      if (new Date(record.startsAt).getTime() + SESSION_LENGTH_MS <= now) record.status = 'completed';
+    }
+    if (record.status === 'matching') {
+      const created = matchTimers.get(record.id);
+      if (created !== undefined && now - created >= MATCH_DELAY_MS) {
+        const startsAt = new Date(now + MATCH_ARRIVAL_MS).toISOString();
+        record.status = 'confirmed';
+        record.startsAt = startsAt;
+        record.whenLabel = formatWhen(startsAt);
+        matchTimers.delete(record.id);
+      }
+    }
+  }
+}
+
+function hasConflict(startsAt: string, ignoreId?: string): boolean {
+  return bookingRecords.some(
+    (record) =>
+      record.id !== ignoreId &&
+      (record.status === 'confirmed' || record.status === 'matching') &&
+      record.startsAt === startsAt,
+  );
+}
+
+function assertBookableSlot(startsAt: string | undefined, ignoreId?: string): string {
+  if (!startsAt || Number.isNaN(new Date(startsAt).getTime())) throw new ApiError('INVALID_REQUEST');
+  if (new Date(startsAt).getTime() <= Date.now()) throw new ApiError('SLOT_UNAVAILABLE');
+  if (hasConflict(startsAt, ignoreId)) throw new ApiError('SLOT_CONFLICT');
+  return startsAt;
+}
+
 function isChangeable(record: BookingRecord): boolean {
   if (record.status === 'matching') return true;
   if (record.status !== 'confirmed' || !record.startsAt) return false;
@@ -207,11 +253,12 @@ const toBooking = (record: BookingRecord): Booking => ({ ...record, canChange: i
 
 function findRecord(id: string): BookingRecord {
   const record = bookingRecords.find((item) => item.id === id);
-  if (!record) throw new Error(`Unknown booking: ${id}`);
+  if (!record) throw new ApiError('NOT_FOUND', `Unknown booking: ${id}`);
   return record;
 }
 
 function upcomingFromBookings(): HomeData['upcomingSession'] {
+  settle();
   const active = bookingRecords
     .filter((record) => record.status === 'matching' || record.status === 'confirmed')
     .sort((a, b) => {
@@ -221,11 +268,20 @@ function upcomingFromBookings(): HomeData['upcomingSession'] {
     });
   const next = active[0];
   if (!next) return null;
+  const weekStart = new Date();
+  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7)); // Monday
+  const doneThisWeek = bookingRecords.filter(
+    (record) =>
+      record.status === 'completed' &&
+      record.startsAt !== null &&
+      new Date(record.startsAt).getTime() >= weekStart.getTime(),
+  ).length;
   return {
     id: next.id,
     serviceName: next.serviceName,
     whenLabel: next.whenLabel,
-    sessionsDoneThisWeek: 2,
+    sessionsDoneThisWeek: doneThisWeek,
     weeklyGoal: 3,
   };
 }
@@ -239,7 +295,7 @@ export const mockApi: Api = {
   async getService(slug) {
     await wait(200);
     const detail = serviceDetails[slug];
-    if (!detail) throw new Error(`Unknown service: ${slug}`);
+    if (!detail) throw new ApiError('NOT_FOUND', `Unknown service: ${slug}`);
     return detail;
   },
 
@@ -250,15 +306,21 @@ export const mockApi: Api = {
 
   async addAddress(input) {
     await wait(300);
+    const duplicate = addresses.find(
+      (item) =>
+        item.line.trim().toLowerCase() === input.line.trim().toLowerCase() &&
+        item.pincode === input.pincode.trim(),
+    );
+    if (duplicate) return duplicate;
     const created: Address = {
       id: `addr-${Date.now()}`,
-      label: input.label,
-      line: input.line,
-      area: input.area,
-      pincode: input.pincode,
+      label: input.label.trim(),
+      line: input.line.trim(),
+      area: input.area.trim(),
+      pincode: input.pincode.trim(),
       isDefault: false,
       // Mock rule: Mumbai PIN codes (400xxx) are inside an active cluster, everything else is not yet.
-      serviceable: input.pincode.startsWith('400'),
+      serviceable: /^400\d{3}$/.test(input.pincode.trim()),
     };
     addresses.push(created);
     return created;
@@ -271,8 +333,15 @@ export const mockApi: Api = {
 
   async createBooking(input) {
     await wait(600);
+    settle();
+    const replay = createdByKey.get(input.idempotencyKey);
+    if (replay) return replay;
     const detail = serviceDetails[input.serviceSlug];
-    if (!detail) throw new Error(`Unknown service: ${input.serviceSlug}`);
+    if (!detail) throw new ApiError('NOT_FOUND', `Unknown service: ${input.serviceSlug}`);
+    const address = addresses.find((item) => item.id === input.addressId);
+    if (!address) throw new ApiError('ADDRESS_NOT_FOUND');
+    if (!address.serviceable) throw new ApiError('NOT_SERVICEABLE');
+    if (input.mode !== 'instant') assertBookableSlot(input.startsAt);
     const format = detail.formats.find((item) => item.slug === input.formatSlug) ?? detail.formats[0];
     const whenLabel =
       input.mode === 'instant'
@@ -288,7 +357,6 @@ export const mockApi: Api = {
       whenLabel,
       totalPaise: detail.pricePaise[input.mode],
     };
-    const address = addresses.find((item) => item.id === input.addressId);
     bookingRecords.push({
       id: result.id,
       serviceSlug: detail.slug,
@@ -298,27 +366,33 @@ export const mockApi: Api = {
       status: input.mode === 'instant' ? 'matching' : 'confirmed',
       startsAt: input.mode === 'instant' ? null : (input.startsAt ?? null),
       whenLabel,
-      addressLabel: address?.label ?? 'Home',
-      areaLabel: address?.area ?? '',
+      addressLabel: address.label,
+      areaLabel: address.area,
       totalPaise: result.totalPaise,
     });
+    if (input.mode === 'instant') matchTimers.set(result.id, Date.now());
+    createdByKey.set(input.idempotencyKey, result);
     return result;
   },
 
   async getBooking(id) {
     await wait(150);
+    settle();
     return toBooking(findRecord(id));
   },
 
   async listBookings() {
     await wait(200);
+    settle();
     return [...bookingRecords].reverse().map(toBooking);
   },
 
   async rescheduleBooking(id, startsAt) {
     await wait(400);
+    settle();
     const record = findRecord(id);
-    if (record.mode === 'instant' || !isChangeable(record)) throw new Error('CHANGE_WINDOW_CLOSED');
+    if (record.mode === 'instant' || !isChangeable(record)) throw new ApiError('CHANGE_WINDOW_CLOSED');
+    assertBookableSlot(startsAt, id);
     record.startsAt = startsAt;
     record.whenLabel = formatWhen(startsAt);
     return toBooking(record);
@@ -326,9 +400,11 @@ export const mockApi: Api = {
 
   async cancelBooking(id) {
     await wait(400);
+    settle();
     const record = findRecord(id);
-    if (!isChangeable(record)) throw new Error('CHANGE_WINDOW_CLOSED');
+    if (!isChangeable(record)) throw new ApiError('CHANGE_WINDOW_CLOSED');
     record.status = 'cancelled';
+    matchTimers.delete(id);
     return toBooking(record);
   },
 };

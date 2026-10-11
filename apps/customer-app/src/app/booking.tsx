@@ -2,7 +2,7 @@ import { formatInr } from '@zoove/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AddressPicker } from '@/components/booking/AddressPicker';
@@ -19,11 +19,14 @@ import { TabFooter } from '@/components/ui/TabFooter';
 import { useAddresses, useCreateBooking, useService } from '@/features/booking/hooks';
 import { useHomeData } from '@/features/home/useHomeData';
 import { track } from '@/lib/analytics/track';
-import type { Address, BookingMode, BookingResult, Participant } from '@/lib/api';
+import { bookingErrorMessage } from '@/lib/api/errorMessage';
+import { ApiError, type Address, type BookingMode, type BookingResult, type Participant } from '@/lib/api';
 import { formatWhen, nextDays } from '@/lib/dates';
 import { colors, spacing } from '@/theme';
 
 const LAST_STEP = 3;
+
+const newKey = () => `bk-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 export default function BookingScreen() {
   const { t } = useTranslation();
@@ -48,7 +51,9 @@ export default function BookingScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const scrollToEndNext = useRef(false);
 
-  const { data: service } = useService(serviceSlug);
+  const { data: service, isError: serviceFailed, refetch: refetchService } = useService(serviceSlug);
+  // One key per booking attempt on this screen: a retry cannot create a second booking.
+  const idempotencyKey = useRef<string | null>(null);
   const format = service?.formats.find((item) => item.slug === formatSlug) ?? service?.formats[0];
   const defaultAddressId = addresses?.find((address) => address.isDefault)?.id ?? addresses?.[0]?.id;
   const selectedAddress = addresses?.find((address) => address.id === (pickedAddressId ?? defaultAddressId));
@@ -60,7 +65,9 @@ export default function BookingScreen() {
   const canAdvance =
     step === 0
       ? participant === 'personal'
-      : step === 1
+      : participant !== 'personal'
+        ? false
+        : step === 1
         ? Boolean(service && format)
         : step === 2
           ? Boolean(selectedAddress?.serviceable) && (instant || Boolean(slotStartsAt))
@@ -92,7 +99,8 @@ export default function BookingScreen() {
   };
 
   const onConfirm = () => {
-    if (!service || !format || !selectedAddress) return;
+    if (createBooking.isPending || !service || !format || !selectedAddress) return;
+    idempotencyKey.current ??= newKey();
     createBooking.mutate(
       {
         serviceSlug,
@@ -101,6 +109,7 @@ export default function BookingScreen() {
         participant,
         addressId: selectedAddress.id,
         startsAt: instant ? undefined : slotStartsAt,
+        idempotencyKey: idempotencyKey.current,
       },
       {
         onSuccess: (booking) => {
@@ -110,6 +119,15 @@ export default function BookingScreen() {
             amount_paise: booking.totalPaise,
           });
           setResult(booking);
+        },
+        onError: (error) => {
+          // A slot problem means the chosen time is no good any more: make the customer pick again.
+          if (error instanceof ApiError && (error.code === 'SLOT_UNAVAILABLE' || error.code === 'SLOT_CONFLICT')) {
+            setSlotStartsAt(undefined);
+            setStep(2);
+          }
+          // A rejected request gets a fresh key; a dropped connection keeps its key so the retry is safe.
+          if (error instanceof ApiError) idempotencyKey.current = null;
         },
       },
     );
@@ -160,6 +178,9 @@ export default function BookingScreen() {
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <ScreenHeader title={t('booking.title')} />
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
@@ -234,8 +255,17 @@ export default function BookingScreen() {
 
         {createBooking.isError ? (
           <AppText variant="caption" color={colors.danger}>
-            {t('booking.error')}
+            {bookingErrorMessage(createBooking.error, t)}
           </AppText>
+        ) : null}
+
+        {serviceFailed ? (
+          <View style={styles.instantBox}>
+            <AppText variant="caption" color={colors.danger}>
+              {t('booking.serviceError')}
+            </AppText>
+            <PrimaryButton label={t('booking.retry')} variant="soft" onPress={() => void refetchService()} />
+          </View>
         ) : null}
       </ScrollView>
 
@@ -247,6 +277,7 @@ export default function BookingScreen() {
           onPress={onPrimary}
         />
       </View>
+      </KeyboardAvoidingView>
       <TabFooter />
     </SafeAreaView>
   );
@@ -257,6 +288,7 @@ const styles = StyleSheet.create({
   content: { padding: 17, paddingBottom: spacing.xxl, gap: 22 },
   instantBox: { gap: 10 },
   successWrap: { flex: 1 },
+  flex: { flex: 1 },
   footer: {
     paddingHorizontal: 18,
     paddingVertical: 10,

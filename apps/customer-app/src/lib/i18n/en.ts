@@ -96,6 +96,12 @@ export const en = {
     successInstantBody:
       'We are matching you with a coach. You will get a notification as soon as one accepts.',
     error: 'Something went wrong while booking. Please try again.',
+    errorSlotTaken: 'That time was just taken or has passed. Please pick another slot.',
+    errorNotServiceable: 'We are not in this area yet. Please choose another address.',
+    errorAddress: 'We could not find that address. Please choose it again.',
+    addressError: 'We could not save this address. Please try again.',
+    serviceError: 'We could not load this service.',
+    retry: 'Try again',
     prototypeNote: 'Prototype booking · no payment is taken yet.',
   },
   session: {
@@ -116,6 +122,8 @@ export const en = {
     support: 'Contact support',
     notFound: 'We could not find this session',
     changeError: 'This session can no longer be changed.',
+    errorSlotTaken: 'That time was just taken or has passed. Please pick another slot.',
+    errorGeneric: 'Something went wrong. Please try again.',
     rescheduleTitle: 'Reschedule',
     currentBooking: 'CURRENT BOOKING',
     rescheduleCta: 'Confirm new time',

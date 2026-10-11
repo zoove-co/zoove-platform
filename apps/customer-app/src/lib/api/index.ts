@@ -4,7 +4,9 @@ import type { Api } from './types';
 // Switch to the HTTP client here once the NestJS API exists. Screens never import the mock.
 export const api: Api = mockApi;
 
+export { ApiError } from './types';
 export type {
+  ApiErrorCode,
   Address,
   Api,
   Booking,

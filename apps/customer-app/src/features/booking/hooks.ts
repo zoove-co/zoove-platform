@@ -29,12 +29,23 @@ export function useCreateBooking() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: BookingInput) => api.createBooking(input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['home'] }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['home'] }),
+        queryClient.invalidateQueries({ queryKey: ['bookings'] }),
+      ]),
+    // Slots may have changed under us (someone else took one); refetch either way.
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['slots'] }),
   });
 }
 
 export function useBooking(id: string) {
-  return useQuery({ queryKey: ['booking', id], queryFn: () => api.getBooking(id) });
+  return useQuery({
+    queryKey: ['booking', id],
+    queryFn: () => api.getBooking(id),
+    // While a coach is being matched, keep checking so the screen updates by itself.
+    refetchInterval: (query) => (query.state.data?.status === 'matching' ? 5000 : false),
+  });
 }
 
 export function useBookings() {
@@ -57,6 +68,7 @@ export function useRescheduleBooking(id: string) {
   return useMutation({
     mutationFn: (startsAt: string) => api.rescheduleBooking(id, startsAt),
     onSuccess: () => refresh(id),
+    onError: () => refresh(id),
   });
 }
 
@@ -65,5 +77,6 @@ export function useCancelBooking(id: string) {
   return useMutation({
     mutationFn: () => api.cancelBooking(id),
     onSuccess: () => refresh(id),
+    onError: () => refresh(id),
   });
 }
