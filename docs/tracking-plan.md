@@ -26,6 +26,9 @@ Rules
 | session_completed | End code accepted | booking_id |
 | booking_rescheduled | Time changed | booking_id |
 | booking_cancelled | Booking cancelled | booking_id, reason |
+| packages_viewed | Packages entry tapped on Home | none |
+| academy_viewed | Academy card tapped | section (certified, programs, verified) |
+| notifications_opened | Bell tapped | none |
 
 Retention triggers planned in CleverTap: started but not confirmed within 30 minutes; no booking within
 10 to 11 days of the last completed session; streak about to break.

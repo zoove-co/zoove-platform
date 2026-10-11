@@ -27,3 +27,6 @@ ios/
 # Supabase local
 supabase/.branches/
 supabase/.temp/
+
+# Expo template leftovers
+apps/customer-app/example/
