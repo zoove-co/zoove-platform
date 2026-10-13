@@ -72,7 +72,7 @@ export default function BookingScreen() {
 
   const { data: service, isError: serviceFailed, refetch: refetchService } = useService(serviceSlug);
   // One key per booking attempt on this screen: a retry cannot create a second booking.
-  const idempotencyKey = useRef<string | null>(null);
+  const idempotencyKey = useRef<{ key: string; signature: string } | null>(null);
   const format = service?.formats.find((item) => item.slug === formatSlug) ?? service?.formats[0];
   const defaultAddressId = addresses?.find((address) => address.isDefault)?.id ?? addresses?.[0]?.id;
   const selectedAddress =
@@ -125,7 +125,11 @@ export default function BookingScreen() {
 
   const onConfirm = () => {
     if (createBooking.isPending || !service || !format || !selectedAddress) return;
-    idempotencyKey.current ??= newKey();
+    // The key belongs to one exact request: if anything was changed after a dropped connection, use a new key.
+    const signature = [serviceSlug, format.slug, mode, selectedAddress.id, instant ? '' : slotStartsAt, chosenCoach?.id].join('|');
+    if (!idempotencyKey.current || idempotencyKey.current.signature !== signature) {
+      idempotencyKey.current = { key: newKey(), signature };
+    }
     createBooking.mutate(
       {
         serviceSlug,
@@ -135,7 +139,7 @@ export default function BookingScreen() {
         addressId: selectedAddress.id,
         startsAt: instant ? undefined : slotStartsAt,
         preferredCoachId: showCoachPicker ? chosenCoach?.id : undefined,
-        idempotencyKey: idempotencyKey.current,
+        idempotencyKey: idempotencyKey.current.key,
       },
       {
         onSuccess: (booking) => {

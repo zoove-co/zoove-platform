@@ -1,6 +1,6 @@
 import { rupeesToPaise } from '@zoove/shared';
 
-import { formatClock, formatWhen } from '@/lib/dates';
+import { formatClock, formatWhen, toIsoDate } from '@/lib/dates';
 
 import { isActiveStatus } from './status';
 
@@ -218,7 +218,7 @@ function slotsFor(isoDate: string): TimeSlot[] {
       id: `${isoDate}-${time}`,
       startsAt: start.toISOString(),
       label: formatClock(start),
-      available: start.getTime() > Date.now(),
+      available: start.getTime() > Date.now() && !hasConflict(start.toISOString()),
     };
   });
 }
@@ -731,6 +731,72 @@ export const mockApi: Api = {
   async listPackages() {
     await wait(200);
     return packages.map((item) => ({ ...item }));
+  },
+
+  async getStreak() {
+    await wait(250);
+    settle();
+    const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const monday = new Date();
+    monday.setHours(0, 0, 0, 0);
+    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+    const todayIso = toIsoDate(new Date());
+    const completed = bookingRecords.filter((r) => r.status === 'completed' && r.startsAt !== null);
+    const onDay = (iso: string, list: BookingRecord[]) =>
+      list.some((r) => r.startsAt !== null && toIsoDate(new Date(r.startsAt)) === iso);
+    const active = bookingRecords.filter((r) => isActiveStatus(r.status) && r.startsAt !== null);
+
+    const weekDays = WEEKDAY_LABELS.map((weekday, index) => {
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + index);
+      const iso = toIsoDate(date);
+      const state: 'completed' | 'booked' | 'none' = onDay(iso, completed)
+        ? 'completed'
+        : onDay(iso, active)
+          ? 'booked'
+          : 'none';
+      return { iso, weekday, dayOfMonth: date.getDate(), state, isToday: iso === todayIso };
+    });
+
+    // Consecutive weeks (newest first) with at least one completed session. The current week only
+    // counts if it already has one, but an empty current week does not break a running streak.
+    const weekHas = (offset: number) => {
+      const start = new Date(monday);
+      start.setDate(start.getDate() - offset * 7);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 7);
+      return completed.some((r) => {
+        const time = new Date(r.startsAt as string).getTime();
+        return time >= start.getTime() && time < end.getTime();
+      });
+    };
+    let weekStreak = 0;
+    for (let offset = weekHas(0) ? 0 : 1; weekHas(offset); offset += 1) weekStreak += 1;
+
+    const bySlug = new Map<string, { serviceName: string; sessions: number }>();
+    for (const r of completed) {
+      const entry = bySlug.get(r.serviceSlug) ?? { serviceName: r.serviceName, sessions: 0 };
+      entry.sessions += 1;
+      bySlug.set(r.serviceSlug, entry);
+    }
+    const focusAreas = [...bySlug.entries()]
+      .map(([serviceSlug, value]) => ({ serviceSlug, ...value }))
+      .sort((a, b) => b.sessions - a.sessions);
+
+    const recentSessions = [...completed]
+      .sort((a, b) => new Date(b.startsAt as string).getTime() - new Date(a.startsAt as string).getTime())
+      .slice(0, 3)
+      .map(toBooking);
+
+    return {
+      weekDays,
+      sessionsThisWeek: completedThisWeek(),
+      weeklyGoal: WEEKLY_GOAL,
+      totalSessions: completed.length,
+      weekStreak,
+      focusAreas,
+      recentSessions,
+    };
   },
 
   async savePartyPlan(input) {

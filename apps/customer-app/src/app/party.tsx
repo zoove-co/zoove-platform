@@ -167,7 +167,7 @@ export default function PartyScreen() {
               }}
               slotStartsAt={slotStartsAt}
               onSlotChange={setSlotStartsAt}
-              firstNumber={1}
+              numbered={false}
             />
             <View style={styles.where}>
               <View style={styles.modes}>
@@ -175,7 +175,7 @@ export default function PartyScreen() {
                 <Mode label={`${t('party.studio')} · ${t('booking.soon')}`} />
                 <Mode label={`${t('party.online')} · ${t('booking.soon')}`} />
               </View>
-              <AddressPicker stepNumber="3" selectedId={address?.id} onSelect={setAddress} />
+              <AddressPicker selectedId={address?.id} onSelect={setAddress} />
             </View>
           </>
         ) : null}

@@ -50,6 +50,7 @@ export function useCreateBooking() {
       Promise.all([
         queryClient.invalidateQueries({ queryKey: ['home'] }),
         queryClient.invalidateQueries({ queryKey: ['bookings'] }),
+        queryClient.invalidateQueries({ queryKey: ['streak'] }),
         queryClient.invalidateQueries({ queryKey: ['notifications'] }),
       ]),
     // Slots may have changed under us (someone else took one); refetch either way.
@@ -79,6 +80,10 @@ export function usePastCoaches() {
   return useQuery({ queryKey: ['past-coaches'], queryFn: () => api.listPastCoaches() });
 }
 
+export function useStreak() {
+  return useQuery({ queryKey: ['streak'], queryFn: () => api.getStreak() });
+}
+
 export function useSavePartyPlan() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -98,6 +103,7 @@ function useRefreshBookings() {
       queryClient.invalidateQueries({ queryKey: ['booking', id] }),
       queryClient.invalidateQueries({ queryKey: ['bookings'] }),
       queryClient.invalidateQueries({ queryKey: ['home'] }),
+      queryClient.invalidateQueries({ queryKey: ['streak'] }),
       queryClient.invalidateQueries({ queryKey: ['notifications'] }),
     ]);
   };

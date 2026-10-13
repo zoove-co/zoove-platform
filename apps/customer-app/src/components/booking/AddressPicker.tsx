@@ -11,7 +11,7 @@ import type { Address } from '@/lib/api';
 import { colors, radius, spacing } from '@/theme';
 
 type Props = {
-  stepNumber: string;
+  stepNumber?: string;
   selectedId: string | undefined;
   onSelect: (address: Address) => void;
 };

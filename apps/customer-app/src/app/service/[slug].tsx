@@ -66,7 +66,7 @@ export default function ServiceDetailScreen() {
           colors={heroImage ? ['rgba(8, 11, 15, 0.05)', colors.overlay] : [colors.purple, colors.supportingPurple]}
           start={heroImage ? { x: 0.5, y: 0.3 } : { x: 0, y: 0 }}
           end={heroImage ? { x: 0.5, y: 1 } : { x: 1, y: 1 }}
-          style={[styles.hero, heroImage && styles.heroPhoto]}>
+          style={[styles.hero, heroImage ? styles.heroPhoto : undefined]}>
           {heroImage ? <Image source={heroImage} contentFit="cover" style={styles.heroImage} /> : null}
           <AppText variant="screenTitle" color={colors.white}>
             {service.name}

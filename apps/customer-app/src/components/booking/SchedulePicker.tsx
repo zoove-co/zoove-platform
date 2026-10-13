@@ -14,6 +14,8 @@ type Props = {
   onDayChange: (iso: string) => void;
   slotStartsAt: string | undefined;
   onSlotChange: (startsAt: string) => void;
+  // Pass false inside a flow that already shows its own step counter.
+  numbered?: boolean;
   firstNumber?: number;
 };
 
@@ -24,6 +26,7 @@ export function SchedulePicker({
   slotStartsAt,
   onSlotChange,
   firstNumber = 2,
+  numbered = true,
 }: Props) {
   const { t } = useTranslation();
   const days = useMemo(() => nextDays(7), []);
@@ -32,7 +35,7 @@ export function SchedulePicker({
 
   return (
     <View style={styles.wrap}>
-      <StepHeading number={String(firstNumber)} title={t('booking.dateTitle')} />
+      <StepHeading number={numbered ? String(firstNumber) : undefined} title={t('booking.dateTitle')} />
       <View style={styles.dayRow}>
         {days.map((day) => {
           const selected = day.iso === dayIso;
@@ -57,7 +60,11 @@ export function SchedulePicker({
         })}
       </View>
 
-      <StepHeading number={String(firstNumber + 1)} title={t('booking.slotTitle')} detail={t('booking.slotDetail')} />
+      <StepHeading
+        number={numbered ? String(firstNumber + 1) : undefined}
+        title={t('booking.slotTitle')}
+        detail={t('booking.slotDetail')}
+      />
       {isPending ? (
         <ActivityIndicator color={colors.purple} />
       ) : (

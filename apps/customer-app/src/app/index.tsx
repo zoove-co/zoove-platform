@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     color: colors.ink,
   },
-  inputWeb: { outlineStyle: 'none' } as TextStyle,
+  inputWeb: { outlineStyle: 'none' } as unknown as TextStyle,
   actions: { gap: spacing.md },
   legal: { textAlign: 'center' },
 });

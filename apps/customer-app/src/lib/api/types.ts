@@ -224,6 +224,34 @@ export interface PartyPlan extends PartyPlanInput {
   createdAt: string;
 }
 
+export type StreakDayState = 'completed' | 'booked' | 'none';
+
+export interface StreakDay {
+  iso: string;
+  weekday: string;
+  dayOfMonth: number;
+  state: StreakDayState;
+  isToday: boolean;
+}
+
+export interface FocusArea {
+  serviceSlug: string;
+  serviceName: string;
+  sessions: number;
+}
+
+// Computed by the server. A "week streak" counts consecutive weeks with at least one completed session
+// (assumption, open question 46). Streak data is always derived from bookings; the app never counts.
+export interface StreakData {
+  weekDays: StreakDay[];
+  sessionsThisWeek: number;
+  weeklyGoal: number;
+  totalSessions: number;
+  weekStreak: number;
+  focusAreas: FocusArea[];
+  recentSessions: Booking[];
+}
+
 export interface Api {
   // Tells the API which session this device holds (null = signed out).
   setSession(token: string | null): void;
@@ -247,6 +275,7 @@ export interface Api {
   listBookings(): Promise<Booking[]>;
   listPastCoaches(): Promise<PastCoach[]>;
   listPackages(): Promise<SessionPackage[]>;
+  getStreak(): Promise<StreakData>;
   savePartyPlan(input: PartyPlanInput): Promise<PartyPlan>;
   rescheduleBooking(id: string, startsAt: string): Promise<Booking>;
   // Development only: the mock implements it so the trainer-cancel flow can be tried by hand.
