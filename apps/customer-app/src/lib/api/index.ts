@@ -7,6 +7,17 @@ export const api: Api = mockApi;
 export { ApiError } from './types';
 export type {
   ApiErrorCode,
+  CoachRef,
+  OtpRequestResult,
+  PastCoach,
+  PartyOccasion,
+  PartyPlan,
+  PartyPlanInput,
+  SessionPackage,
+  OtpVerifyResult,
+  Profile,
+  ProfileUpdate,
+  ServiceabilityCheck,
   AppNotification,
   Address,
   Api,

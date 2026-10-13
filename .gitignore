@@ -30,3 +30,4 @@ supabase/.temp/
 
 # Expo template leftovers
 apps/customer-app/example/
+.tmp-preview/

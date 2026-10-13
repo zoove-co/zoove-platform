@@ -16,6 +16,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 
 import { track } from '@/lib/analytics/track';
+import { useAuth } from '@/lib/auth/useAuth';
 import { colors } from '@/theme';
 
 void SplashScreen.preventAutoHideAsync();
@@ -29,28 +30,54 @@ export default function RootLayout() {
     Kalam_700Bold,
     ...Ionicons.font,
   });
+  const authStatus = useAuth((state) => state.status);
+  const hydrateAuth = useAuth((state) => state.hydrate);
   const [queryClient] = useState(
     () => new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1 } } }),
   );
 
   useEffect(() => {
-    if (fontsLoaded || fontError) {
+    void hydrateAuth();
+  }, [hydrateAuth]);
+
+  const ready = (fontsLoaded || Boolean(fontError)) && authStatus !== 'loading';
+
+  useEffect(() => {
+    if (ready) {
       void SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, fontError]);
+  }, [ready]);
 
   useEffect(() => {
     track('app_opened');
   }, []);
 
-  if (!fontsLoaded && !fontError) {
+  if (!ready) {
     return null;
   }
 
   return (
     <QueryClientProvider client={queryClient}>
       <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }} />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="otp" />
+        {/* Everything below needs a signed-in customer; signed-out visitors are sent back to '/'. */}
+        <Stack.Protected guard={authStatus === 'signedIn'}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="booking" />
+          <Stack.Screen name="service/[slug]" />
+          <Stack.Screen name="session/[id]/index" />
+          <Stack.Screen name="session/[id]/reschedule" />
+          <Stack.Screen name="orders" />
+          <Stack.Screen name="packages" />
+          <Stack.Screen name="party" />
+          <Stack.Screen name="addresses" />
+          <Stack.Screen name="notifications" />
+          <Stack.Screen name="profile" />
+          <Stack.Screen name="soon" />
+        </Stack.Protected>
+      </Stack>
     </QueryClientProvider>
   );
 }

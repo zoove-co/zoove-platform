@@ -58,4 +58,27 @@ Expo Router, TanStack Query (server data), Zustand (UI state only), React Hook F
 Ionicons (replaces SF Symbols), Inter (body) and Kalam (wordmark, replaces iOS-only Noteworthy), expo-image.
 pnpm uses `node-linker=hoisted` (see `.npmrc`) so Metro resolves workspace packages.
 
+## D13: Commercial settings are data, not code (proposed by Ritesh, 12 Oct 2026; Pratik to confirm)
+Package prices, discounts, validity, session prices (instant, scheduled, demo) and similar offers are
+records that Pratik, admins and the support team edit in the admin panel (with roles and an audit log).
+The customer app only displays what the API returns, so a change shows up in the app without a release.
+The app never hard-codes a price, discount or expiry.
+
+## D14: Coach choice is "rebook a past coach", not a trainer list (proposed by Ritesh, 12 Oct 2026; Pratik to confirm)
+A customer cannot browse or pick trainers for a first booking. After a completed session they can ask for
+one of the coaches they have already had. If that coach is not free at that time, the system matches
+another coach and tells the customer. Answers open question 1.
+
+## D15: Trainer cancels an assigned session (proposed by Ritesh, 12 Oct 2026; Pratik to confirm)
+The booking is never silently lost. It moves to a "finding a new coach" state, the customer is notified at
+once, and the system looks for another coach nearby. If one accepts, the customer is notified with the new
+coach. The customer can reschedule or cancel at any point. What happens when nobody accepts in time, and
+any compensation, are open questions 29 to 31.
+
+## D16: Zoove Party is a separate group-booking product (from Pratik's mockups, 14 Oct 2026; scope to confirm)
+Pratik shared a "Zoove Party" flow (Drive: Zoove Prototype Images Repository / Zoove Party). It is a group fitness experience at the customer's place (Dance, Wellness, Aqua and Pilates Party), not the 1:1 session. Mockup flow: landing, choose experience, experience details, date and time, duration, number of guests, location, add-ons, trainer preference, special requests, review, payment, confirmation, event details, "get party ready" checklist.
+- It is built as its own booking type with its own screens; it does not change the 1:1 booking flow.
+- Everything in the mockup that looks like a business rule (prices, durations, add-ons, guest limits, trainer gender choice) is a placeholder until Pratik confirms it. See open questions 35 to 42.
+- Images from Pratik (logo, service tiles, participant tiles, banners, academy cards) are bundled as app assets for now. Later, banners and tiles should come from the admin panel (D13), the same way package prices do.
+
 ## Not decided (waiting on Pratik): see open-questions.md

@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
   tile: {
     flexGrow: 1,
     flexBasis: '47%',
-    height: 108,
+    aspectRatio: 1,
     borderRadius: radius.lg,
     overflow: 'hidden',
     justifyContent: 'flex-end',

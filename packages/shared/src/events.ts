@@ -21,8 +21,15 @@ export const TRACKED_EVENTS = [
   'notifications_opened',
   'orders_viewed',
   'booking_repeated',
+  'past_coach_selected',
+  'package_selected',
+  'banner_tapped',
+  'party_viewed',
+  'party_plan_saved',
   'streak_viewed',
   'account_viewed',
+  'profile_completed',
+  'signed_out',
 ] as const;
 
 export type TrackedEventName = (typeof TRACKED_EVENTS)[number];

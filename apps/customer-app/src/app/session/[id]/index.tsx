@@ -11,7 +11,9 @@ import { Icon, type IconName } from '@/components/ui/Icon';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { TabFooter } from '@/components/ui/TabFooter';
-import { useBooking, useCancelBooking } from '@/features/booking/hooks';
+import { useBooking, useCancelBooking, useSimulateTrainerCancel } from '@/features/booking/hooks';
+import { api } from '@/lib/api';
+import { isActiveStatus } from '@/lib/api/status';
 import { track } from '@/lib/analytics/track';
 import { colors, fonts, radius, spacing } from '@/theme';
 
@@ -32,6 +34,7 @@ export default function SessionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: booking, isPending, isError } = useBooking(id);
   const cancel = useCancelBooking(id);
+  const simulateCancel = useSimulateTrainerCancel(id);
   const [confirming, setConfirming] = useState(false);
 
   if (isPending) {
@@ -58,10 +61,21 @@ export default function SessionDetailScreen() {
       ? t('session.statusConfirmed')
       : booking.status === 'matching'
         ? t('session.statusMatching')
-        : booking.status === 'cancelled'
-          ? t('session.statusCancelled')
-          : t('session.statusCompleted');
-  const active = booking.status === 'confirmed' || booking.status === 'matching';
+        : booking.status === 'rematching'
+          ? t('session.statusRematching')
+          : booking.status === 'cancelled'
+            ? t('session.statusCancelled')
+            : t('session.statusCompleted');
+  const active = isActiveStatus(booking.status);
+  const coachText =
+    booking.status === 'rematching'
+      ? t('session.coachFinding')
+      : booking.status === 'matching'
+        ? t('session.statusMatching')
+        : booking.coach
+          ? t('session.coachName', { name: booking.coach.name })
+          : t('booking.coachValue');
+  const canSimulate = __DEV__ && Boolean(api.dev) && booking.status === 'confirmed' && booking.coach !== null;
   const canReschedule = active && booking.mode !== 'instant' && booking.startsAt !== null;
 
   const onCancel = () => {
@@ -100,12 +114,21 @@ export default function SessionDetailScreen() {
           </View>
         </View>
 
+        {booking.status === 'rematching' ? (
+          <View style={styles.banner}>
+            <Icon name="search-outline" size={18} color={colors.purple} />
+            <View style={styles.bannerText}>
+              <AppText variant="bodyStrong">{t('session.rematchTitle')}</AppText>
+              <AppText variant="caption" color={colors.muted}>
+                {t('session.rematchBody')}
+              </AppText>
+            </View>
+          </View>
+        ) : null}
+
         <View style={styles.details}>
           <DetailRow icon="home-outline" text={t('booking.formatValue')} />
-          <DetailRow
-            icon="person-outline"
-            text={booking.status === 'matching' ? t('session.statusMatching') : t('booking.coachValue')}
-          />
+          <DetailRow icon="person-outline" text={coachText} />
           <DetailRow icon="location-outline" text={`${booking.addressLabel} · ${booking.areaLabel}`} />
         </View>
 
@@ -142,9 +165,19 @@ export default function SessionDetailScreen() {
               disabled={!booking.canChange}
               onPress={() => setConfirming(true)}
             />
-            <AppText variant="micro" color={colors.muted} style={styles.note}>
-              {booking.canChange ? t('session.changeNote') : t('session.changeClosed')}
-            </AppText>
+            {canSimulate ? (
+              <PrimaryButton
+                label="Dev: coach cancels"
+                variant="soft"
+                loading={simulateCancel.isPending}
+                onPress={() => simulateCancel.mutate()}
+              />
+            ) : null}
+            {booking.status === 'rematching' ? null : (
+              <AppText variant="micro" color={colors.muted} style={styles.note}>
+                {booking.canChange ? t('session.changeNote') : t('session.changeClosed')}
+              </AppText>
+            )}
             {cancel.isError ? (
               <AppText variant="caption" color={colors.danger} style={styles.note}>
                 {t('session.changeError')}
@@ -215,6 +248,17 @@ const styles = StyleSheet.create({
   },
   statusInactive: { backgroundColor: 'rgba(8, 11, 15, 0.06)' },
   statusText: { fontFamily: fonts.semibold },
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    padding: 14,
+    borderRadius: radius.lg,
+    backgroundColor: colors.lavender,
+    borderWidth: 0.8,
+    borderColor: colors.purple,
+  },
+  bannerText: { flex: 1, gap: 3 },
   details: {
     gap: spacing.md,
     padding: 14,

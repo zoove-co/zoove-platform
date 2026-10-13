@@ -36,7 +36,13 @@
         }
       ],
       "expo-secure-store",
-      "expo-localization"
+      "expo-localization",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Zoove uses your location to pin your address so your coach can find you."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,9 +1,11 @@
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { AppText } from '@/components/ui/AppText';
 import { Icon } from '@/components/ui/Icon';
+import { demoTrainerImage } from '@/lib/images';
 import { colors, radius, spacing } from '@/theme';
 
 type Props = {
@@ -26,7 +28,7 @@ export function DemoBanner({ priceLabel, originalPriceLabel, onPress }: Props) {
         end={{ x: 1, y: 0.5 }}
         style={styles.card}>
         <View style={styles.thumb}>
-          <Icon name="barbell-outline" size={26} color={colors.purple} />
+          <Image source={demoTrainerImage} contentFit="cover" style={styles.thumbImage} />
         </View>
         <View style={styles.text}>
           <AppText variant="eyebrow" color={colors.muted}>
@@ -63,10 +65,12 @@ const styles = StyleSheet.create({
     width: 62,
     height: 62,
     borderRadius: 16,
+    overflow: 'hidden',
     backgroundColor: colors.lavender,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  thumbImage: { width: '100%', height: '100%' },
   text: { flex: 1, gap: 2 },
   prices: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   struck: { textDecorationLine: 'line-through' },

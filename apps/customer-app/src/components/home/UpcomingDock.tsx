@@ -3,17 +3,19 @@ import { useTranslation } from 'react-i18next';
 
 import { AppText } from '@/components/ui/AppText';
 import { Icon } from '@/components/ui/Icon';
+import type { BookingStatus } from '@/lib/api';
 import { colors, radius, spacing } from '@/theme';
 
 type Props = {
   serviceName: string;
   whenLabel: string;
+  status: BookingStatus;
   done: number;
   goal: number;
   onPress: () => void;
 };
 
-export function UpcomingDock({ serviceName, whenLabel, done, goal, onPress }: Props) {
+export function UpcomingDock({ serviceName, whenLabel, status, done, goal, onPress }: Props) {
   const { t } = useTranslation();
   return (
     <Pressable
@@ -22,11 +24,17 @@ export function UpcomingDock({ serviceName, whenLabel, done, goal, onPress }: Pr
       onPress={onPress}
       style={({ pressed }) => [styles.dock, { opacity: pressed ? 0.88 : 1 }]}>
       <View style={styles.badge}>
-        <Icon name="calendar-outline" size={18} color={colors.purple} />
+        <Icon
+          name={status === 'rematching' ? 'search-outline' : 'calendar-outline'}
+          size={18}
+          color={colors.purple}
+        />
       </View>
       <View style={styles.text}>
         <AppText variant="eyebrow" color={colors.purple} style={styles.eyebrow}>
-          {t('home.upcomingEyebrow', { done, goal })}
+          {status === 'rematching'
+            ? t('home.findingCoachEyebrow')
+            : t('home.upcomingEyebrow', { done, goal })}
         </AppText>
         <AppText variant="bodyStrong" numberOfLines={1}>
           {serviceName}  ·  {whenLabel}

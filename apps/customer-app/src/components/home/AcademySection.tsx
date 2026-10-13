@@ -1,18 +1,20 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
 import { useTranslation } from 'react-i18next';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
-import { Icon, type IconName } from '@/components/ui/Icon';
-import { colors, fonts, spacing } from '@/theme';
+import { academyImages } from '@/lib/images';
+import { colors, spacing } from '@/theme';
 
-type Props = { onOpen: (section: 'certified' | 'programs' | 'verified') => void };
+type Section = 'certified' | 'programs' | 'verified';
+type Props = { onOpen: (section: Section) => void };
 
 export function AcademySection({ onOpen }: Props) {
   const { t } = useTranslation();
-  const cards: { key: 'certified' | 'programs' | 'verified'; label: string; icon: IconName }[] = [
-    { key: 'certified', label: t('home.academyCertified'), icon: 'ribbon-outline' },
-    { key: 'programs', label: t('home.academyPrograms'), icon: 'school-outline' },
-    { key: 'verified', label: t('home.academyVerified'), icon: 'shield-checkmark-outline' },
+  const cards: { key: Section; label: string }[] = [
+    { key: 'certified', label: t('home.academyCertified') },
+    { key: 'programs', label: t('home.academyPrograms') },
+    { key: 'verified', label: t('home.academyVerified') },
   ];
 
   return (
@@ -30,13 +32,8 @@ export function AcademySection({ onOpen }: Props) {
             accessibilityRole="button"
             accessibilityLabel={card.label.replace('\n', ' ')}
             onPress={() => onOpen(card.key)}
-            style={styles.card}>
-            <View style={styles.thumb}>
-              <Icon name={card.icon} size={24} color={colors.purple} />
-            </View>
-            <AppText variant="micro" style={styles.cardLabel}>
-              {card.label}
-            </AppText>
+            style={({ pressed }) => [styles.card, { opacity: pressed ? 0.88 : 1 }]}>
+            <Image source={academyImages[card.key]} contentFit="cover" style={styles.image} />
           </Pressable>
         ))}
       </View>
@@ -47,15 +44,7 @@ export function AcademySection({ onOpen }: Props) {
 const styles = StyleSheet.create({
   section: { gap: 9, paddingBottom: spacing.sm },
   title: { letterSpacing: 2, fontSize: 11 },
-  row: { flexDirection: 'row', gap: 9 },
-  card: { flex: 1, gap: 6, alignItems: 'center' },
-  thumb: {
-    alignSelf: 'stretch',
-    height: 60,
-    borderRadius: 13,
-    backgroundColor: colors.lavender,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardLabel: { textAlign: 'center', fontSize: 9, fontFamily: fonts.semibold },
+  row: { flexDirection: 'row', gap: 8 },
+  card: { flex: 1, aspectRatio: 1.5, borderRadius: 10, overflow: 'hidden', backgroundColor: colors.lavender },
+  image: { flex: 1 },
 });

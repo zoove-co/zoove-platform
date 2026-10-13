@@ -3,6 +3,24 @@ import type { TFunction } from 'i18next';
 import { ApiError } from '@/lib/api/types';
 
 // Maps an API failure to one clear sentence for the customer.
+export function authErrorMessage(error: unknown, t: TFunction): string {
+  if (error instanceof ApiError) {
+    switch (error.code) {
+      case 'INVALID_PHONE':
+        return t('auth.phoneError');
+      case 'OTP_INVALID':
+        return t('auth.otpInvalid');
+      case 'OTP_LOCKED':
+        return t('auth.otpLocked');
+      case 'OTP_RATE_LIMITED':
+        return t('auth.otpRateLimited');
+      default:
+        break;
+    }
+  }
+  return t('auth.otpGeneric');
+}
+
 export function bookingErrorMessage(error: unknown, t: TFunction): string {
   if (error instanceof ApiError) {
     switch (error.code) {

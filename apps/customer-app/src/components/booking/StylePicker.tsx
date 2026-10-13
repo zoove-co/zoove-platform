@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -5,6 +6,7 @@ import { AppText } from '@/components/ui/AppText';
 import { InfoPill } from '@/components/ui/InfoPill';
 import { StepHeading } from '@/components/ui/StepHeading';
 import type { ServiceDetail, ServiceSummary } from '@/lib/api';
+import { formatImages, serviceImages } from '@/lib/images';
 import { colors, radius, spacing } from '@/theme';
 
 type Props = {
@@ -33,6 +35,8 @@ function Pill({ label, selected, onPress }: { label: string; selected: boolean; 
 export function StylePicker({ services, serviceSlug, onServiceChange, detail, formatSlug, onFormatChange }: Props) {
   const { t } = useTranslation();
   const format = detail?.formats.find((item) => item.slug === formatSlug) ?? detail?.formats[0];
+  // Picking a style changes the photo, like the prototype.
+  const hero = (format ? formatImages[format.slug] : undefined) ?? serviceImages[serviceSlug];
 
   return (
     <View style={styles.wrap}>
@@ -63,6 +67,7 @@ export function StylePicker({ services, serviceSlug, onServiceChange, detail, fo
               />
             ))}
           </View>
+          {hero ? <Image source={hero} contentFit="cover" style={styles.hero} /> : null}
           <AppText variant="heading" color={colors.purple}>
             {detail.tagline}
           </AppText>
@@ -87,6 +92,7 @@ const styles = StyleSheet.create({
   wrap: { gap: 13 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   sub: { fontSize: 14 },
+  hero: { width: '100%', aspectRatio: 1.6, borderRadius: radius.lg, backgroundColor: colors.lavender },
   infoRow: { flexDirection: 'row', gap: 8 },
   pill: {
     paddingHorizontal: 14,

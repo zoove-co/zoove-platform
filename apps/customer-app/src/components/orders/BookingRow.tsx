@@ -5,21 +5,24 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/ui/AppText';
 import { Icon } from '@/components/ui/Icon';
 import type { Booking } from '@/lib/api';
+import { isActiveStatus } from '@/lib/api/status';
 import { colors, fonts, radius } from '@/theme';
 
 type Props = { booking: Booking; onPress: () => void };
 
 export function BookingRow({ booking, onPress }: Props) {
   const { t } = useTranslation();
-  const active = booking.status === 'confirmed' || booking.status === 'matching';
+  const active = isActiveStatus(booking.status);
   const statusLabel =
     booking.status === 'confirmed'
       ? t('session.statusConfirmed')
       : booking.status === 'matching'
         ? t('session.statusMatching')
-        : booking.status === 'cancelled'
-          ? t('session.statusCancelled')
-          : t('session.statusCompleted');
+        : booking.status === 'rematching'
+          ? t('session.statusRematching')
+          : booking.status === 'cancelled'
+            ? t('session.statusCancelled')
+            : t('session.statusCompleted');
   const done = booking.status === 'completed';
 
   return (

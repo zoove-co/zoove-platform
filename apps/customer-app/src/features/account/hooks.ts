@@ -6,7 +6,11 @@ export function useSetDefaultAddress() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.setDefaultAddress(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['addresses'] }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['addresses'] }),
+        queryClient.invalidateQueries({ queryKey: ['home'] }),
+      ]),
   });
 }
 
@@ -14,7 +18,11 @@ export function useDeleteAddress() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.deleteAddress(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['addresses'] }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['addresses'] }),
+        queryClient.invalidateQueries({ queryKey: ['home'] }),
+      ]),
   });
 }
 

@@ -30,9 +30,16 @@ Rules
 | academy_viewed | Academy card tapped | section (certified, programs, verified) |
 | notifications_opened | Bell tapped | none |
 | orders_viewed | Orders & History opened | none |
+| past_coach_selected | Customer asked for a past coach in the booking flow (or switched back to any coach) | coach_id (null = any coach) |
+| package_selected | Choose tapped on a package | package_id, sessions_count, price_paise |
 | booking_repeated | Book again tapped on a past session | booking_id, service_slug |
 | streak_viewed | Streak tab opened | none |
 | account_viewed | Account tab opened | none |
+| profile_completed | Customer saved their name and details in Edit profile | none |
+| signed_out | Customer signed out from Account | none |
 
 Retention triggers planned in CleverTap: started but not confirmed within 30 minutes; no booking within
 10 to 11 days of the last completed session; streak about to break.
+| `banner_tapped` | Customer taps a Home banner | `banner` |
+| `party_viewed` | Customer opens the Zoove Party planner | none |
+| `party_plan_saved` | Customer finishes the party planner | `occasion`, `activity`, `guests` |

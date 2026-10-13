@@ -2,9 +2,16 @@ import { rupeesToPaise } from '@zoove/shared';
 
 import { formatClock, formatWhen } from '@/lib/dates';
 
+import { isActiveStatus } from './status';
+
 import {
   ApiError,
   type Address,
+  type CoachRef,
+  type PastCoach,
+  type SessionPackage,
+  type Profile,
+  type ServiceabilityCheck,
   type AppNotification,
   type Api,
   type Booking,
@@ -25,9 +32,26 @@ const prices: Record<BookingMode, number> = {
   demo: rupeesToPaise(500),
 };
 
+// Admin-managed in the real system (decision D13): price, discount, validity and badge are edited
+// in the admin panel. Validity is left empty because it is still an open question (item 4).
+const packages: SessionPackage[] = [6, 12, 24, 36].map((count, index) => {
+  const price = [9000, 17000, 30000, 40000][index] ?? 0;
+  return {
+    id: `pkg-${count}`,
+    name: `${count} sessions`,
+    sessionsCount: count,
+    pricePaise: rupeesToPaise(price),
+    originalPricePaise: rupeesToPaise(1500 * count),
+    validityDays: [28, 56, 112, 168][index] ?? null,
+    badge: index === 0 ? 'Most popular' : null,
+  };
+});
+
 const home: HomeData = {
-  customerFirstName: 'Pratik',
-  locationLabel: 'Bandra West, Mumbai',
+  customerFirstName: null,
+  locationLabel: null,
+  locationServiceable: true,
+  locationArea: null,
   hasUnreadNotifications: false,
   instant: { etaHours: 4, pricePaise: prices.instant },
   scheduled: { pricePaise: prices.scheduled },
@@ -147,6 +171,30 @@ const serviceDetails: Record<string, ServiceDetail | undefined> = {
   },
 };
 
+function isValidCoordinate(lat: number, lng: number): boolean {
+  return (
+    typeof lat === 'number' && typeof lng === 'number' && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+  );
+}
+
+// Rough Greater Mumbai box, standing in for the cluster polygons.
+function insideMumbai(lat: number | undefined, lng: number | undefined): boolean {
+  return (
+    typeof lat === 'number' &&
+    typeof lng === 'number' &&
+    lat >= 18.89 &&
+    lat <= 19.33 &&
+    lng >= 72.77 &&
+    lng <= 72.99
+  );
+}
+
+function isServiceable(input: ServiceabilityCheck): boolean {
+  const { latitude, longitude } = input;
+  if (typeof latitude === 'number' && typeof longitude === 'number') return insideMumbai(latitude, longitude);
+  return /^400\d{3}$/.test(input.pincode.trim());
+}
+
 const addresses: Address[] = [
   {
     id: 'addr-home',
@@ -155,6 +203,8 @@ const addresses: Address[] = [
     area: 'Bandra West, Mumbai',
     pincode: '400050',
     isDefault: true,
+    latitude: 19.0596,
+    longitude: 72.8295,
     serviceable: true,
   },
 ];
@@ -178,7 +228,32 @@ function slotsFor(isoDate: string): TimeSlot[] {
 // ---------------------------------------------------------------------------
 const CHANGE_WINDOW_MS = 2 * 60 * 60 * 1000;
 
-type BookingRecord = Omit<Booking, 'canChange'> & { addressId: string | null };
+const COACHES: CoachRef[] = [
+  { id: 'coach-aarav', name: 'Aarav S.' },
+  { id: 'coach-meera', name: 'Meera K.' },
+  { id: 'coach-rohan', name: 'Rohan P.' },
+];
+
+// Mock availability rule: Meera takes no sessions that start at 6 PM or later. The real API checks
+// each coach's schedule and distance to the customer's address.
+function coachAvailable(coachId: string, startsAt: string | null, busy: string[]): boolean {
+  if (busy.includes(coachId)) return false;
+  if (coachId === 'coach-meera' && startsAt && new Date(startsAt).getHours() >= 18) return false;
+  return true;
+}
+
+function pickCoach(preferredId: string | undefined, startsAt: string | null, busy: string[]): CoachRef | null {
+  const preferred = COACHES.find((item) => item.id === preferredId);
+  if (preferred && coachAvailable(preferred.id, startsAt, busy)) return preferred;
+  return COACHES.find((item) => coachAvailable(item.id, startsAt, busy)) ?? null;
+}
+
+type BookingRecord = Omit<Booking, 'canChange'> & {
+  addressId: string | null;
+  preferredCoachId?: string;
+  // Coaches who cancelled this booking, so a replacement is never the same person.
+  cancelledCoachIds: string[];
+};
 
 const seedStart = new Date();
 seedStart.setDate(seedStart.getDate() + 2);
@@ -198,7 +273,31 @@ const bookingRecords: BookingRecord[] = [
     areaLabel: 'Bandra West, Mumbai',
     totalPaise: prices.scheduled,
     addressId: 'addr-home',
+    coach: COACHES[0] ?? null,
+    cancelledCoachIds: [],
   },
+  // A session already done, so "rebook a past coach" and the Past tab can be tried straight away.
+  (() => {
+    const done = new Date();
+    done.setDate(done.getDate() - 1);
+    done.setHours(7, 0, 0, 0);
+    return {
+      id: 'mock-session-0',
+      serviceSlug: 'strength',
+      serviceName: 'Strength',
+      formatName: 'Strength Training',
+      mode: 'scheduled' as const,
+      status: 'completed' as const,
+      startsAt: done.toISOString(),
+      whenLabel: formatWhen(done.toISOString()),
+      addressLabel: 'Home',
+      areaLabel: 'Bandra West, Mumbai',
+      totalPaise: prices.scheduled,
+      addressId: 'addr-home',
+      coach: COACHES[1] ?? null,
+      cancelledCoachIds: [],
+    };
+  })(),
 ];
 
 // A session is treated as done one hour after it starts.
@@ -207,7 +306,10 @@ const SESSION_LENGTH_MS = 60 * 60 * 1000;
 const MATCH_DELAY_MS = 15_000;
 const MATCH_ARRIVAL_MS = 90 * 60 * 1000;
 
+const REMATCH_DELAY_MS = 20_000;
+
 const matchTimers = new Map<string, number>();
+const rematchTimers = new Map<string, number>();
 const createdByKey = new Map<string, BookingResult>();
 
 // Brings stored records up to date with the clock, the way the real API would.
@@ -224,8 +326,40 @@ function settle(): void {
         record.status = 'confirmed';
         record.startsAt = startsAt;
         record.whenLabel = formatWhen(startsAt);
+        record.coach = pickCoach(record.preferredCoachId, startsAt, record.cancelledCoachIds);
         matchTimers.delete(record.id);
-        notify('Coach matched', `Your ${record.serviceName} coach is on the way. ${record.whenLabel}.`, record.id);
+        notify(
+          'Coach matched',
+          `${record.coach?.name ?? 'Your coach'} will take your ${record.serviceName} session. ${record.whenLabel}.`,
+          record.id,
+        );
+      }
+    }
+    if (record.status === 'rematching') {
+      // No coach found before the session time: close it honestly instead of leaving it open forever.
+      if (record.startsAt && new Date(record.startsAt).getTime() <= now) {
+        record.status = 'cancelled';
+        rematchTimers.delete(record.id);
+        notify(
+          'We could not find a coach',
+          `We could not find a coach for your ${record.serviceName} session on ${record.whenLabel}. The session was cancelled.`,
+          record.id,
+        );
+        continue;
+      }
+      const started = rematchTimers.get(record.id);
+      if (started !== undefined && now - started >= REMATCH_DELAY_MS) {
+        const replacement = pickCoach(record.preferredCoachId, record.startsAt, record.cancelledCoachIds);
+        if (replacement) {
+          record.coach = replacement;
+          record.status = 'confirmed';
+          rematchTimers.delete(record.id);
+          notify(
+            'New coach found',
+            `${replacement.name} will take your ${record.serviceName} session on ${record.whenLabel}.`,
+            record.id,
+          );
+        }
       }
     }
   }
@@ -235,7 +369,7 @@ function hasConflict(startsAt: string, ignoreId?: string): boolean {
   return bookingRecords.some(
     (record) =>
       record.id !== ignoreId &&
-      (record.status === 'confirmed' || record.status === 'matching') &&
+      isActiveStatus(record.status) &&
       record.startsAt === startsAt,
   );
 }
@@ -248,14 +382,17 @@ function assertBookableSlot(startsAt: string | undefined, ignoreId?: string): st
 }
 
 function isChangeable(record: BookingRecord): boolean {
-  if (record.status === 'matching') return true;
+  // While we are finding a replacement coach the customer is never locked out of changing the booking.
+  if (record.status === 'matching' || record.status === 'rematching') return true;
   if (record.status !== 'confirmed' || !record.startsAt) return false;
   return new Date(record.startsAt).getTime() - Date.now() >= CHANGE_WINDOW_MS;
 }
 
 const toBooking = (record: BookingRecord): Booking => {
-  const { addressId: _addressId, ...rest } = record;
-  void _addressId;
+  const { addressId: _a, preferredCoachId: _p, cancelledCoachIds: _c, ...rest } = record;
+  void _a;
+  void _p;
+  void _c;
   return { ...rest, canChange: isChangeable(record) };
 };
 
@@ -299,7 +436,7 @@ function completedThisWeek(): number {
 function upcomingFromBookings(): HomeData['upcomingSession'] {
   settle();
   const active = bookingRecords
-    .filter((record) => record.status === 'matching' || record.status === 'confirmed')
+    .filter((record) => isActiveStatus(record.status))
     .sort((a, b) => {
       const aTime = a.startsAt ? new Date(a.startsAt).getTime() : 0;
       const bTime = b.startsAt ? new Date(b.startsAt).getTime() : 0;
@@ -312,17 +449,104 @@ function upcomingFromBookings(): HomeData['upcomingSession'] {
     id: next.id,
     serviceName: next.serviceName,
     whenLabel: next.whenLabel,
+    status: next.status,
     sessionsDoneThisWeek: doneThisWeek,
     weeklyGoal: WEEKLY_GOAL,
   };
 }
 
+// ---------------------------------------------------------------------------
+// Auth and profile. The real API sends an SMS and issues JWTs (decision D5). Mock rules:
+// the code is always 123456, five wrong tries lock the code, a new code can be asked after 30 s.
+// ---------------------------------------------------------------------------
+const OTP_CODE = '123456';
+const OTP_MAX_TRIES = 5;
+const OTP_RESEND_SECONDS = 30;
+const otpState = new Map<string, { tries: number; requestedAt: number }>();
+const knownPhones = new Set<string>();
+const profiles = new Map<string, Profile>();
+let signedInPhone: string | null = null;
+
+const isIndianMobile = (phone: string) => /^\+91[6-9]\d{9}$/.test(phone);
+
+function currentProfile(): Profile | null {
+  return signedInPhone ? (profiles.get(signedInPhone) ?? null) : null;
+}
+
 export const mockApi: Api = {
+  setSession(token) {
+    const prefix = 'mock-token-';
+    if (token?.startsWith(prefix)) {
+      const phone = token.slice(prefix.length);
+      signedInPhone = phone;
+      knownPhones.add(phone);
+      if (!profiles.has(phone)) {
+        profiles.set(phone, { phone, firstName: null, lastName: null, email: null });
+      }
+    } else {
+      signedInPhone = null;
+    }
+  },
+
+  async requestOtp(phone) {
+    await wait(500);
+    if (!isIndianMobile(phone)) throw new ApiError('INVALID_PHONE');
+    const previous = otpState.get(phone);
+    if (previous && Date.now() - previous.requestedAt < OTP_RESEND_SECONDS * 1000) {
+      throw new ApiError('OTP_RATE_LIMITED');
+    }
+    otpState.set(phone, { tries: 0, requestedAt: Date.now() });
+    return { resendAfterSeconds: OTP_RESEND_SECONDS };
+  },
+
+  async verifyOtp(phone, code) {
+    await wait(500);
+    const state = otpState.get(phone);
+    if (!state) throw new ApiError('OTP_INVALID');
+    if (state.tries >= OTP_MAX_TRIES) throw new ApiError('OTP_LOCKED');
+    if (code !== OTP_CODE) {
+      state.tries += 1;
+      throw new ApiError(state.tries >= OTP_MAX_TRIES ? 'OTP_LOCKED' : 'OTP_INVALID');
+    }
+    otpState.delete(phone);
+    const isNewUser = !knownPhones.has(phone);
+    knownPhones.add(phone);
+    if (!profiles.has(phone)) {
+      profiles.set(phone, { phone, firstName: null, lastName: null, email: null });
+    }
+    signedInPhone = phone;
+    return { token: `mock-token-${phone}`, isNewUser };
+  },
+
+  async getProfile() {
+    await wait(150);
+    const profile = currentProfile();
+    if (!profile) throw new ApiError('NOT_FOUND');
+    return { ...profile };
+  },
+
+  async updateProfile(input) {
+    await wait(300);
+    const profile = currentProfile();
+    if (!profile) throw new ApiError('NOT_FOUND');
+    const firstName = input.firstName.trim();
+    if (firstName.length < 2) throw new ApiError('INVALID_REQUEST');
+    profile.firstName = firstName;
+    profile.lastName = input.lastName?.trim() || null;
+    profile.email = input.email?.trim() || null;
+    return { ...profile };
+  },
+
   async getHome() {
     await wait(350);
     const upcomingSession = upcomingFromBookings();
+    const current = addresses.find((item) => item.isDefault) ?? addresses[0];
     return {
       ...home,
+      customerFirstName: currentProfile()?.firstName ?? null,
+      locationLabel: current ? `${current.label} · ${current.area}` : null,
+      locationServiceable: current?.serviceable ?? true,
+      locationArea: current?.area ?? null,
       hasUnreadNotifications: notifications.some((item) => !item.read),
       upcomingSession,
       weekly: { done: completedThisWeek(), goal: WEEKLY_GOAL },
@@ -349,6 +573,10 @@ export const mockApi: Api = {
         item.pincode === input.pincode.trim(),
     );
     if (duplicate) return duplicate;
+    const lat = input.latitude;
+    const lng = input.longitude;
+    const pinned = typeof lat === 'number' && typeof lng === 'number';
+    if (pinned && !isValidCoordinate(lat, lng)) throw new ApiError('INVALID_REQUEST');
     const created: Address = {
       id: `addr-${Date.now()}`,
       label: input.label.trim(),
@@ -356,11 +584,19 @@ export const mockApi: Api = {
       area: input.area.trim(),
       pincode: input.pincode.trim(),
       isDefault: false,
-      // Mock rule: Mumbai PIN codes (400xxx) are inside an active cluster, everything else is not yet.
-      serviceable: /^400\d{3}$/.test(input.pincode.trim()),
+      latitude: pinned ? lat : null,
+      longitude: pinned ? lng : null,
+      // Mock rule: a pinned location must fall inside Greater Mumbai; otherwise a Mumbai PIN (400xxx)
+      // counts. The real API checks the pin against the active cluster polygons (PostGIS).
+      serviceable: isServiceable({ pincode: input.pincode, latitude: input.latitude, longitude: input.longitude }),
     };
     addresses.push(created);
     return created;
+  },
+
+  async checkServiceability(input) {
+    await wait(250);
+    return { serviceable: isServiceable(input) };
   },
 
   async setDefaultAddress(id) {
@@ -376,7 +612,7 @@ export const mockApi: Api = {
     const index = addresses.findIndex((item) => item.id === id);
     if (index < 0) throw new ApiError('ADDRESS_NOT_FOUND');
     const inUse = bookingRecords.some(
-      (record) => record.addressId === id && (record.status === 'confirmed' || record.status === 'matching'),
+      (record) => record.addressId === id && isActiveStatus(record.status),
     );
     if (inUse) throw new ApiError('ADDRESS_IN_USE');
     const [removed] = addresses.splice(index, 1);
@@ -440,7 +676,19 @@ export const mockApi: Api = {
       areaLabel: address.area,
       totalPaise: result.totalPaise,
       addressId: address.id,
+      preferredCoachId: input.preferredCoachId,
+      coach: input.mode === 'instant' ? null : pickCoach(input.preferredCoachId, input.startsAt ?? null, []),
+      cancelledCoachIds: [],
     });
+    const created = bookingRecords[bookingRecords.length - 1];
+    const wanted = COACHES.find((item) => item.id === input.preferredCoachId);
+    if (wanted && created?.coach && created.coach.id !== wanted.id) {
+      notify(
+        'Coach changed',
+        `${wanted.name} is not free at that time, so ${created.coach.name} will take your session.`,
+        result.id,
+      );
+    }
     notify(
       input.mode === 'instant' ? 'Finding your coach' : 'Booking confirmed',
       input.mode === 'instant'
@@ -459,6 +707,59 @@ export const mockApi: Api = {
     return toBooking(findRecord(id));
   },
 
+  async listPastCoaches() {
+    await wait(150);
+    settle();
+    const byCoach = new Map<string, PastCoach>();
+    const done = bookingRecords
+      .filter((record) => record.status === 'completed' && record.coach)
+      .sort((a, b) => new Date(b.startsAt ?? 0).getTime() - new Date(a.startsAt ?? 0).getTime());
+    for (const record of done) {
+      if (!record.coach) continue;
+      const existing = byCoach.get(record.coach.id);
+      if (existing) existing.sessionsTogether += 1;
+      else
+        byCoach.set(record.coach.id, {
+          ...record.coach,
+          sessionsTogether: 1,
+          lastSessionLabel: record.whenLabel,
+        });
+    }
+    return [...byCoach.values()];
+  },
+
+  async listPackages() {
+    await wait(200);
+    return packages.map((item) => ({ ...item }));
+  },
+
+  async savePartyPlan(input) {
+    await wait(500);
+    if (input.guests < 2 || input.guests > 30) throw new ApiError('INVALID_REQUEST');
+    const plan = { ...input, id: `party-${Date.now()}`, createdAt: new Date().toISOString() };
+    notify('Party plan saved', 'We will confirm coach availability and pricing for your group soon.', null);
+    return plan;
+  },
+
+  dev: {
+    async simulateTrainerCancel(id) {
+      await wait(200);
+      settle();
+      const record = findRecord(id);
+      if (record.status !== 'confirmed' || !record.coach) throw new ApiError('INVALID_REQUEST');
+      record.cancelledCoachIds.push(record.coach.id);
+      const gone = record.coach.name;
+      record.coach = null;
+      record.status = 'rematching';
+      rematchTimers.set(id, Date.now());
+      notify(
+        'Your coach had to cancel',
+        `${gone} can no longer take your ${record.serviceName} session on ${record.whenLabel}. We are finding another coach nearby and will tell you as soon as one accepts.`,
+        id,
+      );
+    },
+  },
+
   async listBookings() {
     await wait(200);
     settle();
@@ -473,6 +774,24 @@ export const mockApi: Api = {
     assertBookableSlot(startsAt, id);
     record.startsAt = startsAt;
     record.whenLabel = formatWhen(startsAt);
+    if (record.status === 'rematching') {
+      // New time, new search: give the replacement search a fresh start.
+      rematchTimers.set(id, Date.now());
+    } else if (record.coach && !coachAvailable(record.coach.id, startsAt, [])) {
+      const previous = record.coach.name;
+      record.coach = pickCoach(record.preferredCoachId, startsAt, record.cancelledCoachIds);
+      notify(
+        'Coach changed',
+        record.coach
+          ? `${previous} is not free at the new time, so ${record.coach.name} will take your session.`
+          : `${previous} is not free at the new time. We are finding another coach nearby.`,
+        id,
+      );
+      if (!record.coach) {
+        record.status = 'rematching';
+        rematchTimers.set(id, Date.now());
+      }
+    }
     notify('Session rescheduled', `${record.serviceName} is now on ${record.whenLabel}.`, id);
     return toBooking(record);
   },
@@ -484,6 +803,7 @@ export const mockApi: Api = {
     if (!isChangeable(record)) throw new ApiError('CHANGE_WINDOW_CLOSED');
     record.status = 'cancelled';
     matchTimers.delete(id);
+    rematchTimers.delete(id);
     notify('Session cancelled', `Your ${record.serviceName} session was cancelled.`, id);
     return toBooking(record);
   },

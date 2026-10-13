@@ -10,6 +10,7 @@ import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { TabFooter } from '@/components/ui/TabFooter';
 import { useBookings } from '@/features/booking/hooks';
+import { isActiveStatus } from '@/lib/api/status';
 import { track } from '@/lib/analytics/track';
 import { colors, radius, spacing } from '@/theme';
 
@@ -27,16 +28,15 @@ export default function OrdersScreen() {
 
   const { upcoming, past } = useMemo(() => {
     const all = data ?? [];
-    const isActive = (status: string) => status === 'confirmed' || status === 'matching';
     const time = (startsAt: string | null) => (startsAt ? new Date(startsAt).getTime() : Number.MAX_SAFE_INTEGER);
     return {
       // Soonest first; instant bookings still matching have no time yet, so they sit at the top.
       upcoming: all
-        .filter((b) => isActive(b.status))
+        .filter((b) => isActiveStatus(b.status))
         .sort((a, b) => (a.startsAt ? time(a.startsAt) : 0) - (b.startsAt ? time(b.startsAt) : 0)),
       // Most recent first.
       past: all
-        .filter((b) => !isActive(b.status))
+        .filter((b) => !isActiveStatus(b.status))
         .sort((a, b) => time(b.startsAt) - time(a.startsAt)),
     };
   }, [data]);

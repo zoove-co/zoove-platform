@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AddressPicker } from '@/components/booking/AddressPicker';
 import { BookingSuccess } from '@/components/booking/BookingSuccess';
+import { CoachPicker } from '@/components/booking/CoachPicker';
 import { ParticipantPicker } from '@/components/booking/ParticipantPicker';
 import { ReviewCard } from '@/components/booking/ReviewCard';
 import { SchedulePicker } from '@/components/booking/SchedulePicker';
@@ -16,7 +17,7 @@ import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { StepHeading } from '@/components/ui/StepHeading';
 import { TabFooter } from '@/components/ui/TabFooter';
-import { useAddresses, useCreateBooking, useService } from '@/features/booking/hooks';
+import { useAddresses, useCreateBooking, usePastCoaches, useService } from '@/features/booking/hooks';
 import { useHomeData } from '@/features/home/useHomeData';
 import { track } from '@/lib/analytics/track';
 import { bookingErrorMessage } from '@/lib/api/errorMessage';
@@ -38,6 +39,7 @@ export default function BookingScreen() {
   const { data: home } = useHomeData();
   const { data: addresses } = useAddresses();
   const createBooking = useCreateBooking();
+  const { data: pastCoaches } = usePastCoaches();
 
   const [participant, setParticipant] = useState<Participant>('personal');
   const [serviceSlug, setServiceSlug] = useState(params.service || 'yoga');
@@ -45,6 +47,7 @@ export default function BookingScreen() {
   const [dayIso, setDayIso] = useState(() => nextDays(1)[0]?.iso ?? '');
   const [slotStartsAt, setSlotStartsAt] = useState<string | undefined>();
   const [pickedAddressId, setPickedAddressId] = useState<string | undefined>();
+  const [preferredCoachId, setPreferredCoachId] = useState<string | undefined>();
   const [step, setStep] = useState(0);
   const [result, setResult] = useState<BookingResult | null>(null);
 
@@ -75,6 +78,10 @@ export default function BookingScreen() {
   const selectedAddress =
     addresses?.find((address) => address.id === pickedAddressId) ??
     addresses?.find((address) => address.id === defaultAddressId);
+  // A coach picked earlier stays valid only while that coach is still in the customer's history.
+  const coaches = pastCoaches ?? [];
+  const showCoachPicker = coaches.length > 0 && mode !== 'demo';
+  const chosenCoach = coaches.find((coach) => coach.id === preferredCoachId);
   const hours = home?.instant.etaHours ?? 4;
   const instant = mode === 'instant';
   const totalPaise = service?.pricePaise[mode];
@@ -127,6 +134,7 @@ export default function BookingScreen() {
         participant,
         addressId: selectedAddress.id,
         startsAt: instant ? undefined : slotStartsAt,
+        preferredCoachId: showCoachPicker ? chosenCoach?.id : undefined,
         idempotencyKey: idempotencyKey.current,
       },
       {
@@ -158,6 +166,11 @@ export default function BookingScreen() {
     } else {
       onConfirm();
     }
+  };
+
+  const onCoachSelect = (coachId: string | undefined) => {
+    setPreferredCoachId(coachId);
+    track('past_coach_selected', { coach_id: coachId ?? null });
   };
 
   const whenValue = instant
@@ -246,12 +259,20 @@ export default function BookingScreen() {
               selectedId={selectedAddress?.id}
               onSelect={onAddressSelect}
             />
+            {showCoachPicker ? (
+              <CoachPicker
+                stepNumber={instant ? '4' : '5'}
+                coaches={coaches}
+                selectedId={chosenCoach?.id}
+                onSelect={onCoachSelect}
+              />
+            ) : null}
           </>
         ) : null}
 
         {step >= 3 && service && format ? (
           <ReviewCard
-            stepNumber={instant ? '4' : '5'}
+            stepNumber={String((instant ? 4 : 5) + (showCoachPicker ? 1 : 0))}
             heading={t('booking.reviewTitle')}
             detail={t('booking.reviewDetail')}
             title={`${format.name} · ${t('booking.personal')}`}
@@ -260,7 +281,7 @@ export default function BookingScreen() {
             footnote={t('booking.prototypeNote')}
             rows={[
               { label: t('booking.rowWhen'), value: whenValue },
-              { label: t('booking.rowCoach'), value: t('booking.coachValue') },
+              { label: t('booking.rowCoach'), value: chosenCoach ? chosenCoach.name : t('booking.coachValue') },
               { label: t('booking.rowFormat'), value: t('booking.formatValue') },
               {
                 label: t('booking.rowAddress'),

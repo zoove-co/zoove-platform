@@ -13,6 +13,7 @@ import { TabFooter } from '@/components/ui/TabFooter';
 import { useBooking, useRescheduleBooking } from '@/features/booking/hooks';
 import { track } from '@/lib/analytics/track';
 import { ApiError } from '@/lib/api';
+import { isActiveStatus } from '@/lib/api/status';
 import { bookingErrorMessage } from '@/lib/api/errorMessage';
 import { formatWhen, nextDays } from '@/lib/dates';
 import { colors, radius, spacing } from '@/theme';
@@ -49,7 +50,7 @@ export default function RescheduleScreen() {
   }
 
   // Deep link or stale screen: only a changeable, scheduled session can be rescheduled.
-  if (!updatedLabel && (!booking.canChange || booking.mode === 'instant' || booking.status !== 'confirmed')) {
+  if (!updatedLabel && (!booking.canChange || booking.mode === 'instant' || !isActiveStatus(booking.status))) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
         <ScreenHeader title={t('session.rescheduleTitle')} />

@@ -1,4 +1,5 @@
 import { formatInr } from '@zoove/shared';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -15,6 +16,7 @@ import { TabFooter } from '@/components/ui/TabFooter';
 import { useService } from '@/features/booking/hooks';
 import { useHomeData } from '@/features/home/useHomeData';
 import { track } from '@/lib/analytics/track';
+import { formatImages, serviceImages } from '@/lib/images';
 import { colors, fonts, radius, spacing } from '@/theme';
 
 export default function ServiceDetailScreen() {
@@ -46,6 +48,7 @@ export default function ServiceDetailScreen() {
 
   const format = service.formats.find((item) => item.slug === formatSlug) ?? service.formats[0];
   const hours = home?.instant.etaHours ?? 4;
+  const heroImage = (format ? formatImages[format.slug] : undefined) ?? serviceImages[service.slug];
 
   const startBooking = (mode: 'instant' | 'scheduled' | 'demo') => {
     track('booking_started', { mode, service_slug: service.slug });
@@ -60,10 +63,11 @@ export default function ServiceDetailScreen() {
       <ScreenHeader title={service.name} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <LinearGradient
-          colors={[colors.purple, colors.supportingPurple]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.hero}>
+          colors={heroImage ? ['rgba(8, 11, 15, 0.05)', colors.overlay] : [colors.purple, colors.supportingPurple]}
+          start={heroImage ? { x: 0.5, y: 0.3 } : { x: 0, y: 0 }}
+          end={heroImage ? { x: 0.5, y: 1 } : { x: 1, y: 1 }}
+          style={[styles.hero, heroImage && styles.heroPhoto]}>
+          {heroImage ? <Image source={heroImage} contentFit="cover" style={styles.heroImage} /> : null}
           <AppText variant="screenTitle" color={colors.white}>
             {service.name}
           </AppText>
@@ -133,6 +137,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   content: { padding: 18, gap: 15 },
+  heroPhoto: { overflow: 'hidden' },
+  heroImage: { ...StyleSheet.absoluteFill, zIndex: -1 },
   hero: { height: 170, justifyContent: 'flex-end', gap: 4, padding: 18, borderRadius: 22 },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   pill: {
