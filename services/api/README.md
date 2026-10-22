@@ -81,6 +81,13 @@ To try bookings locally, open a cluster first (the seed leaves them locked):
 update clusters set status = 'active', activated_at = now() where slug = 'bandra-khar';
 ```
 
+## Production checklist (the API refuses some of these itself)
+
+- `NODE_ENV=production` with `SMS_PROVIDER=console` or `DEV_FIXED_OTP` set will not start.
+- Behind a load balancer set `TRUST_PROXY=true`, or every customer shares one rate limit.
+- `JWT_SECRET` and `OTP_SECRET`: different random values, 32+ characters.
+- Keep `SWAGGER_ENABLED` off.
+
 ## Rules to keep
 
 - Every database change is a new numbered file in `supabase/migrations`. Never edit an applied one.

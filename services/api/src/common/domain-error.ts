@@ -17,6 +17,7 @@ export type ErrorCode =
   | 'CHANGE_WINDOW_CLOSED'
   | 'IDEMPOTENCY_KEY_REUSED'
   | 'TOO_MANY_REQUESTS'
+  | 'SMS_FAILED'
   | 'INTERNAL';
 
 const STATUS: Record<ErrorCode, number> = {
@@ -37,6 +38,7 @@ const STATUS: Record<ErrorCode, number> = {
   CHANGE_WINDOW_CLOSED: 409,
   IDEMPOTENCY_KEY_REUSED: 422,
   TOO_MANY_REQUESTS: 429,
+  SMS_FAILED: 502,
   INTERNAL: 500,
 };
 
@@ -47,8 +49,9 @@ export class DomainError extends Error {
     readonly code: ErrorCode,
     message?: string,
     readonly details?: Record<string, unknown>,
+    options?: { cause?: unknown },
   ) {
-    super(message ?? code);
+    super(message ?? code, options);
     this.name = 'DomainError';
     this.status = STATUS[code];
   }

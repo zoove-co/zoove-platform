@@ -120,7 +120,10 @@ export class AddressesService {
       await lockFor(client, 'address', userId);
       const address = await this.mustOwn(client, userId, id);
       const inUse = await client.query(
-        `select 1 from bookings where address_id = $1 and status in ('matching', 'confirmed', 'rematching') limit 1`,
+        `select 1 from bookings
+          where address_id = $1 and status in ('matching', 'confirmed', 'rematching')
+            and (starts_at is null or starts_at > now())
+          limit 1`,
         [id],
       );
       if (inUse.rows[0]) {

@@ -37,6 +37,15 @@ const schema = z
   .refine((env) => !(env.NODE_ENV === 'production' && env.DEV_FIXED_OTP), {
     message: 'DEV_FIXED_OTP must not be set in production',
     path: ['DEV_FIXED_OTP'],
+  })
+  // The console provider prints every OTP into the logs. Production needs a real SMS provider.
+  .refine((env) => !(env.NODE_ENV === 'production' && env.SMS_PROVIDER === 'console'), {
+    message: 'SMS_PROVIDER=console must not be used in production (it logs every OTP)',
+    path: ['SMS_PROVIDER'],
+  })
+  .refine((env) => env.JWT_SECRET !== env.OTP_SECRET, {
+    message: 'JWT_SECRET and OTP_SECRET must be different values',
+    path: ['OTP_SECRET'],
   });
 
 export type Env = z.infer<typeof schema>;

@@ -31,14 +31,26 @@ export class UsersService {
 
   async updateProfile(
     userId: string,
-    input: { firstName: string; lastName?: string | undefined; email?: string | undefined },
+    input: { firstName?: string | undefined; lastName?: string | undefined; email?: string | undefined },
   ): Promise<Profile> {
+    // Only the fields that were sent are changed; an empty string clears lastName or email.
+    const sets: string[] = [];
+    const params: unknown[] = [userId];
+    const add = (column: string, value: string | null) => {
+      params.push(value);
+      sets.push(`${column} = $${params.length}`);
+    };
+    if (input.firstName !== undefined) add('first_name', input.firstName);
+    if (input.lastName !== undefined) add('last_name', input.lastName || null);
+    if (input.email !== undefined) add('email', input.email || null);
+    if (sets.length === 0) return this.getProfile(userId);
+
     try {
       const result = await this.db.query<UserRow>(
-        `update users set first_name = $2, last_name = $3, email = $4
+        `update users set ${sets.join(', ')}
           where id = $1 and status = 'active'
           returning phone_e164, first_name, last_name, email`,
-        [userId, input.firstName, input.lastName || null, input.email || null],
+        params,
       );
       const row = result.rows[0];
       if (!row) throw new DomainError('NOT_FOUND', 'Profile not found.');

@@ -6,11 +6,14 @@ import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { AuthGuard, CurrentUser, type AuthUser } from './auth.guard';
 import { UsersService, type Profile } from './users.service';
 
-const updateSchema = z.object({
-  firstName: z.string().trim().min(2).max(60),
-  lastName: z.string().trim().max(60).optional(),
-  email: z.union([z.literal(''), z.email().max(200)]).optional(),
-});
+// Send only what changes. An empty lastName or email clears it. At least one field is needed.
+const updateSchema = z
+  .object({
+    firstName: z.string().trim().min(2).max(60).optional(),
+    lastName: z.string().trim().max(60).optional(),
+    email: z.union([z.literal(''), z.email().max(200)]).optional(),
+  })
+  .refine((value) => Object.values(value).some((field) => field !== undefined), { message: 'Send at least one field to change.' });
 
 const profileSchema: NonNullable<ApiResponseSchemaHost['schema']> = {
   type: 'object',
@@ -42,7 +45,6 @@ export class MeController {
     schema: {
       type: 'object',
       properties: { firstName: { type: 'string' }, lastName: { type: 'string' }, email: { type: 'string' } },
-      required: ['firstName'],
     },
   })
   @ApiOkResponse({ schema: profileSchema })

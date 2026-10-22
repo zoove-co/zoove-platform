@@ -162,6 +162,14 @@ suite('API against a real database', () => {
       expect(response.body.error.code).toBe('OTP_INVALID');
     });
 
+    it('stops a blocked customer at once, even with a token that has not expired', async () => {
+      const { token } = await signIn();
+      await http().get('/v1/me').set('Authorization', `Bearer ${token}`).expect(200);
+      await pool.query(`update users set status = 'blocked'`);
+      const r = await http().get('/v1/me').set('Authorization', `Bearer ${token}`).expect(401);
+      expect(r.body.error.code).toBe('UNAUTHORIZED');
+    });
+
     it('refuses a blocked account', async () => {
       await signIn();
       await pool.query(`update users set status = 'blocked'`);
@@ -190,6 +198,17 @@ suite('API against a real database', () => {
         .send({ firstName: '  Ritesh ', lastName: 'Sharma', email: 'ritesh@example.com' })
         .expect(200);
       expect(updated.body).toEqual({ phone: PHONE, firstName: 'Ritesh', lastName: 'Sharma', email: 'ritesh@example.com' });
+    });
+
+    it('updates only what is sent, and an empty value clears it', async () => {
+      const { token } = await signIn();
+      const auth = { Authorization: `Bearer ${token}` };
+      await http().patch('/v1/me').set(auth).send({ firstName: 'Ritesh', lastName: 'Sharma' }).expect(200);
+      const emailOnly = await http().patch('/v1/me').set(auth).send({ email: 'only@example.com' }).expect(200);
+      expect(emailOnly.body).toEqual({ phone: PHONE, firstName: 'Ritesh', lastName: 'Sharma', email: 'only@example.com' });
+      const cleared = await http().patch('/v1/me').set(auth).send({ email: '', lastName: '' }).expect(200);
+      expect(cleared.body).toEqual({ phone: PHONE, firstName: 'Ritesh', lastName: null, email: null });
+      await http().patch('/v1/me').set(auth).send({}).expect(400);
     });
 
     it('validates the update', async () => {

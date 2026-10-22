@@ -169,15 +169,29 @@ Missing endpoints (the app's mock has them, the API does not):
 
 ### Behaviour gaps in what is built
 1. **Nothing marks a booking `completed`.** Streak, past coaches and "rebook" cannot work until the trainer flow (or an admin action) exists.
-2. **A blocked customer keeps working for up to 15 minutes**, until the access token expires: the guard checks the token, not the account status.
+2. ~~A blocked customer keeps working for up to 15 minutes~~ **Fixed 22 Oct:** the guard now checks the account status on every request.
 3. **No account deletion.** Apple and Google Play both require in-app account deletion before approval.
-4. `PATCH /v1/me` always demands a first name, so email alone cannot be updated.
+4. ~~`PATCH /v1/me` always demands a first name~~ **Fixed 22 Oct:** send only the fields that change; an empty value clears lastName or email.
 5. Expired OTPs and refresh tokens are never cleaned up; the tables only grow.
 6. No limit on saved addresses.
 7. No request ids or error tracking, so a failure in production cannot be traced.
 8. Database TLS does not verify the certificate (known TODO).
 9. Swagger has no request or response schemas for addresses and bookings. The generated client (D11) needs them, so schemas must be added first.
 10. No Dockerfile or deployment.
+
+### Second review: bugs found and fixed (22 Oct, night)
+- **SMS vendor down:** the customer got a 500 and was locked out for 30 seconds, and the failed code counted against the hourly limit. Now the code is removed and the API answers `SMS_FAILED` (502) so they can retry at once.
+- **Address could not be deleted** if it had an old session that never finished (stuck in `matching`). Now only sessions still ahead, or without a time yet, block deletion.
+- **Production safety:** the API now refuses to start in production with `SMS_PROVIDER=console` (it prints every OTP to the log) or with the same value for both secrets.
+- 71 tests pass (6 new).
+
+### Second review: found, not fixed (needs a decision or a later module)
+- **Sessions that never get a coach stay `matching` forever**, even after their start time passes (no matching module, no expiry job). The app will show them as upcoming. The expiry rule needs a business answer (questions 29 to 34).
+- **Behind a load balancer set `TRUST_PROXY=true`.** Otherwise every customer shares one rate limit and the 121st request in a minute from anyone is refused.
+- **Deleted accounts:** the phone number is unique, so a deleted customer could never sign up again. Account deletion must anonymise the phone number.
+- **Switching the app from the mock to the API** needs: refresh-token handling (the mock has only one token), new error codes in the app (`UNAUTHORIZED`, `ACCOUNT_BLOCKED`, `EMAIL_TAKEN`, `IDEMPOTENCY_KEY_REUSED`, `TOO_MANY_REQUESTS`, `SMS_FAILED`, `INTERNAL`), and scheduled bookings now start as `matching` with no coach (the mock confirmed them at once).
+- Ten simultaneous requests from one customer can hold all 10 database connections while they wait on that customer's lock. Fine for normal use; matters only under abuse.
+- A customer can save unlimited addresses.
 
 ### Database actions that must still be run by hand
 1. `supabase db push` applies migrations 0003 and 0004 only. It does **not** run `seed.sql`.

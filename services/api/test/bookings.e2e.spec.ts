@@ -109,6 +109,13 @@ suite('addresses, slots and bookings', () => {
       await http().put(`/v1/addresses/${mine.id}/default`).set(as(otherToken)).expect(404);
     });
 
+    it('lets an address go once its only session is in the past', async () => {
+      const address = (await addAddress(token).expect(201)).body;
+      const b = await bookScheduled(token, address.id, slot(3)).expect(201);
+      await pool.query(`update bookings set starts_at = now() - interval '1 day' where id = $1`, [b.body.id]);
+      await http().delete(`/v1/addresses/${address.id}`).set(as(token)).expect(200);
+    });
+
     it('refuses to delete an address with an upcoming session', async () => {
       const address = (await addAddress(token).expect(201)).body;
       await bookScheduled(token, address.id, slot(3)).expect(201);

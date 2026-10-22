@@ -31,6 +31,7 @@ export class OtpService {
     assertIndianMobile(phone);
     const code = this.config.DEV_FIXED_OTP ?? String(randomInt(0, 1_000_000)).padStart(6, '0');
 
+    const challengeId = uuidv7();
     await this.db.tx(async (client) => {
       // One request per phone at a time, so two taps cannot both pass the limits below.
       await client.query('select pg_advisory_xact_lock(hashtext($1))', [phone]);
@@ -56,12 +57,18 @@ export class OtpService {
       await client.query(
         `insert into otp_challenges (id, phone_e164, code_hash, expires_at)
          values ($1, $2, $3, now() + make_interval(secs => $4))`,
-        [uuidv7(), phone, this.hash(phone, code), this.config.OTP_TTL_SECONDS],
+        [challengeId, phone, this.hash(phone, code), this.config.OTP_TTL_SECONDS],
       );
     });
 
     // The SMS goes out after the commit: a rolled-back request must never text anyone.
-    await this.sms.send(phone, `${code} is your Zoove verification code. It is valid for ${Math.round(this.config.OTP_TTL_SECONDS / 60)} minutes.`);
+    try {
+      await this.sms.send(phone, `${code} is your Zoove verification code. It is valid for ${Math.round(this.config.OTP_TTL_SECONDS / 60)} minutes.`);
+    } catch (error) {
+      // The customer never got a code, so do not make them wait 30 seconds or spend one of their hourly codes.
+      await this.db.query('delete from otp_challenges where id = $1', [challengeId]);
+      throw new DomainError('SMS_FAILED', 'We could not send the code. Please try again.', undefined, { cause: error });
+    }
     return { resendAfterSeconds: this.config.OTP_RESEND_SECONDS };
   }
 
