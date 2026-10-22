@@ -72,6 +72,10 @@ export default function RootLayout() {
           <Stack.Screen name="orders" />
           <Stack.Screen name="packages" />
           <Stack.Screen name="party" />
+          <Stack.Screen name="academy" />
+          <Stack.Screen name="help" />
+          <Stack.Screen name="policies" />
+          <Stack.Screen name="referral" />
           <Stack.Screen name="addresses" />
           <Stack.Screen name="notifications" />
           <Stack.Screen name="profile" />

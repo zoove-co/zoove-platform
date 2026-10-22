@@ -81,4 +81,25 @@ Pratik shared a "Zoove Party" flow (Drive: Zoove Prototype Images Repository / Z
 - Everything in the mockup that looks like a business rule (prices, durations, add-ons, guest limits, trainer gender choice) is a placeholder until Pratik confirms it. See open questions 35 to 42.
 - Images from Pratik (logo, service tiles, participant tiles, banners, academy cards) are bundled as app assets for now. Later, banners and tiles should come from the admin panel (D13), the same way package prices do.
 
+## D17: API foundation: sign-in, errors, limits (built by Ritesh and Claude, 13 Oct 2026)
+The first API slice is in `services/api` (identity, catalog, health). It follows D4, D5, D6 and D7.
+- **Sign-in:** phone + 6-digit OTP, own implementation. The code is stored only as an HMAC hash, expires in 5 minutes, allows 5 wrong tries, then locks until a new code is requested. One new code per 30 seconds and 5 per hour per phone. Two people cannot use the same code at once (row lock).
+- **Tokens:** access token is a JWT valid 15 minutes; refresh token is random, stored hashed, valid 30 days, and replaced on every use. Using an old refresh token again is treated as theft and ends all of that user's sessions.
+- **New customers:** the first successful OTP creates the user with role `customer`. Blocked accounts cannot sign in.
+- **Errors:** always `{ "error": { "code", "message", "details" } }` with stable codes the apps can switch on.
+- **Versioning and limits:** routes live under `/v1` (health excluded). Global rate limit 120 requests a minute per address, tighter on the OTP routes.
+- **Secrets:** environment variables checked at start-up; the app will not start with a short secret, and refuses a fixed test OTP in production.
+- The numbers above (code length, expiry, limits, token lifetimes) are engineering defaults, not business rules. See open question 47.
+
+## D18: Booking API: safe retries, one source of truth for rules (built 22 Oct 2026)
+Addresses, slots and bookings are live in `services/api` (migration 0004).
+- **Retries are safe.** Every booking carries an idempotency key. The same key returns the same booking; the same key with a different request is refused. Two simultaneous requests cannot both create a booking.
+- **No double booking.** The database allows only one live booking per customer per start time, so this holds even if the code has a bug.
+- **Rules live in the API only** (`src/bookings/rules.ts`): slot times, the 2-hour change window, booking horizon. The app asks the API (`canChange`, slot `available`) and never decides.
+- **India time on the server.** Slots are built in Asia/Kolkata; times are stored as UTC.
+- **Prices are data** (D13): `service_prices`, with a default and per-service overrides. The seed prices are Pratik's prototype numbers, not confirmed.
+- **Serviceability** is "the pincode belongs to an active cluster" for now. Polygon checks come when cluster boundaries exist. Clusters stay locked until ops opens one.
+- **History and events.** Every change writes a `booking_events` row and an outbox event (D6) in the same transaction.
+- New bookings stay in `matching`. Coaches, matching, payments, packages and refunds are not built yet.
+
 ## Not decided (waiting on Pratik): see open-questions.md

@@ -30,8 +30,6 @@ export default function AccountScreen() {
     track('account_viewed');
   }, []);
 
-  const soon = (title: string) => router.push({ pathname: '/soon', params: { title } });
-
   const logout = async () => {
     track('signed_out');
     setConfirmingLogout(false);
@@ -82,8 +80,9 @@ export default function AccountScreen() {
         ) : null}
         <MenuRow icon="location-outline" label={t('account.addresses')} onPress={() => router.push('/addresses')} />
         <MenuRow icon="layers-outline" label={t('account.packages')} onPress={() => router.push('/packages')} />
-        <MenuRow icon="shield-checkmark-outline" label={t('account.policy')} onPress={() => soon(t('account.policy'))} />
-        <MenuRow icon="help-circle-outline" label={t('account.support')} onPress={() => soon(t('account.support'))} />
+        <MenuRow icon="gift-outline" label={t('account.referral')} onPress={() => router.push('/referral')} />
+        <MenuRow icon="shield-checkmark-outline" label={t('account.policy')} onPress={() => router.push('/policies')} />
+        <MenuRow icon="help-circle-outline" label={t('account.support')} onPress={() => router.push('/help')} />
         <MenuRow icon="log-out-outline" label={t('profile.logout')} onPress={() => setConfirmingLogout(true)} />
       </ScrollView>
 

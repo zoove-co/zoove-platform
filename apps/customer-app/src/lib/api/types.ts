@@ -276,6 +276,7 @@ export interface Api {
   listPastCoaches(): Promise<PastCoach[]>;
   listPackages(): Promise<SessionPackage[]>;
   getStreak(): Promise<StreakData>;
+  getReferralCode(): Promise<string>;
   savePartyPlan(input: PartyPlanInput): Promise<PartyPlan>;
   rescheduleBooking(id: string, startsAt: string): Promise<Booking>;
   // Development only: the mock implements it so the trainer-cancel flow can be tried by hand.

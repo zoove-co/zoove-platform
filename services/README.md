@@ -1,5 +1,5 @@
 # services
 
-`api`: NestJS modular monolith. Generated with the Nest CLI inside this folder (see the setup guide),
-then organised into modules: identity, catalog, clusters, and later credits, booking, matching,
-sessions, payments, notifications, streaks, reviews, support.
+`api`: NestJS modular monolith (see `api/README.md` for endpoints, running and testing).
+Built so far: identity (phone OTP sign-in, tokens, profile), catalog, health.
+Next modules: clusters, credits, booking, matching, sessions, payments, notifications, streaks, reviews, support.

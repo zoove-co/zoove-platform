@@ -799,6 +799,12 @@ export const mockApi: Api = {
     };
   },
 
+  async getReferralCode() {
+    await wait(150);
+    // The real API issues a unique code per customer. Rewards are undecided (open question 10).
+    return `ZOOVE${(signedInPhone ?? '0000').slice(-4)}`;
+  },
+
   async savePartyPlan(input) {
     await wait(500);
     if (input.guests < 2 || input.guests > 30) throw new ApiError('INVALID_REQUEST');

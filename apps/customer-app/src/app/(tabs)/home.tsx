@@ -215,7 +215,7 @@ export default function HomeScreen() {
         <AcademySection
           onOpen={(section) => {
             track('academy_viewed', { section });
-            openSoon('Zoove Academy');
+            router.push('/academy');
           }}
         />
       </ScrollView>

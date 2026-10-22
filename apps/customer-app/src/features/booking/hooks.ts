@@ -80,6 +80,10 @@ export function usePastCoaches() {
   return useQuery({ queryKey: ['past-coaches'], queryFn: () => api.listPastCoaches() });
 }
 
+export function useReferralCode() {
+  return useQuery({ queryKey: ['referral-code'], queryFn: () => api.getReferralCode(), staleTime: Infinity });
+}
+
 export function useStreak() {
   return useQuery({ queryKey: ['streak'], queryFn: () => api.getStreak() });
 }

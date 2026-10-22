@@ -43,3 +43,6 @@ Retention triggers planned in CleverTap: started but not confirmed within 30 min
 | `banner_tapped` | Customer taps a Home banner | `banner` |
 | `party_viewed` | Customer opens the Zoove Party planner | none |
 | `party_plan_saved` | Customer finishes the party planner | `occasion`, `activity`, `guests` |
+| `help_viewed` | Help & support opened | none |
+| `referral_viewed` | Refer a friend opened | none |
+| `referral_shared` | Customer taps Share on the referral screen | none |
