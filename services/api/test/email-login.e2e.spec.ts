@@ -140,7 +140,8 @@ suite('email sign-in (trainer page and admin panel)', () => {
   it('prefills the application with the verified email and asks for a phone number', async () => {
     const t = (await login('applicant@example.com')).body.token as string;
     const view = await http().get('/v1/trainer-application').set(as(t)).expect(200);
-    // Nothing is saved until the first save, so the email shows up once an application exists.
+    // Nothing is saved yet, but the form already starts with the email they signed in with.
+    expect(view.body.form.email).toBe('applicant@example.com');
     expect(view.body.missing).toContain('phone');
     await http().put('/v1/trainer-application').set(as(t)).send({ firstName: 'Ravi' }).expect(200);
     const saved = await http().get('/v1/trainer-application').set(as(t)).expect(200);

@@ -146,7 +146,9 @@ export class TrainerApplicationsService {
     const found = await this.db.query<AppRow>(`select ${APP_COLUMNS} from trainer_applications where user_id = $1`, [userId]);
     const row = found.rows[0];
     if (!row) {
-      return { id: null, status: 'none', form: emptyForm(), documents: [], missing: this.missingFor(null, []), canEdit: true, canSubmit: false, reviewNote: null, submittedAt: null };
+      // Nothing saved yet: show the email they signed in with, so the form starts with it filled in.
+      const who = await this.db.query<{ verified_email: string | null }>(`select verified_email from users where id = $1`, [userId]);
+      return { id: null, status: 'none', form: { ...emptyForm(), email: who.rows[0]?.verified_email ?? null }, documents: [], missing: this.missingFor(null, []), canEdit: true, canSubmit: false, reviewNote: null, submittedAt: null };
     }
     const docs = await this.db.query<DocRow>(
       `select id, kind, status, reviewer_note, mime_type, uploaded_at from trainer_documents
