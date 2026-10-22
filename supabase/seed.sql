@@ -27,6 +27,8 @@ on conflict (slug) do update set
   sort_order = excluded.sort_order;
 
 update services set is_active = false where slug = 'hiit';
+update service_formats set is_active = false
+ where service_id in (select id from services where is_active = false);
 
 -- Styles (formats) with the copy used in the app. Re-running updates names and descriptions.
 insert into service_formats (service_id, slug, name, description, sort_order)
