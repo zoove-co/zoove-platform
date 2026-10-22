@@ -63,7 +63,7 @@ export class OtpService {
 
     // The SMS goes out after the commit: a rolled-back request must never text anyone.
     try {
-      await this.sms.send(phone, `${code} is your Zoove verification code. It is valid for ${Math.round(this.config.OTP_TTL_SECONDS / 60)} minutes.`);
+      await this.sms.sendOtp(phone, code, Math.max(1, Math.round(this.config.OTP_TTL_SECONDS / 60)));
     } catch (error) {
       // The customer never got a code, so do not make them wait 30 seconds or spend one of their hourly codes.
       await this.db.query('delete from otp_challenges where id = $1', [challengeId]);
@@ -72,7 +72,13 @@ export class OtpService {
     return { resendAfterSeconds: this.config.OTP_RESEND_SECONDS };
   }
 
-  async verify(phone: string, code: string, device: Record<string, unknown> = {}): Promise<VerifyResult> {
+  // audience 'trainer' is the trainer web page: the person signs in but is NOT made a customer.
+  async verify(
+    phone: string,
+    code: string,
+    device: Record<string, unknown> = {},
+    audience: 'customer' | 'trainer' = 'customer',
+  ): Promise<VerifyResult> {
     assertIndianMobile(phone);
 
     // Wrong guesses must be counted even though the request fails, so the transaction returns an
@@ -108,7 +114,9 @@ export class OtpService {
       if (!row) throw new Error('User upsert returned no row');
       if (row.status !== 'active') return { kind: 'blocked' };
 
-      await client.query(`insert into user_roles (user_id, role) values ($1, 'customer') on conflict do nothing`, [row.id]);
+      if (audience === 'customer') {
+        await client.query(`insert into user_roles (user_id, role) values ($1, 'customer') on conflict do nothing`, [row.id]);
+      }
       const tokens = await this.tokens.issue(client, row.id, device);
       return { kind: 'ok', tokens, isNewUser: row.inserted };
     });

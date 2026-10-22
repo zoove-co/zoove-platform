@@ -7,6 +7,7 @@ import { AuthGuard } from './auth.guard';
 import { MeController } from './me.controller';
 import { OtpService } from './otp.service';
 import { ConsoleSmsProvider } from './sms/console-sms.provider';
+import { Msg91SmsProvider } from './sms/msg91-sms.provider';
 import { SmsProvider } from './sms/sms.provider';
 import { TokenService } from './token.service';
 import { UsersService } from './users.service';
@@ -27,8 +28,14 @@ import { UsersService } from './users.service';
     TokenService,
     UsersService,
     AuthGuard,
-    // The real provider (MSG91 or similar) is chosen here from SMS_PROVIDER once it exists.
-    { provide: SmsProvider, useClass: ConsoleSmsProvider },
+    ConsoleSmsProvider,
+    Msg91SmsProvider,
+    {
+      provide: SmsProvider,
+      inject: [APP_CONFIG, ConsoleSmsProvider, Msg91SmsProvider],
+      useFactory: (config: Env, consoleProvider: ConsoleSmsProvider, msg91: Msg91SmsProvider) =>
+        config.SMS_PROVIDER === 'msg91' ? msg91 : consoleProvider,
+    },
   ],
   exports: [AuthGuard, TokenService],
 })

@@ -102,4 +102,26 @@ Addresses, slots and bookings are live in `services/api` (migration 0004).
 - **History and events.** Every change writes a `booking_events` row and an outbox event (D6) in the same transaction.
 - New bookings stay in `matching`. Coaches, matching, payments, packages and refunds are not built yet.
 
+## D19: Cancellation, refunds and payments: direction (decided 23 Oct 2026, not built yet)
+Founder direction, in plain terms:
+- **Reschedule first.** A customer who cannot attend is offered a new day. Cancelling is the second choice.
+- **Emergency cancellation exists.** It is a request, so ops can see why.
+- **Applies to every kind of session** (single, group, party). Today the API only models single "personal" sessions.
+- **A cancellation is a request with its own progress:** requested, in progress, done. The customer sees it. It is separate from the booking's own status.
+- **Refunds go back to the wallet or to the original payment source**, with their own progress (started, processing, done or failed).
+- **A third-party payment gateway handles money.** Recommendation: Razorpay (see open question 49 for the final pick).
+- **Prices are controlled by the Zoove team in the admin portal** (per session type, and changes show in the customer app). The `service_prices` table (D13) is built for this. The real prices and refund amounts are decided later.
+Engineering rules we will follow when we build it: payments and refunds are idempotent; the gateway's webhook is the source of truth for "paid" and "refunded", never the app; wallet balance is a ledger of entries, never a single editable number; every state change writes an event.
+
+## D20: Trainer onboarding on the web first (decided 23 Oct 2026, backend built)
+Trainers apply through a web page now and through the trainer app later. Both use the same API and tables.
+- **Why web first:** shipping and approving a trainer app in both stores takes much longer; the team (Akash) can start onboarding trainers right away. The page goes on its own address (join.zoove.co); the landing page at zoove.co is not touched.
+- **Same sign-in as the apps:** phone number and OTP (`audience: trainer` signs in without creating a customer account). An applicant has no role until approved; approval creates the `trainers` row and gives the `trainer` role.
+- **Application lifecycle:** draft, submitted, in review, changes requested, approved or rejected. Every step is recorded in `trainer_application_events`.
+- **Files are never in the database.** Aadhaar copy, PAN, certificates and the selfie go to private S3-compatible storage (Supabase Storage now, AWS S3 later: same code). The database keeps the storage key and the review status. Uploads pass through the API, which checks the real file type and size. Reviewers open a file through a 5-minute signed link, and every view is written to `audit_log`.
+- **Sensitive numbers:** PAN is encrypted (AES-256-GCM, `PII_SECRET`) with a one-way fingerprint to stop reuse. Only the last 4 digits of Aadhaar are stored, never the full number.
+- **Emails come from the outbox.** The submit and review actions write events; a background worker sends "received", "changes needed", "approved" and "rejected" emails and alerts the team. Failed emails retry with a growing delay. Provider: Resend now, replaceable (SES later).
+- **Admin panel** reads the same API (`/v1/admin/trainer-applications`, `admin` role only). New applications show up by refreshing the list every few seconds; push updates can come later.
+- Required today: name, date of birth, gender, email, address, specialties, experience, PAN, Aadhaar last 4, Aadhaar front and back, PAN card photo, live selfie. Certificates optional. See open questions 53-56.
+
 ## Not decided (waiting on Pratik): see open-questions.md

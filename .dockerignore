@@ -1,0 +1,16 @@
+**/node_modules
+**/dist
+**/dist-tsc
+**/.git
+.git
+**/.expo
+**/.next
+**/.env
+**/.env.*
+!**/.env.example
+.tmp-preview
+**/_to_delete
+apps
+docs
+supabase
+services/api/api-client

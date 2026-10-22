@@ -9,7 +9,12 @@ import { OtpService, type VerifyResult } from './otp.service';
 import { TokenService } from './token.service';
 
 const requestSchema = z.object({ phone: z.string().min(1).max(20) });
-const verifySchema = z.object({ phone: z.string().min(1).max(20), code: z.string().regex(/^\d{6}$/, 'The code has 6 digits') });
+const verifySchema = z.object({
+  phone: z.string().min(1).max(20),
+  code: z.string().regex(/^\d{6}$/, 'The code has 6 digits'),
+  // 'trainer' is used by the trainer onboarding page: signs in without creating a customer account.
+  audience: z.enum(['customer', 'trainer']).default('customer'),
+});
 const refreshSchema = z.object({ refreshToken: z.string().min(20).max(200) });
 
 const tokenResponse: NonNullable<ApiResponseSchemaHost['schema']> = {
@@ -51,13 +56,17 @@ export class AuthController {
   @ApiBody({
     schema: {
       type: 'object',
-      properties: { phone: { type: 'string', example: '+919876543210' }, code: { type: 'string', example: '123456' } },
+      properties: {
+        phone: { type: 'string', example: '+919876543210' },
+        code: { type: 'string', example: '123456' },
+        audience: { type: 'string', enum: ['customer', 'trainer'], default: 'customer' },
+      },
       required: ['phone', 'code'],
     },
   })
   @ApiOkResponse({ schema: tokenResponse })
   verifyOtp(@Body(new ZodValidationPipe(verifySchema)) body: z.infer<typeof verifySchema>, @Req() request: Request): Promise<VerifyResult> {
-    return this.otp.verify(body.phone, body.code, deviceOf(request));
+    return this.otp.verify(body.phone, body.code, deviceOf(request), body.audience);
   }
 
   @Post('refresh')

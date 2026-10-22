@@ -9,8 +9,12 @@ import { AddressesModule } from './addresses/addresses.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { DatabaseModule } from './database/database.module';
+import { EmailModule } from './email/email.module';
 import { HealthModule } from './health/health.module';
 import { IdentityModule } from './identity/identity.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { StorageModule } from './storage/storage.module';
+import { TrainersModule } from './trainers/trainers.module';
 
 // Modular monolith (decision D4): each module owns its tables and exposes services, never raw SQL on
 // another module's tables. A module can be pulled out into its own service later.
@@ -27,10 +31,14 @@ import { IdentityModule } from './identity/identity.module';
       }),
     }),
     HealthModule,
+    StorageModule,
+    EmailModule,
     IdentityModule,
     CatalogModule,
     AddressesModule,
     BookingsModule,
+    TrainersModule,
+    NotificationsModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
