@@ -1,0 +1,30 @@
+meta {
+  name: Ready
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/health/ready
+  body: none
+  auth: none
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("status is ok", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(res.body.status === 'ok')).to.equal(true);
+  });
+}
+
+docs {
+  Can the API reach the database?
+}

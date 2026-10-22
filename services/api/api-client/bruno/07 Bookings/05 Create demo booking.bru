@@ -1,0 +1,51 @@
+meta {
+  name: Create demo booking
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/v1/bookings
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "serviceSlug": "yoga",
+    "formatSlug": "power-yoga",
+    "mode": "demo",
+    "participant": "personal",
+    "addressId": "{{addressId}}",
+    "startsAt": "{{startsAtLater}}",
+    "idempotencyKey": "{{demoKey}}"
+  }
+}
+
+script:pre-request {
+  bru.setVar('demoKey', 'req-' + Date.now() + '-d');
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+  bru.setVar('demoBookingId', res.body.id);
+}
+
+assert {
+  res.status: eq 201
+}
+
+tests {
+  test("price is 500 rupees", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(res.body.totalPaise === 50000)).to.equal(true);
+  });
+}
+
+docs {
+  The discounted first session.
+}

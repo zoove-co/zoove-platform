@@ -1,0 +1,40 @@
+meta {
+  name: Check serviceability (not served)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/v1/addresses/serviceability
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "pincode": "110001"
+  }
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("not serviceable", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(res.body.serviceable === false)).to.equal(true);
+  });
+}
+
+docs {
+  A pincode outside every cluster.
+}

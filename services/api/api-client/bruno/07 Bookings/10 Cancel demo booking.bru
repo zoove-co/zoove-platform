@@ -1,0 +1,34 @@
+meta {
+  name: Cancel demo booking
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/v1/bookings/{{demoBookingId}}/cancel
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+}
+
+assert {
+  res.status: eq 201
+}
+
+tests {
+  test("cancelled", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(res.body.status === 'cancelled')).to.equal(true);
+  });
+}
+
+docs {
+  Frees the 7 PM slot so this collection can be run again.
+}

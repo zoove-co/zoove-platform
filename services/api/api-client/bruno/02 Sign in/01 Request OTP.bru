@@ -1,0 +1,36 @@
+meta {
+  name: Request OTP
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/v1/auth/otp/request
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "phone": "{{phone}}"
+  }
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("resend wait is returned", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(typeof res.body.resendAfterSeconds === 'number')).to.equal(true);
+  });
+}
+
+docs {
+  Sends a 6-digit code to an Indian mobile number. One code per 30 seconds, 5 per hour.
+}

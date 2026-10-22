@@ -1,0 +1,44 @@
+meta {
+  name: Add address outside service area
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/v1/addresses
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "label": "Office",
+    "line": "Connaught Place, Block A",
+    "area": "New Delhi",
+    "pincode": "110001"
+  }
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+  bru.setVar('outsideAddressId', res.body.id);
+}
+
+assert {
+  res.status: eq 201
+}
+
+tests {
+  test("not serviceable", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(res.body.serviceable === false)).to.equal(true);
+  });
+}
+
+docs {
+  Allowed, but marked serviceable: false and cannot be booked.
+}

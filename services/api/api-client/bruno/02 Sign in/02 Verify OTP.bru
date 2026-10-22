@@ -1,0 +1,43 @@
+meta {
+  name: Verify OTP
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/v1/auth/otp/verify
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "phone": "{{phone}}",
+    "code": "{{otp}}"
+  }
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+  bru.setVar('accessToken', res.body.token);
+  bru.setVar('refreshToken', res.body.refreshToken);
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("has access token", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(typeof res.body.token === 'string')).to.equal(true);
+  });
+  test("has refresh token", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(typeof res.body.refreshToken === 'string')).to.equal(true);
+  });
+}
+
+docs {
+  Exchanges the code for tokens. First sign-in creates the customer. Saves the tokens for the other requests.
+}

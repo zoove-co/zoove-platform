@@ -1,0 +1,36 @@
+meta {
+  name: Bad phone number
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/v1/auth/otp/request
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "phone": "+14155550123"
+  }
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+}
+
+assert {
+  res.status: eq 400
+}
+
+tests {
+  test("code", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(res.body.error.code === 'INVALID_PHONE')).to.equal(true);
+  });
+}
+
+docs {
+  Only Indian mobile numbers (+91) are accepted.
+}

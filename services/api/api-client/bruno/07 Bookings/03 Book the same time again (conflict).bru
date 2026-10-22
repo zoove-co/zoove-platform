@@ -1,0 +1,50 @@
+meta {
+  name: Book the same time again (conflict)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/v1/bookings
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "serviceSlug": "yoga",
+    "formatSlug": "power-yoga",
+    "mode": "scheduled",
+    "participant": "personal",
+    "addressId": "{{addressId}}",
+    "startsAt": "{{startsAtEvening}}",
+    "idempotencyKey": "{{otherKey}}"
+  }
+}
+
+script:pre-request {
+  bru.setVar('otherKey', 'req-' + Date.now() + '-b');
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+}
+
+assert {
+  res.status: eq 409
+}
+
+tests {
+  test("conflict code", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(res.body.error.code === 'SLOT_CONFLICT')).to.equal(true);
+  });
+}
+
+docs {
+  A second live session at the same start time is refused: SLOT_CONFLICT.
+}

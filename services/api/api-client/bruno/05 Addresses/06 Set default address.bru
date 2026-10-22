@@ -1,0 +1,34 @@
+meta {
+  name: Set default address
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{baseUrl}}/v1/addresses/{{addressId}}/default
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("chosen is first", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(res.body[0].id === v('addressId'))).to.equal(true);
+  });
+}
+
+docs {
+  Returns the updated list.
+}

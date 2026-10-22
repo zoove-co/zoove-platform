@@ -1,0 +1,42 @@
+meta {
+  name: Update my profile
+  type: http
+  seq: 2
+}
+
+patch {
+  url: {{baseUrl}}/v1/me
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "firstName": "Ritesh",
+    "lastName": "Sharma",
+    "email": "ritesh.test@example.com"
+  }
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("name saved", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(res.body.firstName === 'Ritesh')).to.equal(true);
+  });
+}
+
+docs {
+  First name is required (2 to 60 characters). Email must be unique.
+}

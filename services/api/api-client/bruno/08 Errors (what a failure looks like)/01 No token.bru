@@ -1,0 +1,30 @@
+meta {
+  name: No token
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/v1/me
+  body: none
+  auth: none
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+}
+
+assert {
+  res.status: eq 401
+}
+
+tests {
+  test("code", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(res.body.error.code === 'UNAUTHORIZED')).to.equal(true);
+  });
+}
+
+docs {
+  Every failure has the same shape: { error: { code, message, details } }.
+}

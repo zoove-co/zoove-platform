@@ -1,0 +1,38 @@
+meta {
+  name: Refresh tokens
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/v1/auth/refresh
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "refreshToken": "{{refreshToken}}"
+  }
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+  bru.setVar('accessToken', res.body.token);
+  bru.setVar('refreshToken', res.body.refreshToken);
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("new token", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(typeof res.body.token === 'string')).to.equal(true);
+  });
+}
+
+docs {
+  Returns a new pair. The old refresh token stops working; using it again signs the customer out everywhere.
+}

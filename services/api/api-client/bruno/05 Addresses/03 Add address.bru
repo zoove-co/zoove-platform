@@ -1,0 +1,46 @@
+meta {
+  name: Add address
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/v1/addresses
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "label": "Home",
+    "line": "A-1203, Rustomjee Seasons",
+    "area": "Bandra West, Mumbai",
+    "pincode": "400050",
+    "latitude": 19.0596,
+    "longitude": 72.8295
+  }
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+  bru.setVar('addressId', res.body.id);
+}
+
+assert {
+  res.status: eq 201
+}
+
+tests {
+  test("has id", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(typeof res.body.id === 'string')).to.equal(true);
+  });
+}
+
+docs {
+  Saving is always allowed. The first address becomes the default. The same address twice is saved once.
+}

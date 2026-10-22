@@ -1,0 +1,1655 @@
+{
+  "info": {
+    "name": "Zoove API",
+    "description": "Every Zoove API request in the order of a real customer journey. Run \"Verify OTP\" first; it saves the tokens.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const day = (n) => new Date(Date.now() + 330 * 60000 + n * 86400000).toISOString().slice(0, 10);",
+          "const at = (n, t) => new Date(day(n) + 'T' + t + ':00+05:30').toISOString();",
+          "pm.collectionVariables.set('slotDate', day(3));",
+          "pm.collectionVariables.set('startsAtEvening', at(3, '18:00'));",
+          "pm.collectionVariables.set('startsAtLater', at(3, '19:00'));",
+          "pm.collectionVariables.set('startsAtMorning', at(4, '07:00'));"
+        ]
+      }
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Alive",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 200', () => pm.expect(res.status).to.equal(200));",
+                  "pm.test(\"status is ok\", () => pm.expect(Boolean(res.body.status === 'ok')).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Is the process up? Used by the load balancer."
+          }
+        },
+        {
+          "name": "Ready",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 200', () => pm.expect(res.status).to.equal(200));",
+                  "pm.test(\"status is ok\", () => pm.expect(Boolean(res.body.status === 'ok')).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/health/ready",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health",
+                "ready"
+              ]
+            },
+            "description": "Can the API reach the database?"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sign in",
+      "item": [
+        {
+          "name": "Request OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 200', () => pm.expect(res.status).to.equal(200));",
+                  "pm.test(\"resend wait is returned\", () => pm.expect(Boolean(typeof res.body.resendAfterSeconds === 'number')).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{phone}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/auth/otp/request",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "otp",
+                "request"
+              ]
+            },
+            "description": "Sends a 6-digit code to an Indian mobile number. One code per 30 seconds, 5 per hour."
+          }
+        },
+        {
+          "name": "Verify OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 200', () => pm.expect(res.status).to.equal(200));",
+                  "pm.test(\"has access token\", () => pm.expect(Boolean(typeof res.body.token === 'string')).to.equal(true));",
+                  "pm.test(\"has refresh token\", () => pm.expect(Boolean(typeof res.body.refreshToken === 'string')).to.equal(true));",
+                  "pm.collectionVariables.set('accessToken', res.body.token);",
+                  "pm.collectionVariables.set('refreshToken', res.body.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{phone}}\",\n  \"code\": \"{{otp}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/auth/otp/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "otp",
+                "verify"
+              ]
+            },
+            "description": "Exchanges the code for tokens. First sign-in creates the customer. Saves the tokens for the other requests."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Profile",
+      "item": [
+        {
+          "name": "Get my profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 200', () => pm.expect(res.status).to.equal(200));",
+                  "pm.test(\"phone matches\", () => pm.expect(Boolean(res.body.phone === v('phone'))).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "me"
+              ]
+            },
+            "description": "The signed-in customer."
+          }
+        },
+        {
+          "name": "Update my profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 200', () => pm.expect(res.status).to.equal(200));",
+                  "pm.test(\"name saved\", () => pm.expect(Boolean(res.body.firstName === 'Ritesh')).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ritesh\",\n  \"lastName\": \"Sharma\",\n  \"email\": \"ritesh.test@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "me"
+              ]
+            },
+            "description": "First name is required (2 to 60 characters). Email must be unique."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Catalog",
+      "item": [
+        {
+          "name": "List services",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 200', () => pm.expect(res.status).to.equal(200));",
+                  "pm.test(\"has services\", () => pm.expect(Boolean(res.body.length > 0)).to.equal(true));",
+                  "pm.test(\"prices are in paise\", () => pm.expect(Boolean(typeof res.body[0].pricePaise.scheduled === 'number')).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/services",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "services"
+              ]
+            },
+            "description": "Active services with styles and prices in paise (no sign-in needed)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Addresses",
+      "item": [
+        {
+          "name": "Check serviceability (served)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 200', () => pm.expect(res.status).to.equal(200));",
+                  "pm.test(\"answer is boolean\", () => pm.expect(Boolean(typeof res.body.serviceable === 'boolean')).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pincode\": \"400050\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/addresses/serviceability",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "addresses",
+                "serviceability"
+              ]
+            },
+            "description": "Do we serve this pincode yet? True only if its cluster is active."
+          }
+        },
+        {
+          "name": "Check serviceability (not served)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 200', () => pm.expect(res.status).to.equal(200));",
+                  "pm.test(\"not serviceable\", () => pm.expect(Boolean(res.body.serviceable === false)).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pincode\": \"110001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/addresses/serviceability",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "addresses",
+                "serviceability"
+              ]
+            },
+            "description": "A pincode outside every cluster."
+          }
+        },
+        {
+          "name": "Add address",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 201', () => pm.expect(res.status).to.equal(201));",
+                  "pm.test(\"has id\", () => pm.expect(Boolean(typeof res.body.id === 'string')).to.equal(true));",
+                  "pm.collectionVariables.set('addressId', res.body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"Home\",\n  \"line\": \"A-1203, Rustomjee Seasons\",\n  \"area\": \"Bandra West, Mumbai\",\n  \"pincode\": \"400050\",\n  \"latitude\": 19.0596,\n  \"longitude\": 72.8295\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/addresses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "addresses"
+              ]
+            },
+            "description": "Saving is always allowed. The first address becomes the default. The same address twice is saved once."
+          }
+        },
+        {
+          "name": "Add address outside service area",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 201', () => pm.expect(res.status).to.equal(201));",
+                  "pm.test(\"not serviceable\", () => pm.expect(Boolean(res.body.serviceable === false)).to.equal(true));",
+                  "pm.collectionVariables.set('outsideAddressId', res.body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"Office\",\n  \"line\": \"Connaught Place, Block A\",\n  \"area\": \"New Delhi\",\n  \"pincode\": \"110001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/addresses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "addresses"
+              ]
+            },
+            "description": "Allowed, but marked serviceable: false and cannot be booked."
+          }
+        },
+        {
+          "name": "List addresses",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 200', () => pm.expect(res.status).to.equal(200));",
+                  "pm.test(\"has addresses\", () => pm.expect(Boolean(res.body.length >= 2)).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/addresses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "addresses"
+              ]
+            },
+            "description": "Default first."
+          }
+        },
+        {
+          "name": "Set default address",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 200', () => pm.expect(res.status).to.equal(200));",
+                  "pm.test(\"chosen is first\", () => pm.expect(Boolean(res.body[0].id === v('addressId'))).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/addresses/{{addressId}}/default",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "addresses",
+                "{{addressId}}",
+                "default"
+              ]
+            },
+            "description": "Returns the updated list."
+          }
+        },
+        {
+          "name": "Delete address",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 200', () => pm.expect(res.status).to.equal(200));",
+                  "pm.test(\"one left\", () => pm.expect(Boolean(res.body.length === 1)).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/addresses/{{outsideAddressId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "addresses",
+                "{{outsideAddressId}}"
+              ]
+            },
+            "description": "Returns the updated list. Refused (409 ADDRESS_IN_USE) while a session is booked there."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Slots",
+      "item": [
+        {
+          "name": "Get slots for a day",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 200', () => pm.expect(res.status).to.equal(200));",
+                  "pm.test(\"eight slots\", () => pm.expect(Boolean(res.body.length === 8)).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/slots?service=yoga&date={{slotDate}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "slots"
+              ],
+              "query": [
+                {
+                  "key": "service",
+                  "value": "yoga"
+                },
+                {
+                  "key": "date",
+                  "value": "{{slotDate}}"
+                }
+              ]
+            },
+            "description": "Eight start times in India time. available is false for past times and times already booked."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bookings",
+      "item": [
+        {
+          "name": "Create scheduled booking",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const day = (n) => new Date(Date.now() + 330 * 60000 + n * 86400000).toISOString().slice(0, 10);",
+                  "const at = (n, t) => new Date(day(n) + 'T' + t + ':00+05:30').toISOString();",
+                  "pm.collectionVariables.set('bookingKey', 'req-' + Date.now());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 201', () => pm.expect(res.status).to.equal(201));",
+                  "pm.test(\"status is matching\", () => pm.expect(Boolean(res.body.status === 'matching')).to.equal(true));",
+                  "pm.test(\"price is 1500 rupees\", () => pm.expect(Boolean(res.body.totalPaise === 150000)).to.equal(true));",
+                  "pm.collectionVariables.set('bookingId', res.body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceSlug\": \"yoga\",\n  \"formatSlug\": \"power-yoga\",\n  \"mode\": \"scheduled\",\n  \"participant\": \"personal\",\n  \"addressId\": \"{{addressId}}\",\n  \"startsAt\": \"{{startsAtEvening}}\",\n  \"idempotencyKey\": \"{{bookingKey}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/bookings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "bookings"
+              ]
+            },
+            "description": "The idempotencyKey makes a retry safe: same key, same booking."
+          }
+        },
+        {
+          "name": "Retry the same booking (same key)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 201', () => pm.expect(res.status).to.equal(201));",
+                  "pm.test(\"same booking id\", () => pm.expect(Boolean(res.body.id === v('bookingId'))).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceSlug\": \"yoga\",\n  \"formatSlug\": \"power-yoga\",\n  \"mode\": \"scheduled\",\n  \"participant\": \"personal\",\n  \"addressId\": \"{{addressId}}\",\n  \"startsAt\": \"{{startsAtEvening}}\",\n  \"idempotencyKey\": \"{{bookingKey}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/bookings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "bookings"
+              ]
+            },
+            "description": "Returns the SAME booking, not a second one."
+          }
+        },
+        {
+          "name": "Book the same time again (conflict)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const day = (n) => new Date(Date.now() + 330 * 60000 + n * 86400000).toISOString().slice(0, 10);",
+                  "const at = (n, t) => new Date(day(n) + 'T' + t + ':00+05:30').toISOString();",
+                  "pm.collectionVariables.set('otherKey', 'req-' + Date.now() + '-b');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 409', () => pm.expect(res.status).to.equal(409));",
+                  "pm.test(\"conflict code\", () => pm.expect(Boolean(res.body.error.code === 'SLOT_CONFLICT')).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceSlug\": \"yoga\",\n  \"formatSlug\": \"power-yoga\",\n  \"mode\": \"scheduled\",\n  \"participant\": \"personal\",\n  \"addressId\": \"{{addressId}}\",\n  \"startsAt\": \"{{startsAtEvening}}\",\n  \"idempotencyKey\": \"{{otherKey}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/bookings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "bookings"
+              ]
+            },
+            "description": "A second live session at the same start time is refused: SLOT_CONFLICT."
+          }
+        },
+        {
+          "name": "Create instant booking",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const day = (n) => new Date(Date.now() + 330 * 60000 + n * 86400000).toISOString().slice(0, 10);",
+                  "const at = (n, t) => new Date(day(n) + 'T' + t + ':00+05:30').toISOString();",
+                  "pm.collectionVariables.set('instantKey', 'req-' + Date.now() + '-i');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 201', () => pm.expect(res.status).to.equal(201));",
+                  "pm.test(\"no start time\", () => pm.expect(Boolean(res.body.startsAt === null)).to.equal(true));",
+                  "pm.test(\"price is 1899 rupees\", () => pm.expect(Boolean(res.body.totalPaise === 189900)).to.equal(true));",
+                  "pm.collectionVariables.set('instantBookingId', res.body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceSlug\": \"yoga\",\n  \"formatSlug\": \"power-yoga\",\n  \"mode\": \"instant\",\n  \"participant\": \"personal\",\n  \"addressId\": \"{{addressId}}\",\n  \"idempotencyKey\": \"{{instantKey}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/bookings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "bookings"
+              ]
+            },
+            "description": "No start time: we find the first free coach."
+          }
+        },
+        {
+          "name": "Create demo booking",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const day = (n) => new Date(Date.now() + 330 * 60000 + n * 86400000).toISOString().slice(0, 10);",
+                  "const at = (n, t) => new Date(day(n) + 'T' + t + ':00+05:30').toISOString();",
+                  "pm.collectionVariables.set('demoKey', 'req-' + Date.now() + '-d');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 201', () => pm.expect(res.status).to.equal(201));",
+                  "pm.test(\"price is 500 rupees\", () => pm.expect(Boolean(res.body.totalPaise === 50000)).to.equal(true));",
+                  "pm.collectionVariables.set('demoBookingId', res.body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceSlug\": \"yoga\",\n  \"formatSlug\": \"power-yoga\",\n  \"mode\": \"demo\",\n  \"participant\": \"personal\",\n  \"addressId\": \"{{addressId}}\",\n  \"startsAt\": \"{{startsAtLater}}\",\n  \"idempotencyKey\": \"{{demoKey}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/bookings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "bookings"
+              ]
+            },
+            "description": "The discounted first session."
+          }
+        },
+        {
+          "name": "List my bookings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 200', () => pm.expect(res.status).to.equal(200));",
+                  "pm.test(\"has my bookings\", () => pm.expect(Boolean(res.body.length >= 3)).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/bookings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "bookings"
+              ]
+            },
+            "description": "Newest first. Only mine."
+          }
+        },
+        {
+          "name": "Get one booking",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 200', () => pm.expect(res.status).to.equal(200));",
+                  "pm.test(\"can change\", () => pm.expect(Boolean(res.body.canChange === true)).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/bookings/{{bookingId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "bookings",
+                "{{bookingId}}"
+              ]
+            },
+            "description": "canChange says whether cancel and reschedule are still allowed."
+          }
+        },
+        {
+          "name": "Reschedule booking",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 201', () => pm.expect(res.status).to.equal(201));",
+                  "pm.test(\"moved to morning\", () => pm.expect(Boolean(res.body.whenLabel.includes('7:00 AM'))).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"startsAt\": \"{{startsAtMorning}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/bookings/{{bookingId}}/reschedule",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "bookings",
+                "{{bookingId}}",
+                "reschedule"
+              ]
+            },
+            "description": "Allowed until 2 hours before the session. Instant bookings cannot be rescheduled."
+          }
+        },
+        {
+          "name": "Cancel booking",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 201', () => pm.expect(res.status).to.equal(201));",
+                  "pm.test(\"cancelled\", () => pm.expect(Boolean(res.body.status === 'cancelled')).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/bookings/{{bookingId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "bookings",
+                "{{bookingId}}",
+                "cancel"
+              ]
+            },
+            "description": "Cancelling twice is not an error."
+          }
+        },
+        {
+          "name": "Cancel demo booking",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 201', () => pm.expect(res.status).to.equal(201));",
+                  "pm.test(\"cancelled\", () => pm.expect(Boolean(res.body.status === 'cancelled')).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/bookings/{{demoBookingId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "bookings",
+                "{{demoBookingId}}",
+                "cancel"
+              ]
+            },
+            "description": "Frees the 7 PM slot so this collection can be run again."
+          }
+        },
+        {
+          "name": "Cancel instant booking",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 201', () => pm.expect(res.status).to.equal(201));",
+                  "pm.test(\"cancelled\", () => pm.expect(Boolean(res.body.status === 'cancelled')).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/bookings/{{instantBookingId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "bookings",
+                "{{instantBookingId}}",
+                "cancel"
+              ]
+            },
+            "description": "Instant bookings can be cancelled while we search."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Errors (what a failure looks like)",
+      "item": [
+        {
+          "name": "No token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 401', () => pm.expect(res.status).to.equal(401));",
+                  "pm.test(\"code\", () => pm.expect(Boolean(res.body.error.code === 'UNAUTHORIZED')).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "me"
+              ]
+            },
+            "description": "Every failure has the same shape: { error: { code, message, details } }."
+          }
+        },
+        {
+          "name": "Bad phone number",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 400', () => pm.expect(res.status).to.equal(400));",
+                  "pm.test(\"code\", () => pm.expect(Boolean(res.body.error.code === 'INVALID_PHONE')).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+14155550123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/auth/otp/request",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "otp",
+                "request"
+              ]
+            },
+            "description": "Only Indian mobile numbers (+91) are accepted."
+          }
+        },
+        {
+          "name": "Booking with a missing time",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const day = (n) => new Date(Date.now() + 330 * 60000 + n * 86400000).toISOString().slice(0, 10);",
+                  "const at = (n, t) => new Date(day(n) + 'T' + t + ':00+05:30').toISOString();",
+                  "pm.collectionVariables.set('badKey', 'req-' + Date.now() + '-x');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 400', () => pm.expect(res.status).to.equal(400));",
+                  "pm.test(\"code\", () => pm.expect(Boolean(res.body.error.code === 'INVALID_REQUEST')).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceSlug\": \"yoga\",\n  \"formatSlug\": \"power-yoga\",\n  \"mode\": \"scheduled\",\n  \"addressId\": \"{{addressId}}\",\n  \"idempotencyKey\": \"{{badKey}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/bookings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "bookings"
+              ]
+            },
+            "description": "A scheduled booking needs startsAt."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Session",
+      "item": [
+        {
+          "name": "Refresh tokens",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 200', () => pm.expect(res.status).to.equal(200));",
+                  "pm.test(\"new token\", () => pm.expect(Boolean(typeof res.body.token === 'string')).to.equal(true));",
+                  "pm.collectionVariables.set('accessToken', res.body.token);",
+                  "pm.collectionVariables.set('refreshToken', res.body.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Returns a new pair. The old refresh token stops working; using it again signs the customer out everywhere."
+          }
+        },
+        {
+          "name": "Sign out",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = (k) => pm.collectionVariables.get(k) ?? pm.environment.get(k);",
+                  "const res = { status: pm.response.code, body: pm.response.text() ? pm.response.json() : null };",
+                  "pm.test('status is 204', () => pm.expect(res.status).to.equal(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Ends this device. Always 204."
+          }
+        }
+      ]
+    }
+  ]
+}

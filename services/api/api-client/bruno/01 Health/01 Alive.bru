@@ -1,0 +1,30 @@
+meta {
+  name: Alive
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/health
+  body: none
+  auth: none
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("status is ok", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(res.body.status === 'ok')).to.equal(true);
+  });
+}
+
+docs {
+  Is the process up? Used by the load balancer.
+}

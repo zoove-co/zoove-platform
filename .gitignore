@@ -31,3 +31,6 @@ supabase/.temp/
 # Expo template leftovers
 apps/customer-app/example/
 .tmp-preview/
+
+# Leftovers that could not be deleted from the cloud session; safe to remove
+_to_delete/

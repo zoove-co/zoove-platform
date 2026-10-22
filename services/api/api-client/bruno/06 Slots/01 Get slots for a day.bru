@@ -1,0 +1,39 @@
+meta {
+  name: Get slots for a day
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/v1/slots?service=yoga&date={{slotDate}}
+  body: none
+  auth: bearer
+}
+
+params:query {
+  service: yoga
+  date: {{slotDate}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("eight slots", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(res.body.length === 8)).to.equal(true);
+  });
+}
+
+docs {
+  Eight start times in India time. available is false for past times and times already booked.
+}

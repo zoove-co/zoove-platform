@@ -1,0 +1,55 @@
+meta {
+  name: Create scheduled booking
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/v1/bookings
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "serviceSlug": "yoga",
+    "formatSlug": "power-yoga",
+    "mode": "scheduled",
+    "participant": "personal",
+    "addressId": "{{addressId}}",
+    "startsAt": "{{startsAtEvening}}",
+    "idempotencyKey": "{{bookingKey}}"
+  }
+}
+
+script:pre-request {
+  bru.setVar('bookingKey', 'req-' + Date.now());
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+  bru.setVar('bookingId', res.body.id);
+}
+
+assert {
+  res.status: eq 201
+}
+
+tests {
+  test("status is matching", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(res.body.status === 'matching')).to.equal(true);
+  });
+  test("price is 1500 rupees", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(res.body.totalPaise === 150000)).to.equal(true);
+  });
+}
+
+docs {
+  The idempotencyKey makes a retry safe: same key, same booking.
+}

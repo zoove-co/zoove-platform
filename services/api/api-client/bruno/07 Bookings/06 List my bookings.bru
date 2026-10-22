@@ -1,0 +1,34 @@
+meta {
+  name: List my bookings
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/v1/bookings
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("has my bookings", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(res.body.length >= 3)).to.equal(true);
+  });
+}
+
+docs {
+  Newest first. Only mine.
+}

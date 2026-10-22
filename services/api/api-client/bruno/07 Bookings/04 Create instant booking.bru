@@ -1,0 +1,54 @@
+meta {
+  name: Create instant booking
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/v1/bookings
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "serviceSlug": "yoga",
+    "formatSlug": "power-yoga",
+    "mode": "instant",
+    "participant": "personal",
+    "addressId": "{{addressId}}",
+    "idempotencyKey": "{{instantKey}}"
+  }
+}
+
+script:pre-request {
+  bru.setVar('instantKey', 'req-' + Date.now() + '-i');
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+  bru.setVar('instantBookingId', res.body.id);
+}
+
+assert {
+  res.status: eq 201
+}
+
+tests {
+  test("no start time", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(res.body.startsAt === null)).to.equal(true);
+  });
+  test("price is 1899 rupees", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(res.body.totalPaise === 189900)).to.equal(true);
+  });
+}
+
+docs {
+  No start time: we find the first free coach.
+}

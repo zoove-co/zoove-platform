@@ -1,0 +1,8 @@
+script:pre-request {
+  const day = (n) => new Date(Date.now() + 330 * 60000 + n * 86400000).toISOString().slice(0, 10);
+  const at = (n, t) => new Date(day(n) + 'T' + t + ':00+05:30').toISOString();
+  bru.setVar('slotDate', day(3));
+  bru.setVar('startsAtEvening', at(3, '18:00'));
+  bru.setVar('startsAtLater', at(3, '19:00'));
+  bru.setVar('startsAtMorning', at(4, '07:00'));
+}

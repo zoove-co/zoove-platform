@@ -1,0 +1,48 @@
+meta {
+  name: Booking with a missing time
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/v1/bookings
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "serviceSlug": "yoga",
+    "formatSlug": "power-yoga",
+    "mode": "scheduled",
+    "addressId": "{{addressId}}",
+    "idempotencyKey": "{{badKey}}"
+  }
+}
+
+script:pre-request {
+  bru.setVar('badKey', 'req-' + Date.now() + '-x');
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+}
+
+assert {
+  res.status: eq 400
+}
+
+tests {
+  test("code", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(res.body.error.code === 'INVALID_REQUEST')).to.equal(true);
+  });
+}
+
+docs {
+  A scheduled booking needs startsAt.
+}

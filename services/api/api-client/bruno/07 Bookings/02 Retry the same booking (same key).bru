@@ -1,0 +1,46 @@
+meta {
+  name: Retry the same booking (same key)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/v1/bookings
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "serviceSlug": "yoga",
+    "formatSlug": "power-yoga",
+    "mode": "scheduled",
+    "participant": "personal",
+    "addressId": "{{addressId}}",
+    "startsAt": "{{startsAtEvening}}",
+    "idempotencyKey": "{{bookingKey}}"
+  }
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+}
+
+assert {
+  res.status: eq 201
+}
+
+tests {
+  test("same booking id", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(res.body.id === v('bookingId'))).to.equal(true);
+  });
+}
+
+docs {
+  Returns the SAME booking, not a second one.
+}

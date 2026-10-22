@@ -1,0 +1,40 @@
+meta {
+  name: Check serviceability (served)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/v1/addresses/serviceability
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "pincode": "400050"
+  }
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("answer is boolean", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(typeof res.body.serviceable === 'boolean')).to.equal(true);
+  });
+}
+
+docs {
+  Do we serve this pincode yet? True only if its cluster is active.
+}

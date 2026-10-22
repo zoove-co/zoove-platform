@@ -1,0 +1,40 @@
+meta {
+  name: Reschedule booking
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/v1/bookings/{{bookingId}}/reschedule
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "startsAt": "{{startsAtMorning}}"
+  }
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+}
+
+assert {
+  res.status: eq 201
+}
+
+tests {
+  test("moved to morning", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(res.body.whenLabel.includes('7:00 AM'))).to.equal(true);
+  });
+}
+
+docs {
+  Allowed until 2 hours before the session. Instant bookings cannot be rescheduled.
+}

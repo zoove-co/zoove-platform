@@ -1,0 +1,34 @@
+meta {
+  name: Delete address
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/v1/addresses/{{outsideAddressId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("one left", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(res.body.length === 1)).to.equal(true);
+  });
+}
+
+docs {
+  Returns the updated list. Refused (409 ADDRESS_IN_USE) while a session is booked there.
+}

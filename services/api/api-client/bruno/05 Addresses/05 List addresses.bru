@@ -1,0 +1,34 @@
+meta {
+  name: List addresses
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/v1/addresses
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:post-response {
+  const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("has addresses", function () {
+    const v = (k) => bru.getVar(k) ?? bru.getEnvVar(k);
+    expect(Boolean(res.body.length >= 2)).to.equal(true);
+  });
+}
+
+docs {
+  Default first.
+}

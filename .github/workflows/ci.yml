@@ -55,3 +55,18 @@ jobs:
         env:
           DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
       - run: pnpm --filter @zoove/api test
+      - name: Replay every request in services/api/api-client against the running API
+        run: |
+          psql "$TEST_DATABASE_URL" -c "truncate otp_challenges, refresh_tokens, user_roles, users, outbox_events cascade"
+          psql "$TEST_DATABASE_URL" -c "update clusters set status = 'active', activated_at = now() where slug = 'bandra-khar'"
+          pnpm --filter @zoove/api build
+          node services/api/dist/main.js > api.log 2>&1 &
+          sleep 8
+          API_URL=http://localhost:3000 node services/api/api-client/smoke.mjs || (cat api.log; exit 1)
+        env:
+          NODE_ENV: development
+          PORT: 3000
+          DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
+          JWT_SECRET: ci-only-jwt-secret-ci-only-jwt-secret-1234
+          OTP_SECRET: ci-only-otp-secret-ci-only-otp-secret-1234
+          DEV_FIXED_OTP: '123456'
