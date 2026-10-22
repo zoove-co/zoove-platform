@@ -28,6 +28,7 @@ export type ApplicationForm = {
   dateOfBirth: string | null;
   gender: string | null;
   email: string | null;
+  phone: string | null;
   addressLine: string | null;
   addressArea: string | null;
   addressCity: string;
@@ -67,6 +68,7 @@ export type SaveInput = {
   dateOfBirth?: string;
   gender?: string;
   email?: string;
+  phone?: string;
   addressLine?: string;
   addressArea?: string;
   addressPincode?: string;
@@ -87,6 +89,7 @@ type AppRow = {
   date_of_birth: string | null;
   gender: string | null;
   email: string | null;
+  phone_e164: string | null;
   address_line: string | null;
   address_area: string | null;
   address_city: string;
@@ -104,7 +107,7 @@ type AppRow = {
 
 type DocRow = { id: string; kind: DocumentKind; status: 'uploaded' | 'accepted' | 'rejected'; reviewer_note: string | null; mime_type: string; uploaded_at: Date };
 
-const APP_COLUMNS = `id, status, first_name, last_name, to_char(date_of_birth, 'YYYY-MM-DD') as date_of_birth, gender, email,
+const APP_COLUMNS = `id, status, first_name, last_name, to_char(date_of_birth, 'YYYY-MM-DD') as date_of_birth, gender, email, phone_e164,
   address_line, address_area, address_city, address_pincode, specialties, experience_years, languages, bio,
   pan_last4, pan_hash, aadhaar_last4, review_note, submitted_at`;
 
@@ -116,6 +119,7 @@ const emptyForm = (): ApplicationForm => ({
   dateOfBirth: null,
   gender: null,
   email: null,
+  phone: null,
   addressLine: null,
   addressArea: null,
   addressCity: 'Mumbai',
@@ -174,6 +178,7 @@ export class TrainerApplicationsService {
         if (input.dateOfBirth !== undefined) add('date_of_birth', input.dateOfBirth);
         if (input.gender !== undefined) add('gender', input.gender);
         if (input.email !== undefined) add('email', input.email.toLowerCase());
+        if (input.phone !== undefined) add('phone_e164', input.phone);
         if (input.addressLine !== undefined) add('address_line', input.addressLine);
         if (input.addressArea !== undefined) add('address_area', input.addressArea);
         if (input.addressPincode !== undefined) add('address_pincode', input.addressPincode);
@@ -303,7 +308,12 @@ export class TrainerApplicationsService {
     const existing = await client.query<{ id: string; status: ApplicationStatus }>(`select id, status from trainer_applications where user_id = $1`, [userId]);
     if (existing.rows[0]) return existing.rows[0];
     const id = uuidv7();
-    await client.query(`insert into trainer_applications (id, user_id) values ($1, $2)`, [id, userId]);
+    // Start with what the sign-in already proved: the verified email, or the phone for SMS sign-in.
+    await client.query(
+      `insert into trainer_applications (id, user_id, email, phone_e164)
+       select $1, u.id, u.verified_email, case when u.phone_e164 ~ '^\\+91[6-9][0-9]{9}$' then u.phone_e164 end from users u where u.id = $2`,
+      [id, userId],
+    );
     await this.event(client, id, 'created', 'trainer', userId, {});
     return { id, status: 'draft' };
   }
@@ -344,6 +354,7 @@ export class TrainerApplicationsService {
     need('dateOfBirth', Boolean(row?.date_of_birth));
     need('gender', Boolean(row?.gender));
     need('email', Boolean(row?.email));
+    need('phone', Boolean(row?.phone_e164));
     need('addressLine', Boolean(row?.address_line));
     need('addressArea', Boolean(row?.address_area));
     need('addressPincode', Boolean(row?.address_pincode));
@@ -370,6 +381,7 @@ export class TrainerApplicationsService {
         dateOfBirth: row.date_of_birth,
         gender: row.gender,
         email: row.email,
+        phone: row.phone_e164,
         addressLine: row.address_line,
         addressArea: row.address_area,
         addressCity: row.address_city,

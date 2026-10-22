@@ -2,10 +2,11 @@
 # Stage 1 installs everything and compiles TypeScript; stage 2 keeps only what the running API needs.
 
 FROM node:22-slim AS build
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@10.34.6 --activate
 WORKDIR /repo
 COPY . .
-RUN pnpm install --frozen-lockfile --filter @zoove/api...
+# pnpm 12 refuses packages published < 1 day ago; the lockfile pins exact versions + hashes, so the age gate adds nothing here.
+RUN pnpm install --frozen-lockfile --config.minimumReleaseAge=0 --filter @zoove/api...
 RUN pnpm --filter @zoove/api build
 # Production-only copy of the API and its dependencies in /out.
 RUN pnpm --filter @zoove/api deploy --prod --legacy /out

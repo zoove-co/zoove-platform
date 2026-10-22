@@ -10,7 +10,8 @@ import { TrainerApplicationsService, type ApplicationStatus } from './trainer-ap
 export type AdminListItem = {
   id: string;
   name: string;
-  phone: string;
+  phone: string | null;
+  email: string | null;
   status: ApplicationStatus;
   specialties: string[];
   experienceYears: number | null;
@@ -24,7 +25,8 @@ type ListRow = {
   id: string;
   first_name: string | null;
   last_name: string | null;
-  phone_e164: string;
+  phone_e164: string | null;
+  email: string | null;
   status: ApplicationStatus;
   specialties: string[];
   experience_years: number | null;
@@ -51,11 +53,11 @@ export class AdminTrainerApplicationsService {
     }
     if (filter.search) {
       params.push(`%${filter.search.toLowerCase()}%`);
-      where.push(`(lower(coalesce(a.first_name, '') || ' ' || coalesce(a.last_name, '')) like $${params.length} or u.phone_e164 like $${params.length})`);
+      where.push(`(lower(coalesce(a.first_name, '') || ' ' || coalesce(a.last_name, '')) like $${params.length} or coalesce(a.phone_e164, u.phone_e164, '') like $${params.length} or lower(coalesce(a.email, '')) like $${params.length})`);
     }
     params.push(filter.limit);
     const items = await this.db.query<ListRow>(
-      `select a.id, a.first_name, a.last_name, u.phone_e164, a.status, a.specialties, a.experience_years, a.source, a.submitted_at
+      `select a.id, a.first_name, a.last_name, coalesce(a.phone_e164, u.phone_e164) as phone_e164, a.email, a.status, a.specialties, a.experience_years, a.source, a.submitted_at
          from trainer_applications a join users u on u.id = a.user_id
         where ${where.join(' and ')}
         order by a.submitted_at asc nulls last, a.created_at asc
@@ -68,6 +70,7 @@ export class AdminTrainerApplicationsService {
         id: row.id,
         name: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unnamed',
         phone: row.phone_e164,
+        email: row.email,
         status: row.status,
         specialties: row.specialties,
         experienceYears: row.experience_years,
@@ -79,8 +82,8 @@ export class AdminTrainerApplicationsService {
   }
 
   async detail(applicationId: string) {
-    const found = await this.db.query<{ user_id: string; phone_e164: string }>(
-      `select a.user_id, u.phone_e164 from trainer_applications a join users u on u.id = a.user_id where a.id = $1 and a.status <> 'draft'`,
+    const found = await this.db.query<{ user_id: string; phone_e164: string | null }>(
+      `select a.user_id, coalesce(a.phone_e164, u.phone_e164) as phone_e164 from trainer_applications a join users u on u.id = a.user_id where a.id = $1 and a.status <> 'draft'`,
       [applicationId],
     );
     const owner = found.rows[0];

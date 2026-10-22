@@ -7,7 +7,7 @@ import { approvedEmail, changesEmail, opsNewApplicationEmail, receivedEmail, rej
 
 type OutboxRow = { id: string; aggregate_id: string; event_type: string; payload: Record<string, unknown>; attempts: number };
 
-type ApplicationInfo = { first_name: string | null; last_name: string | null; email: string | null; phone_e164: string; review_note: string | null };
+type ApplicationInfo = { first_name: string | null; last_name: string | null; email: string | null; phone_e164: string | null; review_note: string | null };
 
 const HANDLED = ['trainer.application_submitted', 'trainer.application_approved', 'trainer.application_rejected', 'trainer.application_changes_requested'];
 const MAX_ATTEMPTS = 10;
@@ -72,7 +72,7 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
 
   private async handle(event: OutboxRow): Promise<void> {
     const info = await this.db.query<ApplicationInfo>(
-      `select a.first_name, a.last_name, a.email, u.phone_e164, a.review_note
+      `select a.first_name, a.last_name, a.email, coalesce(a.phone_e164, u.phone_e164) as phone_e164, a.review_note
          from trainer_applications a join users u on u.id = a.user_id where a.id = $1`,
       [event.aggregate_id],
     );
@@ -86,9 +86,9 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
     if (event.event_type === 'trainer.application_submitted') {
       const resubmission = event.payload.resubmission === true;
       if (app.email) messages.push(receivedEmail(app.email, ctx, resubmission));
-      const name = [app.first_name, app.last_name].filter(Boolean).join(' ') || app.phone_e164;
+      const name = [app.first_name, app.last_name].filter(Boolean).join(' ') || app.phone_e164 || app.email || 'A trainer';
       for (const ops of this.config.OPS_NOTIFY_EMAILS.split(',').map((value) => value.trim()).filter(Boolean)) {
-        messages.push(opsNewApplicationEmail(ops, name, app.phone_e164, `${this.config.ADMIN_URL}/trainers/${event.aggregate_id}`, resubmission));
+        messages.push(opsNewApplicationEmail(ops, name, app.phone_e164 ?? app.email ?? 'no contact', `${this.config.ADMIN_URL}/trainers/${event.aggregate_id}`, resubmission));
       }
     } else if (app.email) {
       if (event.event_type === 'trainer.application_approved') messages.push(approvedEmail(app.email, ctx));

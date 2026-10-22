@@ -4,9 +4,9 @@ import { DomainError } from '../common/domain-error';
 import { DatabaseService } from '../database/database.service';
 
 // Same shape as Profile in the customer app, so the app can swap its mock for this API unchanged.
-export type Profile = { phone: string; firstName: string | null; lastName: string | null; email: string | null };
+export type Profile = { phone: string | null; firstName: string | null; lastName: string | null; email: string | null };
 
-type UserRow = { phone_e164: string; first_name: string | null; last_name: string | null; email: string | null };
+type UserRow = { phone_e164: string | null; first_name: string | null; last_name: string | null; email: string | null };
 
 const toProfile = (row: UserRow): Profile => ({
   phone: row.phone_e164,

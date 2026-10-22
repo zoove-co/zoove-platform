@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { APP_CONFIG, type Env } from '../config/env';
 import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
+import { EmailOtpService } from './email-otp.service';
 import { MeController } from './me.controller';
 import { OtpService } from './otp.service';
 import { ConsoleSmsProvider } from './sms/console-sms.provider';
@@ -25,6 +26,7 @@ import { UsersService } from './users.service';
   controllers: [AuthController, MeController],
   providers: [
     OtpService,
+    EmailOtpService,
     TokenService,
     UsersService,
     AuthGuard,

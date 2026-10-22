@@ -5,6 +5,7 @@ import type { Request } from 'express';
 import { z } from 'zod';
 
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
+import { EmailOtpService, type EmailVerifyResult } from './email-otp.service';
 import { OtpService, type VerifyResult } from './otp.service';
 import { TokenService } from './token.service';
 
@@ -14,6 +15,13 @@ const verifySchema = z.object({
   code: z.string().regex(/^\d{6}$/, 'The code has 6 digits'),
   // 'trainer' is used by the trainer onboarding page: signs in without creating a customer account.
   audience: z.enum(['customer', 'trainer']).default('customer'),
+});
+const emailField = z.string().trim().toLowerCase().pipe(z.email().max(200));
+const emailRequestSchema = z.object({ email: emailField, audience: z.enum(['trainer', 'admin']).default('trainer') });
+const emailVerifySchema = z.object({
+  email: emailField,
+  code: z.string().regex(/^\d{6}$/, 'The code has 6 digits'),
+  audience: z.enum(['trainer', 'admin']).default('trainer'),
 });
 const refreshSchema = z.object({ refreshToken: z.string().min(20).max(200) });
 
@@ -35,6 +43,7 @@ const deviceOf = (request: Request) => ({ userAgent: request.headers['user-agent
 export class AuthController {
   constructor(
     private readonly otp: OtpService,
+    private readonly emailOtp: EmailOtpService,
     private readonly tokens: TokenService,
   ) {}
 
@@ -67,6 +76,42 @@ export class AuthController {
   @ApiOkResponse({ schema: tokenResponse })
   verifyOtp(@Body(new ZodValidationPipe(verifySchema)) body: z.infer<typeof verifySchema>, @Req() request: Request): Promise<VerifyResult> {
     return this.otp.verify(body.phone, body.code, deviceOf(request), body.audience);
+  }
+
+  @Post('email-otp/request')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Send a one-time code by email (trainer page and admin panel)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { email: { type: 'string', example: 'akash@example.com' }, audience: { type: 'string', enum: ['trainer', 'admin'], default: 'trainer' } },
+      required: ['email'],
+    },
+  })
+  @ApiOkResponse({ schema: { type: 'object', properties: { resendAfterSeconds: { type: 'integer' } } } })
+  requestEmailOtp(@Body(new ZodValidationPipe(emailRequestSchema)) body: z.infer<typeof emailRequestSchema>) {
+    return this.emailOtp.request(body.email, body.audience);
+  }
+
+  @Post('email-otp/verify')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Check the emailed code and sign in. Never creates a customer; admin needs the admin role.' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        email: { type: 'string', example: 'akash@example.com' },
+        code: { type: 'string', example: '123456' },
+        audience: { type: 'string', enum: ['trainer', 'admin'], default: 'trainer' },
+      },
+      required: ['email', 'code'],
+    },
+  })
+  @ApiOkResponse({ schema: tokenResponse })
+  verifyEmailOtp(@Body(new ZodValidationPipe(emailVerifySchema)) body: z.infer<typeof emailVerifySchema>, @Req() request: Request): Promise<EmailVerifyResult> {
+    return this.emailOtp.verify(body.email, body.code, deviceOf(request), body.audience);
   }
 
   @Post('refresh')

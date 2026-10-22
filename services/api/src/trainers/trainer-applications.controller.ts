@@ -19,6 +19,8 @@ const saveSchema = z
     dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD').refine((value) => !Number.isNaN(Date.parse(value)), 'Not a real date').optional(),
     gender: z.enum(['female', 'male', 'other', 'prefer_not_to_say']).optional(),
     email: z.string().trim().toLowerCase().email().max(120).optional(),
+    // Typed by the trainer, not verified yet. Indian mobile in international format.
+    phone: z.string().trim().regex(/^\+91[6-9][0-9]{9}$/, 'Enter a 10-digit Indian mobile number').optional(),
     addressLine: text(200).optional(),
     addressArea: text(120).optional(),
     addressPincode: z.string().trim().regex(/^[1-9][0-9]{5}$/, 'Enter a 6-digit pincode').optional(),
