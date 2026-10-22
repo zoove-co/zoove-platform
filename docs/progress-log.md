@@ -144,6 +144,56 @@ Cancellation and refund rules, duplicate and instant booking rules, operating ho
 
 ---
 
+## Gap audit (22 October 2026, night)
+
+### The app talks to 18 operations; the API covers 13 of them
+Missing endpoints (the app's mock has them, the API does not):
+- Home summary (name, default address, unread badge, prices, upcoming session, weekly progress)
+- Notifications: list and mark read
+- Past coaches ("rebook a coach")
+- Packages list
+- Streak
+- Referral code
+- Save party plan
+
+### Missing tables (no SQL yet)
+`notifications`, `session_packages` (definitions), `customer_packages` / credits ledger, `party_plans`, `referral_codes` and `referrals`, trainers/coaches and availability, trainer service areas, `payments`, `refunds`, `payouts`, `reviews`, support tickets, `device_tokens` (push). Streak needs no table: it is derived from bookings.
+
+### Tables that exist but nothing uses
+- `customer_profiles` (goals, focus areas): no endpoint.
+- `consents`: sign-in does not record that the customer accepted Terms and Privacy. Needed before launch.
+- `event_log`: the app tracks events, but there is no endpoint that stores them.
+- `audit_log`: nothing writes to it yet.
+- `outbox_events`: bookings write events, but no worker reads them, so nothing is ever delivered.
+- `users.full_name`: deprecated by 0003, still present.
+
+### Behaviour gaps in what is built
+1. **Nothing marks a booking `completed`.** Streak, past coaches and "rebook" cannot work until the trainer flow (or an admin action) exists.
+2. **A blocked customer keeps working for up to 15 minutes**, until the access token expires: the guard checks the token, not the account status.
+3. **No account deletion.** Apple and Google Play both require in-app account deletion before approval.
+4. `PATCH /v1/me` always demands a first name, so email alone cannot be updated.
+5. Expired OTPs and refresh tokens are never cleaned up; the tables only grow.
+6. No limit on saved addresses.
+7. No request ids or error tracking, so a failure in production cannot be traced.
+8. Database TLS does not verify the certificate (known TODO).
+9. Swagger has no request or response schemas for addresses and bookings. The generated client (D11) needs them, so schemas must be added first.
+10. No Dockerfile or deployment.
+
+### Database actions that must still be run by hand
+1. `supabase db push` applies migrations 0003 and 0004 only. It does **not** run `seed.sql`.
+2. Run `supabase/seed.sql` once against the Supabase database (SQL editor or psql). Without it the remote database has no services, prices or pincodes. It is safe to re-run.
+3. Clusters are all locked. Nothing is serviceable until you run: `update clusters set status = 'active', activated_at = now() where slug = 'bandra-khar';`
+4. Check: `select count(*) from services;` (4), `select count(*) from cluster_pincodes;` (13), `select count(*) from service_prices;` (3).
+
+### Order I recommend
+1. Add Swagger schemas, then the generated client (unblocks the app).
+2. Missing read endpoints: home, notifications, packages, streak, referral, party plan (small, no business risk).
+3. Account deletion, consent recording, status check in the auth guard, token cleanup job.
+4. Staging deployment and error tracking.
+5. Trainers, matching, completion, packages and payments once Pratik answers.
+
+---
+
 ## Earlier milestones (short)
 - Monorepo, Supabase project, CI skeleton, decisions D1 to D16, open questions 1 to 43.
 - Customer app first build: login, Home, booking flow, orders, account, addresses, notifications, packages.
