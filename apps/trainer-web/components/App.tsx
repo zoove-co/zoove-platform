@@ -47,16 +47,18 @@ export function App() {
   if (state.kind === 'signin') return <SignIn notice={state.notice} onDone={() => void load()} />;
 
   return (
-    <div className="shell">
-      <div className="topbar">
-        <span className="brand">zoove</span>
-        {state.kind === 'ready' ? (
-          <button className="linkbtn" type="button" onClick={() => void signOut().then(() => setState({ kind: 'signin' }))}>
-            Sign out
-          </button>
-        ) : null}
-      </div>
-
+    <div className="app">
+      <header className="appbar">
+        <div className="appbar-in">
+          <span className="brand">zoove</span>
+          {state.kind === 'ready' ? (
+            <button className="appbar-btn" type="button" onClick={() => void signOut().then(() => setState({ kind: 'signin' }))}>
+              Sign out
+            </button>
+          ) : null}
+        </div>
+      </header>
+      <div className="shell">
       {state.kind === 'loading' ? (
         <div className="center" style={{ padding: 60 }} aria-busy>
           <Spinner />
@@ -79,6 +81,7 @@ export function App() {
           <Status view={state.view} />
         )
       ) : null}
+      </div>
     </div>
   );
 }

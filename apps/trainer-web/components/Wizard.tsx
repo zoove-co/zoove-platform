@@ -237,6 +237,7 @@ export function Wizard({ initial, source, onChange, onExpired }: Props) {
           <b>We need a few changes.</b> {view.reviewNote ?? 'Please check your details and documents, then submit again.'}
         </Banner>
       ) : null}
+      <p className="stepcount">Step {step + 1} of {STEP_TITLES.length}</p>
       <h1>{STEP_TITLES[step]}</h1>
 
       {step === 0 && (
