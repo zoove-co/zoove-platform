@@ -1,18 +1,58 @@
 'use client';
 
-import type { ApplicationView } from '@/lib/api';
+import { useEffect, useState } from 'react';
 
-export function Status({ view }: { view: ApplicationView }) {
-  const name = view.form.firstName ?? 'there';
-  if (view.status === 'approved') {
-    return (
+import { listServices, type ApplicationView, type Service } from '@/lib/api';
+import { FALLBACK_SERVICES } from '@/lib/steps';
+
+function Approved({ view, name }: { view: ApplicationView; name: string }) {
+  const [services, setServices] = useState<Service[]>(FALLBACK_SERVICES);
+  useEffect(() => {
+    listServices().then(setServices).catch(() => undefined);
+  }, []);
+  const f = view.form;
+  const serviceName = (slug: string) => services.find((item) => item.slug === slug)?.name ?? slug;
+  const rows: [string, string][] = [
+    ['Name', [f.firstName, f.lastName].filter(Boolean).join(' ') || '—'],
+    ['Email', f.email ?? '—'],
+    ['Mobile', f.phone ?? '—'],
+    ['Trains', f.specialties.map(serviceName).join(', ') || '—'],
+    ['Experience', f.experienceYears != null ? `${f.experienceYears} years` : '—'],
+    ['Languages', f.languages.join(', ') || '—'],
+    ['Area', [f.addressArea, f.addressCity].filter(Boolean).join(', ') || '—'],
+  ];
+  return (
+    <>
       <div className="center">
         <div className="bigicon">🎉</div>
         <h1>You are approved, {name}!</h1>
-        <p className="muted">Welcome to Zoove. The team will be in touch with the next steps.</p>
+        <p className="muted">Welcome to Zoove. Your KYC is verified and you are part of our trainer network.</p>
       </div>
-    );
-  }
+      <div className="card soft">
+        <b>What happens next</b>
+        <p className="muted small" style={{ margin: '4px 0 0' }}>
+          You do not need to do anything now. We will email you at <b>{f.email}</b> with the next steps, including when the trainer app is ready. You can come back to this page any time with the same email.
+        </p>
+      </div>
+      <div className="card summary">
+        <b>Your profile</b>
+        <dl style={{ marginTop: 10 }}>
+          {rows.map(([k, v]) => (
+            <div key={k} style={{ display: 'contents' }}>
+              <dt>{k}</dt>
+              <dd>{v}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="muted small" style={{ margin: '12px 0 0' }}>To change any of these details, contact the Zoove team.</p>
+      </div>
+    </>
+  );
+}
+
+export function Status({ view }: { view: ApplicationView }) {
+  const name = view.form.firstName ?? 'there';
+  if (view.status === 'approved') return <Approved view={view} name={name} />;
   if (view.status === 'rejected') {
     return (
       <div className="center">
