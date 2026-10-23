@@ -71,60 +71,92 @@ export function SignIn({ onDone, notice }: { onDone: () => void; notice?: string
     }
   }
 
+  const needs = [
+    { title: 'Aadhaar card', note: 'Front and back' },
+    { title: 'PAN card', note: 'Photo or PDF' },
+    { title: 'A selfie', note: 'Taken with your camera' },
+    { title: 'Certificates', note: 'Optional, helps us approve faster' },
+  ];
+
   return (
-    <>
-      <h1>Train with Zoove</h1>
-      <p className="muted">Apply to train clients at home in Mumbai. It takes about 10 minutes. Keep your Aadhaar and PAN card handy.</p>
-      {notice ? <Banner tone="info">{notice}</Banner> : null}
-      {!sentTo ? (
-        <form
-          noValidate
-          onSubmit={(event) => {
-            event.preventDefault();
-            void send();
-          }}
-        >
-          <Field label="Your email" hint="We will email you a 6-digit code. No password needed." error={error ?? undefined}>
-            <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)} aria-invalid={Boolean(error)} />
-          </Field>
-          <button className="btn" type="submit" disabled={busy}>
-            {busy ? <Spinner /> : null} Send me a code
-          </button>
-        </form>
-      ) : (
-        <form
-          noValidate
-          onSubmit={(event) => {
-            event.preventDefault();
-            void verify();
-          }}
-        >
-          <Banner tone="info">
-            We sent a code to <b>{sentTo}</b>. It is valid for 5 minutes. Check your spam folder if you do not see it.
-          </Banner>
-          <Field label="6-digit code" error={error ?? undefined}>
-            <input ref={codeRef} className="codebox" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="••••••" value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} aria-invalid={Boolean(error)} />
-          </Field>
-          <button className="btn" type="submit" disabled={busy || code.length !== 6}>
-            {busy ? <Spinner /> : null} Continue
-          </button>
-          <div className="actions">
-            <button className="btn ghost" type="button" disabled={busy || wait > 0} onClick={() => void send()}>
-              {wait > 0 ? `Send again in ${wait}s` : 'Send a new code'}
-            </button>
-            <button
-              className="btn ghost"
-              type="button"
-              onClick={() => {
-                setSentTo(null);
-                setError(null);
+    <main className="landing">
+      <section className="hero" aria-labelledby="hero-title">
+        <span className="brand">zoove</span>
+        <div className="hero-body">
+          <h1 id="hero-title">Train clients at home, across Mumbai.</h1>
+          <p className="lede">Apply in about 10 minutes. Your answers save as you go, so you can stop and finish later.</p>
+          <div className="needs-wrap">
+            <p className="needs-title">Keep these ready</p>
+            <ul className="needs">
+              {needs.map((item) => (
+                <li key={item.title}>
+                  <b>{item.title}</b>
+                  <span>{item.note}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section className="gate" aria-label="Sign in">
+        <div className="gate-inner">
+          <h2>{sentTo ? 'Enter your code' : 'Start with your email'}</h2>
+          <p className="muted gate-sub">
+            {sentTo ? 'We emailed you a 6-digit code.' : 'Already applied? Use the same email to see where your application stands.'}
+          </p>
+          {notice ? <Banner tone="info">{notice}</Banner> : null}
+          {!sentTo ? (
+            <form
+              noValidate
+              onSubmit={(event) => {
+                event.preventDefault();
+                void send();
               }}
             >
-              Change email
-            </button>
-          </div>
-        </form>
-      )}
-    </>
+              <Field label="Your email" hint="We will email you a 6-digit code. No password needed." error={error ?? undefined}>
+                <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)} aria-invalid={Boolean(error)} />
+              </Field>
+              <button className="btn" type="submit" disabled={busy}>
+                {busy ? <Spinner /> : null} Send me a code
+              </button>
+            </form>
+          ) : (
+            <form
+              noValidate
+              onSubmit={(event) => {
+                event.preventDefault();
+                void verify();
+              }}
+            >
+              <Banner tone="info">
+                Sent to <b>{sentTo}</b>. It is valid for 5 minutes. Check your spam folder if you do not see it.
+              </Banner>
+              <Field label="6-digit code" error={error ?? undefined}>
+                <input ref={codeRef} className="codebox" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="••••••" value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} aria-invalid={Boolean(error)} />
+              </Field>
+              <button className="btn" type="submit" disabled={busy || code.length !== 6}>
+                {busy ? <Spinner /> : null} Continue
+              </button>
+              <div className="actions">
+                <button className="btn ghost" type="button" disabled={busy || wait > 0} onClick={() => void send()}>
+                  {wait > 0 ? `Send again in ${wait}s` : 'Send a new code'}
+                </button>
+                <button
+                  className="btn ghost"
+                  type="button"
+                  onClick={() => {
+                    setSentTo(null);
+                    setError(null);
+                  }}
+                >
+                  Change email
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </section>
+    </main>
   );
 }

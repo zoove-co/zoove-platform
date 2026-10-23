@@ -44,6 +44,8 @@ export function App() {
     void signOut().then(() => setState({ kind: 'signin', notice: 'Your session ended. Please sign in again. What you filled in is saved.' }));
   }, []);
 
+  if (state.kind === 'signin') return <SignIn notice={state.notice} onDone={() => void load()} />;
+
   return (
     <div className="shell">
       <div className="topbar">
@@ -60,8 +62,6 @@ export function App() {
           <Spinner />
         </div>
       ) : null}
-
-      {state.kind === 'signin' ? <SignIn notice={state.notice} onDone={() => void load()} /> : null}
 
       {state.kind === 'error' ? (
         <>
