@@ -143,6 +143,7 @@ export type DocumentKind = 'aadhaar_front' | 'aadhaar_back' | 'pan_card' | 'self
 export type ApplicationView = {
   id: string | null;
   status: 'none' | 'draft' | 'submitted' | 'in_review' | 'changes_requested' | 'approved' | 'rejected';
+  trainerStatus: 'active' | 'paused' | 'suspended' | 'revoked' | null;
   form: {
     firstName: string | null;
     lastName: string | null;

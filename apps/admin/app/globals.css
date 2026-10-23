@@ -331,3 +331,11 @@ dl.kv dd { margin: 0; word-break: break-word; }
 .sw input[type='checkbox']:checked::after { left: 20px; background: #fff; }
 .sw input[type='checkbox']:disabled { opacity: 0.55; cursor: not-allowed; }
 .sw input[type='checkbox']:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+
+/* ---- trainer account status ---- */
+.pill.active { --tone: var(--green); }
+.pill.paused { --tone: var(--amber); }
+.pill.suspended { --tone: var(--orange); }
+.pill.revoked { --tone: var(--red); }
+.statusrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.statusrow .btns { display: flex; gap: 8px; flex-wrap: wrap; }

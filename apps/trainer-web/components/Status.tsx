@@ -21,6 +21,30 @@ function Approved({ view, name }: { view: ApplicationView; name: string }) {
     ['Languages', f.languages.join(', ') || '—'],
     ['Area', [f.addressArea, f.addressCity].filter(Boolean).join(', ') || '—'],
   ];
+  const held = view.trainerStatus && view.trainerStatus !== 'active' ? view.trainerStatus : null;
+  if (held) {
+    const heading = held === 'paused' ? 'Your account is paused' : held === 'suspended' ? 'Your account is suspended' : 'Your trainer account is no longer active';
+    return (
+      <>
+        <div className="center">
+          <div className="bigicon">⏸️</div>
+          <h1>{heading}</h1>
+          <p className="muted">Hi {name}, please contact the Zoove team to find out more. Your details below are kept as they were.</p>
+        </div>
+        <div className="card summary">
+          <b>Your profile</b>
+          <dl style={{ marginTop: 10 }}>
+            {rows.map(([k, v]) => (
+              <div key={k} style={{ display: 'contents' }}>
+                <dt>{k}</dt>
+                <dd>{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </>
+    );
+  }
   return (
     <>
       <div className="center">

@@ -175,7 +175,7 @@ export function Dashboard({ signOut, expired }: { signOut: () => void; expired: 
                     </td>
                     <td className="hide-sm muted">{item.source ?? '—'}</td>
                     <td title={absolute(item.submittedAt)}>{ago(item.submittedAt)}</td>
-                    <td><span className={`pill ${item.status}`}>{STATUS_LABEL[item.status] ?? item.status}</span></td>
+                    <td>{(() => { const shown = item.status === 'approved' && item.trainerStatus && item.trainerStatus !== 'active' ? item.trainerStatus : item.status; return <span className={`pill ${shown}`}>{STATUS_LABEL[shown] ?? shown}</span>; })()}</td>
                   </tr>
                 );
               })}

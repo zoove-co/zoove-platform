@@ -157,12 +157,14 @@ export const updateMember = (id: string, patch: Partial<MemberInput> & { active?
 export type Status = 'submitted' | 'in_review' | 'changes_requested' | 'approved' | 'rejected';
 export type Filter = 'pending' | 'changes_requested' | 'approved' | 'rejected' | 'all';
 
-export type ListItem = { id: string; name: string; phone: string | null; email: string | null; status: Status; specialties: string[]; experienceYears: number | null; source: string | null; submittedAt: string | null };
+export type TrainerStatus = 'active' | 'paused' | 'suspended' | 'revoked';
+export type ListItem = { trainerStatus: TrainerStatus | null; id: string; name: string; phone: string | null; email: string | null; status: Status; specialties: string[]; experienceYears: number | null; source: string | null; submittedAt: string | null };
 export type ListResult = { items: ListItem[]; counts: Record<string, number> };
 
 export type DocKind = 'aadhaar_front' | 'aadhaar_back' | 'pan_card' | 'selfie' | 'certificate' | 'other';
 
 export type Detail = {
+  trainerStatus: TrainerStatus | null;
   id: string;
   status: Status | 'draft';
   phone: string | null;
@@ -198,6 +200,8 @@ export const listApplications = (filter: Filter, search: string) => {
 };
 export const getApplication = (id: string) => api<Detail>(`/v1/admin/trainer-applications/${id}`);
 export const documentLink = (id: string, documentId: string) => api<{ url: string; expiresInSeconds: number }>(`/v1/admin/trainer-applications/${id}/documents/${documentId}/url`);
+export const setTrainerStatus = (id: string, status: TrainerStatus, reason?: string) =>
+  api<unknown>(`/v1/admin/trainer-applications/${id}/trainer-status`, { method: 'POST', json: reason ? { status, reason } : { status } });
 export const startReview = (id: string) => api<unknown>(`/v1/admin/trainer-applications/${id}/start-review`, { method: 'POST', json: {} });
 export const approve = (id: string, note?: string) => api<unknown>(`/v1/admin/trainer-applications/${id}/approve`, { method: 'POST', json: note ? { note } : {} });
 export const reject = (id: string, reason: string) => api<unknown>(`/v1/admin/trainer-applications/${id}/reject`, { method: 'POST', json: { reason } });
@@ -205,6 +209,10 @@ export const requestChanges = (id: string, note: string, documentIds: string[]) 
 
 export const STATUS_LABEL: Record<string, string> = {
   submitted: 'New',
+  active: 'Active',
+  paused: 'Paused',
+  suspended: 'Suspended',
+  revoked: 'Revoked',
   in_review: 'In review',
   changes_requested: 'Changes requested',
   approved: 'Approved',

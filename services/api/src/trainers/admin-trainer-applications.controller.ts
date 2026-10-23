@@ -16,6 +16,9 @@ const listSchema = z.object({
 const idSchema = z.uuid();
 const approveSchema = z.object({ note: z.string().trim().max(500).optional() });
 const rejectSchema = z.object({ reason: z.string().trim().min(3).max(500) });
+const trainerStatusSchema = z
+  .object({ status: z.enum(['active', 'paused', 'suspended', 'revoked']), reason: z.string().trim().max(500).optional() })
+  .refine((value) => value.status === 'active' || (value.reason !== undefined && value.reason.length >= 3), { message: 'Please give a reason.', path: ['reason'] });
 const changesSchema = z.object({ note: z.string().trim().min(3).max(500), documentIds: z.array(z.uuid()).max(20).default([]) });
 
 @ApiTags('admin-trainers')
@@ -81,5 +84,13 @@ export class AdminTrainerApplicationsController {
   @ApiOperation({ summary: 'Ask for fixes or extra information. Listed documents are marked for re-upload. The applicant is emailed.' })
   requestChanges(@CurrentUser() admin: AuthUser, @Param('id', new ZodValidationPipe(idSchema)) id: string, @Body(new ZodValidationPipe(changesSchema)) body: z.infer<typeof changesSchema>) {
     return this.admin.requestChanges(admin.id, id, body.note, body.documentIds);
+  }
+
+  @Post(':id/trainer-status')
+  @HttpCode(200)
+  @RequirePermission('trainers.status')
+  @ApiOperation({ summary: 'Pause, suspend, revoke or resume an approved trainer. A reason is needed except when resuming.' })
+  trainerStatus(@CurrentUser() admin: AuthUser, @Param('id', new ZodValidationPipe(idSchema)) id: string, @Body(new ZodValidationPipe(trainerStatusSchema)) body: z.infer<typeof trainerStatusSchema>) {
+    return this.admin.setTrainerStatus(admin.id, id, body.status, body.reason);
   }
 }

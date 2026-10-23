@@ -50,6 +50,8 @@ export type ApplicationDocument = {
   uploadedAt: string;
 };
 
+export type TrainerStatus = 'active' | 'paused' | 'suspended' | 'revoked';
+
 export type ApplicationView = {
   id: string | null;
   status: ApplicationStatus | 'none';
@@ -60,6 +62,8 @@ export type ApplicationView = {
   canSubmit: boolean;
   reviewNote: string | null;
   submittedAt: string | null;
+  // Set only once approved: whether this trainer is currently active, paused, suspended or revoked.
+  trainerStatus: TrainerStatus | null;
 };
 
 export type SaveInput = {
@@ -148,14 +152,19 @@ export class TrainerApplicationsService {
     if (!row) {
       // Nothing saved yet: show the email they signed in with, so the form starts with it filled in.
       const who = await this.db.query<{ verified_email: string | null }>(`select verified_email from users where id = $1`, [userId]);
-      return { id: null, status: 'none', form: { ...emptyForm(), email: who.rows[0]?.verified_email ?? null }, documents: [], missing: this.missingFor(null, []), canEdit: true, canSubmit: false, reviewNote: null, submittedAt: null };
+      return { id: null, status: 'none', form: { ...emptyForm(), email: who.rows[0]?.verified_email ?? null }, documents: [], missing: this.missingFor(null, []), canEdit: true, canSubmit: false, reviewNote: null, submittedAt: null, trainerStatus: null };
     }
     const docs = await this.db.query<DocRow>(
       `select id, kind, status, reviewer_note, mime_type, uploaded_at from trainer_documents
         where application_id = $1 and status <> 'replaced' order by uploaded_at`,
       [row.id],
     );
-    return this.view(row, docs.rows);
+    const view = this.view(row, docs.rows);
+    if (row.status === 'approved') {
+      const trainer = await this.db.query<{ status: TrainerStatus }>(`select status from trainers where user_id = $1`, [userId]);
+      view.trainerStatus = trainer.rows[0]?.status ?? null;
+    }
+    return view;
   }
 
   async save(userId: string, input: SaveInput): Promise<ApplicationView> {
@@ -401,6 +410,7 @@ export class TrainerApplicationsService {
       canSubmit: canEdit && missing.length === 0,
       reviewNote: row.review_note,
       submittedAt: row.submitted_at ? row.submitted_at.toISOString() : null,
+      trainerStatus: null,
     };
   }
 }

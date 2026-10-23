@@ -304,6 +304,30 @@ suite('trainer onboarding', () => {
     expect(mine.body.status).toBe('approved');
   });
 
+  it('pauses, suspends, revokes and resumes an approved trainer; reasons are required and stay internal', async () => {
+    const path = `/v1/admin/trainer-applications/${applicationId}/trainer-status`;
+    await http().post(path).set(as(adminToken)).send({ status: 'paused' }).expect(400);
+    await http().post(path).set(as(trainerToken)).send({ status: 'paused', reason: 'not allowed' }).expect(403);
+    await http().post(path).set(as(adminToken)).send({ status: 'active', reason: 'nothing to resume' }).expect(409);
+
+    await http().post(path).set(as(adminToken)).send({ status: 'paused', reason: 'On leave for two weeks' }).expect(200);
+    await http().post(path).set(as(adminToken)).send({ status: 'paused', reason: 'Again the same' }).expect(409);
+    const mine = await http().get('/v1/trainer-application').set(as(trainerToken)).expect(200);
+    expect(mine.body.trainerStatus).toBe('paused');
+    expect(JSON.stringify(mine.body)).not.toContain('On leave');
+
+    await http().post(path).set(as(adminToken)).send({ status: 'suspended', reason: 'Under review' }).expect(200);
+    await http().post(path).set(as(adminToken)).send({ status: 'revoked', reason: 'Ended the engagement' }).expect(200);
+    await http().post(path).set(as(adminToken)).send({ status: 'active' }).expect(200);
+
+    const detail = await http().get(`/v1/admin/trainer-applications/${applicationId}`).set(as(adminToken)).expect(200);
+    expect(detail.body.trainerStatus).toBe('active');
+    const types = (detail.body.events as { type: string }[]).map((event) => event.type);
+    expect(types).toEqual(expect.arrayContaining(['trainer_paused', 'trainer_suspended', 'trainer_revoked', 'trainer_resumed']));
+    const audit = await pool.query(`select count(*)::int as n from audit_log where action = 'trainer.status_changed'`);
+    expect(audit.rows[0].n).toBe(4);
+  });
+
   it('rejects an application with a reason and emails it', async () => {
     const t = await login(OTHER);
     await http().put('/v1/trainer-application').set(as(t)).send({ ...details, email: 'other@example.com', panNumber: 'ZZZZZ9999Z' }).expect(200);

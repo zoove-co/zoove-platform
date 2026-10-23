@@ -5,7 +5,7 @@ import { v7 as uuidv7 } from 'uuid';
 import { DomainError } from '../common/domain-error';
 import { DatabaseService } from '../database/database.service';
 import { SIGNED_LINK_SECONDS } from './rules';
-import { TrainerApplicationsService, type ApplicationStatus } from './trainer-applications.service';
+import { TrainerApplicationsService, type ApplicationStatus, type TrainerStatus } from './trainer-applications.service';
 
 export type AdminListItem = {
   id: string;
@@ -17,6 +17,7 @@ export type AdminListItem = {
   experienceYears: number | null;
   source: string | null;
   submittedAt: string | null;
+  trainerStatus: TrainerStatus | null;
 };
 
 export type AdminList = { items: AdminListItem[]; counts: Record<string, number> };
@@ -32,6 +33,7 @@ type ListRow = {
   experience_years: number | null;
   source: string | null;
   submitted_at: Date | null;
+  trainer_status: TrainerStatus | null;
 };
 
 const REVIEWABLE: ApplicationStatus[] = ['submitted', 'in_review'];
@@ -57,8 +59,8 @@ export class AdminTrainerApplicationsService {
     }
     params.push(filter.limit);
     const items = await this.db.query<ListRow>(
-      `select a.id, a.first_name, a.last_name, coalesce(a.phone_e164, u.phone_e164) as phone_e164, a.email, a.status, a.specialties, a.experience_years, a.source, a.submitted_at
-         from trainer_applications a join users u on u.id = a.user_id
+      `select a.id, a.first_name, a.last_name, coalesce(a.phone_e164, u.phone_e164) as phone_e164, a.email, a.status, a.specialties, a.experience_years, a.source, a.submitted_at, t.status as trainer_status
+         from trainer_applications a join users u on u.id = a.user_id left join trainers t on t.application_id = a.id
         where ${where.join(' and ')}
         order by a.submitted_at asc nulls last, a.created_at asc
         limit $${params.length}`,
@@ -76,6 +78,7 @@ export class AdminTrainerApplicationsService {
         experienceYears: row.experience_years,
         source: row.source,
         submittedAt: row.submitted_at ? row.submitted_at.toISOString() : null,
+        trainerStatus: row.trainer_status,
       })),
       counts: Object.fromEntries(counts.rows.map((row) => [row.status, Number(row.n)])),
     };
@@ -167,6 +170,28 @@ export class AdminTrainerApplicationsService {
       await this.applications.event(client, applicationId, 'changes_requested', 'admin', adminId, { note, documentIds });
       await this.applications.publish(client, applicationId, 'trainer.application_changes_requested', {});
     });
+  }
+
+  // Pause, suspend, revoke or resume an approved trainer. The reason is internal: it goes in the history and the audit log, never to the trainer.
+  async setTrainerStatus(adminId: string, applicationId: string, target: TrainerStatus, reason: string | undefined): Promise<{ id: string; trainerStatus: TrainerStatus }> {
+    await this.db.tx(async (client) => {
+      const found = await client.query<{ status: ApplicationStatus; trainer_status: TrainerStatus | null }>(
+        `select a.status, t.status as trainer_status from trainer_applications a left join trainers t on t.application_id = a.id where a.id = $1 for update of a`,
+        [applicationId],
+      );
+      const row = found.rows[0];
+      if (!row) throw new DomainError('NOT_FOUND', 'Application not found.');
+      if (row.status !== 'approved' || !row.trainer_status) throw new DomainError('INVALID_STATE', 'Only an approved trainer can be paused, suspended, revoked or resumed.');
+      if (row.trainer_status === target) throw new DomainError('INVALID_STATE', `This trainer is already ${target === 'active' ? 'active' : target}.`);
+      await client.query(`update trainers set status = $2 where application_id = $1`, [applicationId, target]);
+      const type = target === 'active' ? 'trainer_resumed' : `trainer_${target}`;
+      await this.applications.event(client, applicationId, type, 'admin', adminId, reason ? { reason, from: row.trainer_status } : { from: row.trainer_status });
+      await client.query(
+        `insert into audit_log (id, actor_user_id, action, entity_type, entity_id, before, after) values ($1, $2, 'trainer.status_changed', 'trainer_application', $3, $4, $5)`,
+        [uuidv7(), adminId, applicationId, JSON.stringify({ status: row.trainer_status }), JSON.stringify({ status: target, reason: reason ?? null })],
+      );
+    });
+    return { id: applicationId, trainerStatus: target };
   }
 
   private async transition(

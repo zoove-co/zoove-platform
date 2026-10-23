@@ -4,12 +4,12 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
-import { ApiError, KIND_LABEL, STATUS_LABEL, approve, nice, documentLink, getApplication, reject, requestChanges, startReview, type Detail as DetailData } from '@/lib/api';
+import { ApiError, KIND_LABEL, STATUS_LABEL, approve, nice, documentLink, getApplication, reject, requestChanges, setTrainerStatus, startReview, type TrainerStatus, type Detail as DetailData } from '@/lib/api';
 import { can, useMe } from './me';
 import { Shell } from './Shell';
 import { Banner, Field, Icons, Spinner, avatarTone, initials } from './ui';
 
-type Dialog = null | 'approve' | 'reject' | 'changes';
+type Dialog = null | 'approve' | 'reject' | 'changes' | 'status';
 
 const when = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' }) : '—';
@@ -25,6 +25,10 @@ const EVENT_LABEL: Record<string, string> = {
   document_uploaded: 'Document uploaded',
   document_removed: 'Document removed',
   document_viewed: 'Document viewed',
+  trainer_paused: 'Trainer paused',
+  trainer_suspended: 'Trainer suspended',
+  trainer_revoked: 'Trainer revoked',
+  trainer_resumed: 'Trainer resumed',
 };
 
 export function Detail({ signOut, expired }: { signOut: () => void; expired: () => void }) {
@@ -32,6 +36,8 @@ export function Detail({ signOut, expired }: { signOut: () => void; expired: () 
   const me = useMe();
   const canDocs = can(me, 'trainers.documents');
   const canDecide = can(me, 'trainers.decide');
+  const canStatus = can(me, 'trainers.status');
+  const [target, setTarget] = useState<TrainerStatus>('paused');
   const [data, setData] = useState<DetailData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -81,6 +87,13 @@ export function Detail({ signOut, expired }: { signOut: () => void; expired: () 
     } finally {
       setOpening(null);
     }
+  }
+
+  function openStatus(next: TrainerStatus) {
+    setTarget(next);
+    setNote('');
+    setFieldError(null);
+    setDialog('status');
   }
 
   async function run(action: () => Promise<unknown>) {
@@ -181,6 +194,24 @@ export function Detail({ signOut, expired }: { signOut: () => void; expired: () 
             </div>
           </div>
 
+          {data.status === 'approved' && data.trainerStatus ? (
+            <div className="card">
+              <h2>Trainer account</h2>
+              <div className="statusrow">
+                <span className={`pill ${data.trainerStatus}`}>{STATUS_LABEL[data.trainerStatus] ?? data.trainerStatus}</span>
+                {canStatus ? (
+                  <div className="btns">
+                    {data.trainerStatus === 'active' ? <button className="btn small ghost" type="button" onClick={() => openStatus('paused')}>Pause</button> : null}
+                    {data.trainerStatus !== 'active' ? <button className="btn small good" type="button" onClick={() => openStatus('active')}>Resume</button> : null}
+                    {data.trainerStatus !== 'suspended' ? <button className="btn small soft" type="button" onClick={() => openStatus('suspended')}>Suspend</button> : null}
+                    {data.trainerStatus !== 'revoked' ? <button className="btn small danger" type="button" onClick={() => openStatus('revoked')}>Revoke</button> : null}
+                  </div>
+                ) : null}
+              </div>
+              <p className="muted small" style={{ margin: '10px 0 0' }}>Reasons are kept in the history and are not shown to the trainer. The trainer sees only that their account is {data.trainerStatus === 'active' ? 'active' : data.trainerStatus}.</p>
+            </div>
+          ) : null}
+
           {data.status === 'approved' ? (
             <div className="card">
               <h2>Sessions</h2>
@@ -219,7 +250,7 @@ export function Detail({ signOut, expired }: { signOut: () => void; expired: () 
         </div>
       ) : null}
 
-      {dialog && canDecide ? (
+      {dialog && (dialog === 'status' ? canStatus : canDecide) ? (
         <div className="modal" role="dialog" aria-modal="true">
           <div className="sheet">
             {dialog === 'approve' ? (
@@ -250,18 +281,29 @@ export function Detail({ signOut, expired }: { signOut: () => void; expired: () 
                 ))}
               </>
             ) : null}
+            {dialog === 'status' ? (
+              <>
+                <h2>{target === 'active' ? 'Resume' : target === 'paused' ? 'Pause' : target === 'suspended' ? 'Suspend' : 'Revoke'} {name}?</h2>
+                <p className="muted">
+                  {target === 'active' ? 'The trainer becomes active again.' : target === 'revoked' ? 'This ends their time as a Zoove trainer. You can resume them later if needed.' : `Their account will show as ${target === 'paused' ? 'paused' : 'suspended'}. You can resume it at any time.`}
+                </p>
+                <Field label={target === 'active' ? 'Note (optional)' : 'Reason (internal, kept in history)'} error={fieldError ?? undefined}>
+                  <textarea maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} aria-invalid={Boolean(fieldError)} />
+                </Field>
+              </>
+            ) : null}
             {fieldError && dialog === 'approve' ? <Banner tone="bad">{fieldError}</Banner> : null}
             <div className="actions">
               <button className="btn ghost" type="button" disabled={busy} onClick={() => setDialog(null)}>Cancel</button>
               <button
-                className={`btn ${dialog === 'reject' ? 'danger solid' : dialog === 'approve' ? 'good' : ''}`}
+                className={`btn ${dialog === 'reject' || (dialog === 'status' && target === 'revoked') ? 'danger solid' : dialog === 'approve' || (dialog === 'status' && target === 'active') ? 'good' : ''}`}
                 type="button"
-                disabled={busy || (dialog !== 'approve' && note.trim().length < 3)}
+                disabled={busy || (dialog !== 'approve' && !(dialog === 'status' && target === 'active') && note.trim().length < 3)}
                 onClick={() =>
-                  void run(() => (dialog === 'approve' ? approve(id, note.trim() || undefined) : dialog === 'reject' ? reject(id, note.trim()) : requestChanges(id, note.trim(), picked)))
+                  void run(() => (dialog === 'status' ? setTrainerStatus(id, target, note.trim() || undefined) : dialog === 'approve' ? approve(id, note.trim() || undefined) : dialog === 'reject' ? reject(id, note.trim()) : requestChanges(id, note.trim(), picked)))
                 }
               >
-                {busy ? <Spinner /> : null} {dialog === 'approve' ? 'Approve' : dialog === 'reject' ? 'Reject' : 'Send request'}
+                {busy ? <Spinner /> : null} {dialog === 'status' ? 'Confirm' : dialog === 'approve' ? 'Approve' : dialog === 'reject' ? 'Reject' : 'Send request'}
               </button>
             </div>
           </div>
