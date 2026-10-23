@@ -88,7 +88,7 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
       if (app.email) messages.push(receivedEmail(app.email, ctx, resubmission));
       const name = [app.first_name, app.last_name].filter(Boolean).join(' ') || app.phone_e164 || app.email || 'A trainer';
       for (const ops of this.config.OPS_NOTIFY_EMAILS.split(',').map((value) => value.trim()).filter(Boolean)) {
-        messages.push(opsNewApplicationEmail(ops, name, app.phone_e164 ?? app.email ?? 'no contact', `${this.config.ADMIN_URL}/trainers/${event.aggregate_id}`, resubmission));
+        messages.push(opsNewApplicationEmail(ops, name, app.phone_e164 ?? app.email ?? 'no contact', `${this.config.ADMIN_URL}/applications/${event.aggregate_id}`, resubmission));
       }
     } else if (app.email) {
       if (event.event_type === 'trainer.application_approved') messages.push(approvedEmail(app.email, ctx));

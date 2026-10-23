@@ -173,6 +173,14 @@ export function Detail({ signOut, expired }: { signOut: () => void; expired: () 
               ))}
             </div>
           </div>
+
+          {data.status === 'approved' ? (
+            <div className="card">
+              <h2>Sessions</h2>
+              <div className="seg" aria-hidden><span>Active</span><span>Upcoming</span><span>Past</span></div>
+              <div className="empty-note">This trainer&apos;s sessions will appear here once bookings can be assigned to trainers. Coming soon.</div>
+            </div>
+          ) : null}
         </div>
 
         <div className="card">

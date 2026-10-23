@@ -83,6 +83,9 @@ p { margin: 0 0 12px; }
 .nav a:hover { background: var(--hover); color: var(--text); }
 .nav a[aria-current='page'] { background: color-mix(in srgb, var(--orange) 14%, transparent); color: var(--text); }
 .nav a[aria-current='page'] svg { color: var(--orange); }
+.nav svg { flex: none; }
+.nav .soonitem { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: var(--muted); font-weight: 550; opacity: 0.62; cursor: default; user-select: none; }
+.nav .soontag { margin-left: auto; font-size: 11.5px; font-weight: 650; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--line-strong); color: var(--muted); }
 .nav .badge {
   margin-left: auto; min-width: 22px; text-align: center; padding: 1px 7px; border-radius: 99px;
   font-size: 12px; font-weight: 700; background: var(--orange-btn); color: #fff;
@@ -282,6 +285,12 @@ dl.kv dd { margin: 0; word-break: break-word; }
 }
 .decision .btn { flex: 0 1 auto; }
 @media (max-width: 640px) { .decision .btn { flex: 1 1 calc(50% - 10px); } }
+
+/* ---- sessions placeholder ---- */
+.seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: 11px; background: var(--panel-2); border: 1px solid var(--line); margin-bottom: 14px; }
+.seg span { padding: 6px 14px; border-radius: 8px; font-size: 13.5px; font-weight: 550; color: var(--muted); }
+.seg span:first-child { background: var(--panel); color: var(--text); box-shadow: 0 0 0 1px var(--line); }
+.empty-note { padding: 22px 8px; text-align: center; color: var(--muted); border: 1px dashed var(--line-strong); border-radius: 13px; }
 
 /* ---- modal ---- */
 .modal { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.62); backdrop-filter: blur(3px); display: grid; place-items: center; padding: 16px; z-index: 30; }
