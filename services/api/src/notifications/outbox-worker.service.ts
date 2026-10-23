@@ -80,7 +80,7 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
     if (!app) return; // application no longer exists: nothing to tell anyone
 
     const firstName = app.first_name ?? 'there';
-    const ctx = { firstName, statusUrl: `${this.config.TRAINER_SITE_URL}/status`, note: app.review_note };
+    const ctx = { firstName, statusUrl: this.config.TRAINER_SITE_URL, note: app.review_note };
     const messages: EmailMessage[] = [];
 
     if (event.event_type === 'trainer.application_submitted') {
