@@ -51,6 +51,7 @@ suite('email sign-in (trainer page and admin panel)', () => {
     ({ app, pool } = await startApp(url as string, (builder) => builder.overrideProvider(EmailProvider).useValue(mail).overrideProvider(StorageService).useValue(new NoStorage())));
     await pool.query('truncate table trainer_application_events, trainer_documents, trainers, trainer_applications, outbox_events, audit_log restart identity cascade');
     await pool.query(`delete from otp_challenges where email is not null`);
+    await pool.query(`delete from admin_profiles`);
     await pool.query(`delete from user_roles where user_id in (select id from users where verified_email is not null)`);
     await pool.query(`delete from users where verified_email is not null or email in ('victim@example.com')`);
   });
@@ -174,6 +175,9 @@ suite('email sign-in (trainer page and admin panel)', () => {
       expect(r.status).toBe(200);
       expect(mail.sent.length).toBe(before + 1);
       const token = r.body.token as string;
+      // An admin role with no team profile gets nothing (fail closed) until an owner adds them to the team.
+      await http().get('/v1/admin/trainer-applications?status=pending').set(as(token)).expect(403);
+      await pool.query(`insert into admin_profiles (user_id, display_name, job_title, is_owner) values ($1, 'Boss', 'Owner', true)`, [admin.rows[0].id]);
       const list = await http().get('/v1/admin/trainer-applications?status=pending').set(as(token)).expect(200);
       expect(list.body).toHaveProperty('items');
 

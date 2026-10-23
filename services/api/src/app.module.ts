@@ -14,6 +14,7 @@ import { HealthModule } from './health/health.module';
 import { IdentityModule } from './identity/identity.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { StorageModule } from './storage/storage.module';
+import { TeamModule } from './team/team.module';
 import { TrainersModule } from './trainers/trainers.module';
 
 // Modular monolith (decision D4): each module owns its tables and exposes services, never raw SQL on
@@ -38,6 +39,7 @@ import { TrainersModule } from './trainers/trainers.module';
     AddressesModule,
     BookingsModule,
     TrainersModule,
+    TeamModule,
     NotificationsModule,
   ],
   providers: [

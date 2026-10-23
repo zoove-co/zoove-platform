@@ -305,3 +305,29 @@ dl.kv dd { margin: 0; word-break: break-word; }
 .auth-card .box { margin-top: 22px; padding: 22px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; }
 .center { text-align: center; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---- profile card (sidebar) ---- */
+.me { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.me:hover { border-color: var(--line-strong); }
+.me .who { min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.me .who b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.me .who span { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.accesslist { margin: 0; padding-left: 18px; }
+.accesslist li { margin: 2px 0; }
+@media (max-width: 860px) { .me { width: auto; padding: 4px; border-radius: 99px; } .me .who { display: none; } }
+
+/* ---- team form: on/off switches ---- */
+.modal .sheet.wide { max-width: 580px; max-height: 92vh; overflow-y: auto; }
+.switches { margin-top: 8px; }
+.switches .grouphead { font-size: 12.5px; font-weight: 650; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); padding: 10px 0 2px; }
+.sw { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 11px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+.sw .t { min-width: 0; }
+.sw .t b { display: block; font-weight: 600; font-size: 14.5px; }
+.sw .t small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 1px; }
+.soontag.inline { margin-left: 8px; font-size: 11px; font-weight: 650; padding: 1px 7px; border-radius: 99px; border: 1px solid var(--line-strong); color: var(--muted); vertical-align: 1px; }
+.sw input[type='checkbox'] { appearance: none; -webkit-appearance: none; flex: none; width: 42px; height: 24px; margin: 0; padding: 0; border-radius: 99px; background: var(--panel-2); border: 1px solid var(--line-strong); position: relative; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+.sw input[type='checkbox']::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 99px; background: var(--muted); transition: left 0.15s, background 0.15s; }
+.sw input[type='checkbox']:checked { background: var(--green-btn); border-color: transparent; }
+.sw input[type='checkbox']:checked::after { left: 20px; background: #fff; }
+.sw input[type='checkbox']:disabled { opacity: 0.55; cursor: not-allowed; }
+.sw input[type='checkbox']:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }

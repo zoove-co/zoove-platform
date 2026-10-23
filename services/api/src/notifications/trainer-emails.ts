@@ -2,7 +2,12 @@ import type { EmailMessage } from '../email/email.provider';
 
 const escape = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-function layout(heading: string, paragraphs: string[], action?: { label: string; url: string }): { html: string; text: string } {
+export function layout(
+  heading: string,
+  paragraphs: string[],
+  action?: { label: string; url: string },
+  footer = 'You received this because you applied to train with Zoove.',
+): { html: string; text: string } {
   const body = paragraphs.map((p) => `<p style="margin:0 0 14px;line-height:1.55;color:#2b2b2b">${escape(p)}</p>`).join('');
   const button = action
     ? `<p style="margin:22px 0"><a href="${escape(action.url)}" style="background:#ff5a2c;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;display:inline-block">${escape(action.label)}</a></p>`
@@ -12,7 +17,7 @@ function layout(heading: string, paragraphs: string[], action?: { label: string;
 <p style="font-size:22px;font-weight:700;margin:0 0 22px;color:#111">zoove<span style="color:#ff5a2c">.</span></p>
 <div style="background:#fff;border-radius:12px;padding:26px">
 <h1 style="font-size:20px;margin:0 0 16px;color:#111">${escape(heading)}</h1>${body}${button}</div>
-<p style="font-size:12px;color:#888;margin:16px 4px">Zoove, Mumbai. You received this because you applied to train with Zoove.</p>
+<p style="font-size:12px;color:#888;margin:16px 4px">Zoove, Mumbai. ${escape(footer)}</p>
 </div></body></html>`;
   const text = [heading, '', ...paragraphs, ...(action ? ['', `${action.label}: ${action.url}`] : [])].join('\n');
   return { html, text };

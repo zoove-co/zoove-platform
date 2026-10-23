@@ -6,7 +6,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ApiError, STATUS_LABEL, listApplications, nice, type Filter, type ListResult } from '@/lib/api';
 import { Shell } from './Shell';
-import { Banner, Icons, Spinner } from './ui';
+import { can, useMe } from './me';
+import { Banner, Icons, Spinner, avatarTone, initials } from './ui';
 
 type Card = { key: Filter; label: string; tone: 't-orange' | 't-amber' | 't-green' | 't-red' };
 const CARDS: Card[] = [
@@ -33,18 +34,10 @@ function ago(iso: string | null): string {
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
 }
 
-export const initials = (name: string) =>
-  name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('') || '?';
-
-export const avatarTone = (name: string) => `av${[...name].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % 5}`;
-
 export function Dashboard({ signOut, expired }: { signOut: () => void; expired: () => void }) {
   const router = useRouter();
+  const me = useMe();
+  const allowed = can(me, 'trainers.view');
   const [filter, setFilter] = useState<Filter>('pending');
   const [search, setSearch] = useState('');
   const [data, setData] = useState<ListResult | null>(null);
@@ -54,6 +47,7 @@ export function Dashboard({ signOut, expired }: { signOut: () => void; expired: 
   const seq = useRef(0);
 
   const load = useCallback(async () => {
+    if (!allowed) return;
     const mine = ++seq.current;
     try {
       const result = await listApplications(filter, search);
@@ -67,7 +61,7 @@ export function Dashboard({ signOut, expired }: { signOut: () => void; expired: 
     } finally {
       if (mine === seq.current) setLoading(false);
     }
-  }, [filter, search, expired]);
+  }, [filter, search, expired, allowed]);
 
   // Reload when the filter or search changes (search waits a moment for typing to stop).
   useEffect(() => {
@@ -103,6 +97,15 @@ export function Dashboard({ signOut, expired }: { signOut: () => void; expired: 
   }, [pending]);
 
   const total = countOf('all');
+
+  if (!allowed) {
+    return (
+      <Shell signOut={signOut}>
+        <div className="pagehead"><div><h1>Trainers</h1></div></div>
+        <Banner tone="info">You do not have access to trainer applications yet. Ask an owner to turn it on for you.</Banner>
+      </Shell>
+    );
+  }
 
   return (
     <Shell signOut={signOut} pending={pending}>

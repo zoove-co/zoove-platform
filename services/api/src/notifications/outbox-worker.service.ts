@@ -3,13 +3,14 @@ import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nest
 import { APP_CONFIG, type Env } from '../config/env';
 import { DatabaseService } from '../database/database.service';
 import { EmailProvider, type EmailMessage } from '../email/email.provider';
+import { teamInviteEmail } from './team-emails';
 import { approvedEmail, changesEmail, opsNewApplicationEmail, receivedEmail, rejectedEmail } from './trainer-emails';
 
 type OutboxRow = { id: string; aggregate_id: string; event_type: string; payload: Record<string, unknown>; attempts: number };
 
 type ApplicationInfo = { first_name: string | null; last_name: string | null; email: string | null; phone_e164: string | null; review_note: string | null };
 
-const HANDLED = ['trainer.application_submitted', 'trainer.application_approved', 'trainer.application_rejected', 'trainer.application_changes_requested'];
+const HANDLED = ['trainer.application_submitted', 'trainer.application_approved', 'trainer.application_rejected', 'trainer.application_changes_requested', 'team.member_invited'];
 const MAX_ATTEMPTS = 10;
 const BATCH = 10;
 
@@ -71,6 +72,12 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async handle(event: OutboxRow): Promise<void> {
+    if (event.event_type === 'team.member_invited') {
+      const invite = event.payload as { email?: string; name?: string; jobTitle?: string; invitedBy?: string };
+      if (!invite.email) return;
+      await this.email.send(teamInviteEmail(invite.email, { name: invite.name ?? '', jobTitle: invite.jobTitle ?? 'a team member', invitedBy: invite.invitedBy ?? 'The Zoove team' }, this.config.ADMIN_URL));
+      return;
+    }
     const info = await this.db.query<ApplicationInfo>(
       `select a.first_name, a.last_name, a.email, coalesce(a.phone_e164, u.phone_e164) as phone_e164, a.review_note
          from trainer_applications a join users u on u.id = a.user_id where a.id = $1`,

@@ -2,6 +2,16 @@
 
 import type { ReactNode } from 'react';
 
+export const initials = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('') || '?';
+
+export const avatarTone = (name: string) => `av${[...name].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % 5}`;
+
 export function Spinner() {
   return <span className="spinner" aria-hidden />;
 }

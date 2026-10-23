@@ -128,6 +128,30 @@ export async function signOut(): Promise<void> {
   }
 }
 
+// ---- Team (mirror the API) ----
+
+export type PermissionInfo = { key: string; group: string; label: string; hint: string; soon: boolean };
+export type Member = {
+  id: string;
+  name: string;
+  email: string | null;
+  jobTitle: string;
+  isOwner: boolean;
+  reportsTo: { id: string; name: string } | null;
+  permissions: string[];
+  active: boolean;
+  lastLoginAt: string | null;
+  invitedAt: string;
+  invitedBy: string | null;
+};
+export type Me = Member & { catalog: PermissionInfo[] };
+export type MemberInput = { name: string; jobTitle: string; reportsTo: string | null; permissions: string[]; isOwner: boolean };
+
+export const getMe = () => api<Me>('/v1/admin/me');
+export const listTeam = () => api<{ members: Member[]; permissions: PermissionInfo[] }>('/v1/admin/team');
+export const addMember = (input: MemberInput & { email: string }) => api<Member>('/v1/admin/team', { method: 'POST', json: input });
+export const updateMember = (id: string, patch: Partial<MemberInput> & { active?: boolean }) => api<Member>(`/v1/admin/team/${id}`, { method: 'PATCH', json: patch });
+
 // ---- Trainer applications (mirror the API) ----
 
 export type Status = 'submitted' | 'in_review' | 'changes_requested' | 'approved' | 'rejected';

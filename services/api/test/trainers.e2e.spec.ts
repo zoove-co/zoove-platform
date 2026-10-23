@@ -103,12 +103,14 @@ suite('trainer onboarding', () => {
       builder.overrideProvider(StorageService).useValue(storage).overrideProvider(EmailProvider).useValue(mail),
     ));
     await pool.query('truncate table trainer_application_events, trainer_documents, trainers, trainer_applications, outbox_events, audit_log restart identity cascade');
+    await pool.query('delete from admin_profiles');
     await pool.query(`delete from user_roles where role in ('trainer', 'admin')`);
     await pool.query('delete from consents');
     trainerToken = await login(TRAINER);
     otherToken = await login(OTHER);
     adminToken = await login(ADMIN, 'customer');
     await pool.query(`insert into user_roles (user_id, role) select id, 'admin' from users where phone_e164 = $1 on conflict do nothing`, [ADMIN]);
+    await pool.query(`insert into admin_profiles (user_id, display_name, job_title, is_owner) select id, 'Test admin', 'Owner', true from users where phone_e164 = $1 on conflict do nothing`, [ADMIN]);
     adminToken = await login(ADMIN, 'customer'); // sign in again so the token carries the admin role
   });
 

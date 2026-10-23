@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { AuthGuard, CurrentUser, type AuthUser } from '../identity/auth.guard';
+import { PermissionGuard, RequirePermission } from '../identity/permission.guard';
 import { Roles, RolesGuard } from '../identity/roles.guard';
 import { AdminTrainerApplicationsService } from './admin-trainer-applications.service';
 
@@ -19,25 +20,28 @@ const changesSchema = z.object({ note: z.string().trim().min(3).max(500), docume
 
 @ApiTags('admin-trainers')
 @ApiBearerAuth()
-@UseGuards(AuthGuard, RolesGuard)
+@UseGuards(AuthGuard, RolesGuard, PermissionGuard)
 @Roles('admin')
 @Controller('admin/trainer-applications')
 export class AdminTrainerApplicationsController {
   constructor(private readonly admin: AdminTrainerApplicationsService) {}
 
   @Get()
+  @RequirePermission('trainers.view')
   @ApiOperation({ summary: 'Trainer applications with counts per status. status=pending means submitted or in review.' })
   list(@Query(new ZodValidationPipe(listSchema)) query: z.infer<typeof listSchema>) {
     return this.admin.list({ ...(query.status ? { status: query.status } : {}), ...(query.search ? { search: query.search } : {}), limit: query.limit });
   }
 
   @Get(':id')
+  @RequirePermission('trainers.view')
   @ApiOperation({ summary: 'One application with details, documents and history' })
   detail(@Param('id', new ZodValidationPipe(idSchema)) id: string) {
     return this.admin.detail(id);
   }
 
   @Get(':id/documents/:documentId/url')
+  @RequirePermission('trainers.documents')
   @ApiOperation({ summary: 'A 5-minute private link to view one document. Every view is recorded.' })
   link(
     @CurrentUser() admin: AuthUser,
@@ -49,6 +53,7 @@ export class AdminTrainerApplicationsController {
 
   @Post(':id/start-review')
   @HttpCode(200)
+  @RequirePermission('trainers.decide')
   @ApiOperation({ summary: 'Mark that someone is looking at this application' })
   start(@CurrentUser() admin: AuthUser, @Param('id', new ZodValidationPipe(idSchema)) id: string) {
     return this.admin.startReview(admin.id, id);
@@ -56,6 +61,7 @@ export class AdminTrainerApplicationsController {
 
   @Post(':id/approve')
   @HttpCode(200)
+  @RequirePermission('trainers.decide')
   @ApiOperation({ summary: 'Approve: creates the trainer, gives the trainer role, emails the applicant' })
   approve(@CurrentUser() admin: AuthUser, @Param('id', new ZodValidationPipe(idSchema)) id: string, @Body(new ZodValidationPipe(approveSchema)) body: z.infer<typeof approveSchema>) {
     return this.admin.approve(admin.id, id, body.note);
@@ -63,6 +69,7 @@ export class AdminTrainerApplicationsController {
 
   @Post(':id/reject')
   @HttpCode(200)
+  @RequirePermission('trainers.decide')
   @ApiOperation({ summary: 'Reject with a reason (final). The applicant is emailed.' })
   reject(@CurrentUser() admin: AuthUser, @Param('id', new ZodValidationPipe(idSchema)) id: string, @Body(new ZodValidationPipe(rejectSchema)) body: z.infer<typeof rejectSchema>) {
     return this.admin.reject(admin.id, id, body.reason);
@@ -70,6 +77,7 @@ export class AdminTrainerApplicationsController {
 
   @Post(':id/request-changes')
   @HttpCode(200)
+  @RequirePermission('trainers.decide')
   @ApiOperation({ summary: 'Ask for fixes or extra information. Listed documents are marked for re-upload. The applicant is emailed.' })
   requestChanges(@CurrentUser() admin: AuthUser, @Param('id', new ZodValidationPipe(idSchema)) id: string, @Body(new ZodValidationPipe(changesSchema)) body: z.infer<typeof changesSchema>) {
     return this.admin.requestChanges(admin.id, id, body.note, body.documentIds);

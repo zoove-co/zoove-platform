@@ -5,9 +5,9 @@ import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
 import { ApiError, KIND_LABEL, STATUS_LABEL, approve, nice, documentLink, getApplication, reject, requestChanges, startReview, type Detail as DetailData } from '@/lib/api';
-import { avatarTone, initials } from './Dashboard';
+import { can, useMe } from './me';
 import { Shell } from './Shell';
-import { Banner, Field, Icons, Spinner } from './ui';
+import { Banner, Field, Icons, Spinner, avatarTone, initials } from './ui';
 
 type Dialog = null | 'approve' | 'reject' | 'changes';
 
@@ -29,6 +29,9 @@ const EVENT_LABEL: Record<string, string> = {
 
 export function Detail({ signOut, expired }: { signOut: () => void; expired: () => void }) {
   const { id } = useParams<{ id: string }>();
+  const me = useMe();
+  const canDocs = can(me, 'trainers.documents');
+  const canDecide = can(me, 'trainers.decide');
   const [data, setData] = useState<DetailData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -151,7 +154,9 @@ export function Detail({ signOut, expired }: { signOut: () => void; expired: () 
 
           <div className="card">
             <h2>Documents</h2>
-            <p className="muted small">Each opens in a new tab with a private link that expires in 5 minutes. Every view is recorded.</p>
+            <p className="muted small">
+              {canDocs ? 'Each opens in a new tab with a private link that expires in 5 minutes. Every view is recorded.' : 'You can see which documents were uploaded, but opening them needs the "View KYC documents" permission. Ask an owner.'}
+            </p>
             {docError ? <Banner tone="bad">{docError}</Banner> : null}
             {visibleDocs.length === 0 ? <p className="muted">No documents.</p> : null}
             <div className="docs">
@@ -166,9 +171,11 @@ export function Detail({ signOut, expired }: { signOut: () => void; expired: () 
                       </div>
                     </div>
                   </div>
-                  <button className="btn small ghost" type="button" disabled={opening === doc.id} onClick={() => void openDocument(doc.id)}>
-                    {opening === doc.id ? <Spinner /> : 'View document'}
-                  </button>
+                  {canDocs ? (
+                    <button className="btn small ghost" type="button" disabled={opening === doc.id} onClick={() => void openDocument(doc.id)}>
+                      {opening === doc.id ? <Spinner /> : 'View document'}
+                    </button>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -201,7 +208,7 @@ export function Detail({ signOut, expired }: { signOut: () => void; expired: () 
         </div>
       </div>
 
-      {reviewable ? (
+      {reviewable && canDecide ? (
         <div className="decision">
           {data.status === 'submitted' ? (
             <button className="btn ghost" type="button" disabled={busy} onClick={() => void run(() => startReview(id))}>Start review</button>
@@ -212,7 +219,7 @@ export function Detail({ signOut, expired }: { signOut: () => void; expired: () 
         </div>
       ) : null}
 
-      {dialog ? (
+      {dialog && canDecide ? (
         <div className="modal" role="dialog" aria-modal="true">
           <div className="sheet">
             {dialog === 'approve' ? (
