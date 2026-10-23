@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 
 import { ApiError, api, hasSession, signOut } from '@/lib/api';
 import { SignIn } from './SignIn';
-import { Spinner } from './ui';
+import { Spinner, Wordmark } from './ui';
 
 type Ctx = { signOut: () => void; expired: () => void };
 
@@ -39,18 +39,25 @@ export function Gate({ children }: { children: (ctx: Ctx) => ReactNode }) {
   if (state === 'loading') return <div className="center" style={{ padding: 60 }}><Spinner /></div>;
   if (state === 'forbidden') {
     return (
-      <div className="shell">
-        <h1>No admin access</h1>
-        <p className="muted">This account is signed in but is not a Zoove admin.</p>
-        <button className="btn" type="button" onClick={out}>Sign out</button>
+      <div className="auth">
+        <div className="auth-card">
+          <Wordmark />
+          <div className="box">
+            <h1>No admin access</h1>
+            <p className="muted" style={{ marginTop: 8 }}>This account is signed in but is not a Zoove admin.</p>
+            <button className="btn block" type="button" onClick={out}>Sign out</button>
+          </div>
+        </div>
       </div>
     );
   }
   if (state === 'signin') {
     return (
-      <div className="shell">
-        <div className="topbar"><span className="brand">zoove admin</span></div>
-        <SignIn notice={notice} onDone={() => void check()} />
+      <div className="auth">
+        <div className="auth-card">
+          <Wordmark />
+          <SignIn notice={notice} onDone={() => void check()} />
+        </div>
       </div>
     );
   }

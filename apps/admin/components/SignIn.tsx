@@ -73,8 +73,9 @@ export function SignIn({ onDone, notice }: { onDone: () => void; notice?: string
 
   return (
     <>
-      <h1>Zoove admin</h1>
-      <p className="muted">Sign in with your Zoove admin email. We will send a 6-digit code.</p>
+      <h1>Sign in</h1>
+      <p className="muted">Use your Zoove admin email. We will send you a 6-digit code.</p>
+      <div className="box">
       {notice ? <Banner tone="info">{notice}</Banner> : null}
       {!sentTo ? (
         <form
@@ -87,7 +88,7 @@ export function SignIn({ onDone, notice }: { onDone: () => void; notice?: string
           <Field label="Your email" hint="Only Zoove admins receive a code." error={error ?? undefined}>
             <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="you@zoove.co" value={email} onChange={(event) => setEmail(event.target.value)} aria-invalid={Boolean(error)} />
           </Field>
-          <button className="btn" type="submit" disabled={busy}>
+          <button className="btn block" type="submit" disabled={busy}>
             {busy ? <Spinner /> : null} Send me a code
           </button>
         </form>
@@ -105,7 +106,7 @@ export function SignIn({ onDone, notice }: { onDone: () => void; notice?: string
           <Field label="6-digit code" error={error ?? undefined}>
             <input ref={codeRef} className="codebox" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="••••••" value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} aria-invalid={Boolean(error)} />
           </Field>
-          <button className="btn" type="submit" disabled={busy || code.length !== 6}>
+          <button className="btn block" type="submit" disabled={busy || code.length !== 6}>
             {busy ? <Spinner /> : null} Continue
           </button>
           <div className="actions">
@@ -125,6 +126,7 @@ export function SignIn({ onDone, notice }: { onDone: () => void; notice?: string
           </div>
         </form>
       )}
+      </div>
     </>
   );
 }

@@ -5,7 +5,9 @@ import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
 import { ApiError, KIND_LABEL, STATUS_LABEL, approve, nice, documentLink, getApplication, reject, requestChanges, startReview, type Detail as DetailData } from '@/lib/api';
-import { Banner, Field, Spinner } from './ui';
+import { avatarTone, initials } from './Dashboard';
+import { Shell } from './Shell';
+import { Banner, Field, Icons, Spinner } from './ui';
 
 type Dialog = null | 'approve' | 'reject' | 'changes';
 
@@ -97,11 +99,11 @@ export function Detail({ signOut, expired }: { signOut: () => void; expired: () 
 
   if (error && !data) {
     return (
-      <div className="wide">
-        <Link href="/">← All trainers</Link>
+      <Shell signOut={signOut}>
+        <Link href="/" className="crumb">{Icons.back} Trainers</Link>
         <Banner tone="bad">{error}</Banner>
         <button className="btn" type="button" onClick={() => void load()}>Try again</button>
-      </div>
+      </Shell>
     );
   }
   if (!data) return <div className="center" style={{ padding: 60 }}><Spinner /></div>;
@@ -110,18 +112,21 @@ export function Detail({ signOut, expired }: { signOut: () => void; expired: () 
   const reviewable = data.status === 'submitted' || data.status === 'in_review';
   const name = `${f.firstName ?? ''} ${f.lastName ?? ''}`.trim() || 'Applicant';
   const visibleDocs = data.documents;
+  const docIcon = (kind: string) => (kind.startsWith('aadhaar') ? Icons.id : kind === 'pan_card' ? Icons.card : kind === 'selfie' ? Icons.face : Icons.file);
 
   return (
-    <div className="wide">
-      <div className="topbar">
-        <Link href="/" className="brand" style={{ textDecoration: 'none' }}>zoove admin</Link>
-        <button className="linkbtn" type="button" onClick={signOut}>Sign out</button>
+    <Shell signOut={signOut}>
+      <Link href="/" className="crumb">{Icons.back} Trainers</Link>
+      <div className="who-head">
+        <span className={`avatar lg ${avatarTone(name)}`}>{initials(name)}</span>
+        <div>
+          <h1>{name}</h1>
+          <div className="meta">
+            <span className={`pill ${data.status}`}>{STATUS_LABEL[data.status] ?? data.status}</span>
+            <span style={{ marginLeft: 10 }}>Submitted {when(data.submittedAt)}{data.source ? ` · via ${data.source}` : ''}</span>
+          </div>
+        </div>
       </div>
-      <p><Link href="/">← All trainers</Link></p>
-      <h1>
-        {name} <span className={`pill ${data.status}`} style={{ verticalAlign: 'middle', marginLeft: 6 }}>{STATUS_LABEL[data.status] ?? data.status}</span>
-      </h1>
-      <p className="muted">Submitted {when(data.submittedAt)}{data.source ? ` · via ${data.source}` : ''}</p>
       {data.reviewNote && !reviewable ? <Banner tone="info"><b>Last decision note:</b> {data.reviewNote}</Banner> : null}
       {error ? <Banner tone="bad">{error}</Banner> : null}
 
@@ -146,22 +151,27 @@ export function Detail({ signOut, expired }: { signOut: () => void; expired: () 
 
           <div className="card">
             <h2>Documents</h2>
-            <p className="muted small">Opens in a new tab with a private link that expires in 5 minutes. Every view is recorded.</p>
+            <p className="muted small">Each opens in a new tab with a private link that expires in 5 minutes. Every view is recorded.</p>
             {docError ? <Banner tone="bad">{docError}</Banner> : null}
             {visibleDocs.length === 0 ? <p className="muted">No documents.</p> : null}
-            {visibleDocs.map((doc) => (
-              <div className="doc" key={doc.id}>
-                <div className="meta">
-                  <div className="name">{KIND_LABEL[doc.kind] ?? doc.kind}</div>
-                  <div className={`state ${doc.status === 'rejected' ? 'bad' : doc.status === 'accepted' ? 'ok' : ''}`}>
-                    {doc.status === 'rejected' ? `Needs re-upload${doc.note ? `: ${doc.note}` : ''}` : doc.status === 'accepted' ? 'Accepted' : 'Uploaded'} · {when(doc.uploadedAt)}
+            <div className="docs">
+              {visibleDocs.map((doc) => (
+                <div className="doc" key={doc.id}>
+                  <div className="top">
+                    <span className="ico">{docIcon(doc.kind)}</span>
+                    <div>
+                      <div className="name">{KIND_LABEL[doc.kind] ?? doc.kind}</div>
+                      <div className={`state ${doc.status === 'rejected' ? 'bad' : doc.status === 'accepted' ? 'ok' : ''}`}>
+                        {doc.status === 'rejected' ? `Needs re-upload${doc.note ? `: ${doc.note}` : ''}` : doc.status === 'accepted' ? 'Accepted' : 'Uploaded'} · {when(doc.uploadedAt)}
+                      </div>
+                    </div>
                   </div>
+                  <button className="btn small ghost" type="button" disabled={opening === doc.id} onClick={() => void openDocument(doc.id)}>
+                    {opening === doc.id ? <Spinner /> : 'View document'}
+                  </button>
                 </div>
-                <button className="btn small secondary" type="button" disabled={opening === doc.id} onClick={() => void openDocument(doc.id)}>
-                  {opening === doc.id ? <Spinner /> : 'View'}
-                </button>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
 
@@ -172,9 +182,9 @@ export function Detail({ signOut, expired }: { signOut: () => void; expired: () 
             {[...data.events].reverse().map((event, index) => {
               const text = (event.payload.note ?? event.payload.reason) as string | undefined;
               return (
-                <li key={`${event.at}-${index}`}>
+                <li key={`${event.at}-${index}`} className={`ev-${event.type}`}>
                   <b>{EVENT_LABEL[event.type] ?? event.type.replace(/_/g, ' ')}</b>
-                  {text ? <div>“{text}”</div> : null}
+                  {text ? <div className="note">“{text}”</div> : null}
                   <div className="when">{when(event.at)} · {event.actor}</div>
                 </li>
               );
@@ -188,9 +198,9 @@ export function Detail({ signOut, expired }: { signOut: () => void; expired: () 
           {data.status === 'submitted' ? (
             <button className="btn ghost" type="button" disabled={busy} onClick={() => void run(() => startReview(id))}>Start review</button>
           ) : null}
-          <button className="btn" type="button" disabled={busy} onClick={() => { setDialog('approve'); setFieldError(null); }}>Approve</button>
-          <button className="btn secondary" type="button" disabled={busy} onClick={() => { setDialog('changes'); setFieldError(null); }}>Request changes</button>
           <button className="btn danger" type="button" disabled={busy} onClick={() => { setDialog('reject'); setFieldError(null); }}>Reject</button>
+          <button className="btn soft" type="button" disabled={busy} onClick={() => { setDialog('changes'); setFieldError(null); }}>Request changes</button>
+          <button className="btn good" type="button" disabled={busy} onClick={() => { setDialog('approve'); setFieldError(null); }}>Approve</button>
         </div>
       ) : null}
 
@@ -229,7 +239,7 @@ export function Detail({ signOut, expired }: { signOut: () => void; expired: () 
             <div className="actions">
               <button className="btn ghost" type="button" disabled={busy} onClick={() => setDialog(null)}>Cancel</button>
               <button
-                className={`btn ${dialog === 'reject' ? 'danger' : ''}`}
+                className={`btn ${dialog === 'reject' ? 'danger solid' : dialog === 'approve' ? 'good' : ''}`}
                 type="button"
                 disabled={busy || (dialog !== 'approve' && note.trim().length < 3)}
                 onClick={() =>
@@ -242,6 +252,6 @@ export function Detail({ signOut, expired }: { signOut: () => void; expired: () 
           </div>
         </div>
       ) : null}
-    </div>
+    </Shell>
   );
 }
