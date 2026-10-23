@@ -119,6 +119,8 @@ export class TeamService {
 
   async update(actorId: string, id: string, patch: UpdateInput): Promise<Member> {
     await this.db.tx(async (client) => {
+      // One team change at a time, so two owners cannot demote each other at the same moment and leave no owner.
+      await client.query(`select pg_advisory_xact_lock(hashtext('zoove.admin_team'))`);
       const current = await client.query<{ display_name: string; job_title: string; is_owner: boolean; reports_to: string | null; permissions: string[]; status: string }>(
         `select p.display_name, p.job_title, p.is_owner, p.reports_to, p.permissions, u.status
            from admin_profiles p join users u on u.id = p.user_id where p.user_id = $1 for update of p, u`,
