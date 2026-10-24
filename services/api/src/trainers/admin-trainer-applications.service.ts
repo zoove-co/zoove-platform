@@ -130,6 +130,11 @@ export class AdminTrainerApplicationsService {
 
   approve(adminId: string, applicationId: string, note: string | undefined) {
     return this.transition(adminId, applicationId, REVIEWABLE, async (client, app) => {
+      const certificates = await client.query<{ n: string }>(
+        `select count(*) n from trainer_documents where application_id = $1 and kind = 'certificate' and status not in ('replaced', 'rejected')`,
+        [applicationId],
+      );
+      if (Number(certificates.rows[0]?.n ?? 0) === 0) throw new DomainError('INVALID_STATE', 'A certificate is required. Use Request changes to ask the trainer to add one.');
       await client.query(
         `update trainer_applications set status = 'approved', reviewed_at = now(), reviewed_by = $2, review_note = $3 where id = $1`,
         [applicationId, adminId, note ?? null],

@@ -23,7 +23,7 @@ export function startingStep(view: ApplicationView): number {
 export const FALLBACK_SERVICES = [
   { slug: 'yoga', name: 'Yoga' },
   { slug: 'pilates', name: 'Pilates' },
-  { slug: 'strength', name: 'Strength' },
+  { slug: 'strength', name: 'HIIT/Strength' },
   { slug: 'zumba', name: 'Zumba' },
 ];
 export const LANGUAGES = ['English', 'Hindi', 'Marathi', 'Gujarati', 'Tamil', 'Telugu', 'Kannada', 'Bengali', 'Punjabi'] as const;

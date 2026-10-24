@@ -238,6 +238,16 @@ export class TrainerApplicationsService {
       replacedKey = await this.db.tx(async (client) => {
         const app = await client.query<{ status: ApplicationStatus }>(`select status from trainer_applications where id = $1 for update`, [application.id]);
         if (!app.rows[0] || !EDITABLE.includes(app.rows[0].status)) throw new DomainError('INVALID_STATE', 'This application can no longer be edited.');
+        // While the team has asked for changes, only the documents they marked (or that are still missing) can be replaced.
+        if (app.rows[0].status === 'changes_requested') {
+          const kinds = kind === 'certificate' ? ['certificate'] : [kind];
+          const current = await client.query<{ status: string }>(
+            `select status from trainer_documents where application_id = $1 and kind = any($2) and status <> 'replaced'`,
+            [application.id, kinds],
+          );
+          const stillGood = current.rows.some((item) => item.status !== 'rejected');
+          if (kind === 'other' || stillGood) throw new DomainError('INVALID_STATE', 'This document was not asked to be changed. Only the documents marked "upload again" can be replaced.');
+        }
         let old: string | null = null;
         if ((SINGLE_DOCUMENT_KINDS as readonly string[]).includes(kind)) {
           const replaced = await client.query<{ storage_key: string }>(
@@ -269,8 +279,8 @@ export class TrainerApplicationsService {
 
   async removeDocument(userId: string, documentId: string): Promise<ApplicationView> {
     const key = await this.db.tx(async (client) => {
-      const found = await client.query<{ id: string; storage_key: string; status: ApplicationStatus; kind: DocumentKind }>(
-        `select d.id, d.storage_key, a.status, d.kind from trainer_documents d join trainer_applications a on a.id = d.application_id
+      const found = await client.query<{ id: string; storage_key: string; status: ApplicationStatus; kind: DocumentKind; doc_status: string }>(
+        `select d.id, d.storage_key, a.status, d.kind, d.status as doc_status from trainer_documents d join trainer_applications a on a.id = d.application_id
           where d.id = $1 and a.user_id = $2 and d.status <> 'replaced' for update of a`,
         [documentId, userId],
       );
@@ -278,6 +288,7 @@ export class TrainerApplicationsService {
       if (!row) throw new DomainError('NOT_FOUND', 'Document not found.');
       if (!EDITABLE.includes(row.status)) throw new DomainError('INVALID_STATE', 'This application can no longer be edited.');
       if (!['certificate', 'other'].includes(row.kind)) throw new DomainError('INVALID_REQUEST', 'Upload a new file to replace this document.');
+      if (row.status === 'changes_requested' && row.doc_status !== 'rejected') throw new DomainError('INVALID_STATE', 'This document was not asked to be changed.');
       await client.query(`delete from trainer_documents where id = $1`, [documentId]);
       return row.storage_key;
     });

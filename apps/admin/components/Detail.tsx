@@ -272,8 +272,9 @@ export function Detail({ signOut, expired }: { signOut: () => void; expired: () 
                 <h2>Request changes</h2>
                 <p className="muted">The applicant is emailed and can edit and resubmit.</p>
                 <Field label="What needs to change?" error={fieldError ?? undefined}><textarea maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} aria-invalid={Boolean(fieldError)} /></Field>
+                {data.documents.some((doc) => doc.kind === 'certificate' && doc.status !== 'rejected') ? null : <Banner tone="warn">No certificate uploaded. The trainer will be asked to add one.</Banner>}
                 <p className="small"><b>Documents to re-upload</b></p>
-                {data.documents.filter((doc) => doc.kind !== 'certificate' && doc.kind !== 'other').map((doc) => (
+                {data.documents.map((doc) => (
                   <label className="check" key={doc.id}>
                     <input type="checkbox" checked={picked.includes(doc.id)} onChange={() => setPicked((cur) => (cur.includes(doc.id) ? cur.filter((x) => x !== doc.id) : [...cur, doc.id]))} />
                     <span>{KIND_LABEL[doc.kind] ?? doc.kind}</span>

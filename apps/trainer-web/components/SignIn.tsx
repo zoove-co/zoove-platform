@@ -75,7 +75,7 @@ export function SignIn({ onDone, notice }: { onDone: () => void; notice?: string
     { title: 'Aadhaar card', note: 'Front and back' },
     { title: 'PAN card', note: 'Photo or PDF' },
     { title: 'A selfie', note: 'Taken with your camera' },
-    { title: 'Certificates', note: 'Optional, helps us approve faster' },
+    { title: 'A certificate', note: 'Yoga, fitness or training. At least one' },
   ];
 
   return (

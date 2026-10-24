@@ -56,7 +56,7 @@ const details = {
   specialties: ['yoga', 'pilates'],
   experienceYears: 6,
   languages: ['English', 'Hindi'],
-  panNumber: 'abcde1234f',
+  panNumber: 'abcpe1234f',
   aadhaarLast4: '4321',
   source: 'akash',
 };
@@ -89,6 +89,7 @@ suite('trainer onboarding', () => {
     await upload(t, 'aadhaar_back', JPEG).expect(201);
     await upload(t, 'pan_card', PNG, 'pan.png').expect(201);
     await upload(t, 'selfie', JPEG, 'me.jpg').expect(201);
+    await upload(t, 'certificate', PDF, 'cert.pdf').expect(201);
   }
 
   const drain = async () => {
@@ -142,9 +143,9 @@ suite('trainer onboarding', () => {
     expect(r.body.form.email).toBe('asha@example.com');
     expect(r.body.form.panLast4).toBe('234F');
     expect(r.body.form.aadhaarLast4).toBe('4321');
-    expect(JSON.stringify(r.body)).not.toContain('ABCDE1234F');
+    expect(JSON.stringify(r.body)).not.toContain('ABCPE1234F');
     const stored = await pool.query(`select pan_encrypted, pan_hash from trainer_applications`);
-    expect(stored.rows[0].pan_encrypted).not.toContain('ABCDE');
+    expect(stored.rows[0].pan_encrypted).not.toContain('ABCPE');
     expect(stored.rows[0].pan_hash).toHaveLength(64);
     // A later partial save changes only what was sent.
     const again = await http().put('/v1/trainer-application').set(as(trainerToken)).send({ experienceYears: 7 }).expect(200);
@@ -162,7 +163,7 @@ suite('trainer onboarding', () => {
   });
 
   it('does not let the same PAN be used by two applicants', async () => {
-    await http().put('/v1/trainer-application').set(as(otherToken)).send({ panNumber: 'ABCDE1234F' }).expect(400);
+    await http().put('/v1/trainer-application').set(as(otherToken)).send({ panNumber: 'ABCPE1234F' }).expect(400);
   });
 
   it('accepts real files only', async () => {
@@ -188,7 +189,7 @@ suite('trainer onboarding', () => {
   it('will not submit until everything is there, and says what is missing', async () => {
     const r = await http().post('/v1/trainer-application/submit').set(as(trainerToken)).send({ agree: true }).expect(422);
     expect(r.body.error.code).toBe('APPLICATION_INCOMPLETE');
-    expect(r.body.error.details.missing).toEqual(expect.arrayContaining(['document:aadhaar_back', 'document:pan_card', 'document:selfie']));
+    expect(r.body.error.details.missing).toEqual(expect.arrayContaining(['document:aadhaar_back', 'document:pan_card', 'document:selfie', 'document:certificate']));
   });
 
   it('submits once complete, and needs agreement to the terms', async () => {
@@ -276,6 +277,22 @@ suite('trainer onboarding', () => {
     expect(view.body.documents.find((x: { kind: string }) => x.kind === 'pan_card').status).toBe('rejected');
   });
 
+  it('changes requested: only the marked document can be replaced', async () => {
+    await upload(trainerToken, 'aadhaar_front', JPEG).expect(409);
+    await upload(trainerToken, 'selfie', JPEG, 'me.jpg').expect(409);
+    await upload(trainerToken, 'certificate', PDF, 'cert2.pdf').expect(409);
+    const view = await http().get('/v1/trainer-application').set(as(trainerToken)).expect(200);
+    const cert = view.body.documents.find((d: { kind: string }) => d.kind === 'certificate');
+    await http().delete(`/v1/trainer-application/documents/${cert.id}`).set(as(trainerToken)).expect(409);
+  });
+
+  it('rejects a PAN with a wrong holder type and a repeated-digit phone', async () => {
+    const bad = (body: object) => http().put('/v1/trainer-application').set(as(trainerToken)).send(body);
+    expect((await bad({ panNumber: 'ABCDE1234F' })).status).toBe(400);
+    expect((await bad({ phone: '+919999999999' })).status).toBe(400);
+    expect((await bad({ phone: '+9187654321' })).status).toBe(400);
+  });
+
   it('lets the trainer fix it and resubmit', async () => {
     await upload(trainerToken, 'pan_card', JPEG, 'pan2.jpg').expect(201);
     const r = await http().post('/v1/trainer-application/submit').set(as(trainerToken)).send({ agree: true }).expect(200);
@@ -286,6 +303,11 @@ suite('trainer onboarding', () => {
   });
 
   it('approves: creates the trainer, grants the role, emails, and blocks a second decision', async () => {
+    // A certificate is mandatory: without a usable one, approval is refused with a clear message.
+    await pool.query(`update trainer_documents set status = 'rejected' where application_id = $1 and kind = 'certificate'`, [applicationId]);
+    const blocked = await http().post(`/v1/admin/trainer-applications/${applicationId}/approve`).set(as(adminToken)).send({}).expect(409);
+    expect(blocked.body.error.message).toContain('certificate');
+    await pool.query(`update trainer_documents set status = 'uploaded' where application_id = $1 and kind = 'certificate'`, [applicationId]);
     await http().post(`/v1/admin/trainer-applications/${applicationId}/approve`).set(as(adminToken)).send({}).expect(200);
     const trainers = await pool.query(`select t.status from trainers t join users u on u.id = t.user_id where u.phone_e164 = $1`, [TRAINER]);
     expect(trainers.rows).toEqual([{ status: 'active' }]);
@@ -330,11 +352,12 @@ suite('trainer onboarding', () => {
 
   it('rejects an application with a reason and emails it', async () => {
     const t = await login(OTHER);
-    await http().put('/v1/trainer-application').set(as(t)).send({ ...details, email: 'other@example.com', panNumber: 'ZZZZZ9999Z' }).expect(200);
+    await http().put('/v1/trainer-application').set(as(t)).send({ ...details, email: 'other@example.com', panNumber: 'ZZZPZ9999Z' }).expect(200);
     await upload(t, 'aadhaar_front', JPEG).expect(201);
     await upload(t, 'aadhaar_back', JPEG).expect(201);
     await upload(t, 'pan_card', JPEG).expect(201);
     await upload(t, 'selfie', JPEG).expect(201);
+    await upload(t, 'certificate', PDF, 'cert.pdf').expect(201);
     await http().post('/v1/trainer-application/submit').set(as(t)).send({ agree: true }).expect(200);
     const list = await http().get('/v1/admin/trainer-applications?status=submitted').set(as(adminToken)).expect(200);
     const id = list.body.items[0].id as string;

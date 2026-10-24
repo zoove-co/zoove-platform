@@ -4,8 +4,8 @@ export const SINGLE_DOCUMENT_KINDS = ['aadhaar_front', 'aadhaar_back', 'pan_card
 export const DOCUMENT_KINDS = [...SINGLE_DOCUMENT_KINDS, 'certificate', 'other'] as const;
 export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
 
-// Documents a trainer must upload before submitting. Certificates are optional for now.
-export const REQUIRED_DOCUMENT_KINDS: readonly DocumentKind[] = SINGLE_DOCUMENT_KINDS;
+// Documents a trainer must upload before submitting. Pratik confirmed (24 Oct 2026) that a certificate is mandatory: at least one.
+export const REQUIRED_DOCUMENT_KINDS: readonly DocumentKind[] = [...SINGLE_DOCUMENT_KINDS, 'certificate'];
 
 export const MAX_FILE_BYTES = 8 * 1024 * 1024;
 export const MAX_EXTRA_DOCUMENTS = 10;
@@ -14,7 +14,12 @@ export const SIGNED_LINK_SECONDS = 300;
 
 export const CONSENT_VERSION = '2026-10';
 
-export const PAN_PATTERN = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+// PAN: 3 letters, 1 letter for the holder type (P person, C company, H HUF, F firm, A AOP, T trust, B body of individuals, L local authority, J juridical person, G government), 1 letter, 4 digits, 1 letter.
+export const PAN_PATTERN = /^[A-Z]{3}[ABCFGHJLPT][A-Z][0-9]{4}[A-Z]$/;
+
+// A real Indian mobile: +91, then 10 digits starting 6 to 9. Ten of the same digit (9999999999) is never a real number.
+export const PHONE_PATTERN = /^\+91[6-9][0-9]{9}$/;
+export const looksFakePhone = (e164: string): boolean => /^\+91(\d)\1{9}$/.test(e164);
 
 export type SniffedFile = { mime: 'image/jpeg' | 'image/png' | 'image/webp' | 'application/pdf'; ext: 'jpg' | 'png' | 'webp' | 'pdf' };
 

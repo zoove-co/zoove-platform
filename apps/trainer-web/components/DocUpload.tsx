@@ -14,6 +14,7 @@ type Props = {
   title: string;
   help: string;
   doc: Doc | undefined;
+  frozen?: boolean;
   allowPdf: boolean;
   live?: boolean;
   disabled: boolean;
@@ -21,7 +22,7 @@ type Props = {
   onExpired: () => void;
 };
 
-export function DocUpload({ kind, title, help, doc, allowPdf, live, disabled, onUpdated, onExpired }: Props) {
+export function DocUpload({ kind, title, help, doc, frozen, allowPdf, live, disabled, onUpdated, onExpired }: Props) {
   const input = useRef<HTMLInputElement>(null);
   const lastFile = useRef<{ blob: Blob; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -83,10 +84,10 @@ export function DocUpload({ kind, title, help, doc, allowPdf, live, disabled, on
       <button
         className={`btn small ${doc && !rejected ? 'ghost' : ''}`}
         type="button"
-        disabled={busy || disabled}
+        disabled={busy || disabled || Boolean(frozen)}
         onClick={() => (live ? setCamera(true) : input.current?.click())}
       >
-        {busy ? <Spinner /> : doc && !rejected ? (live ? 'Retake' : 'Replace') : live ? 'Open camera' : 'Upload'}
+        {busy ? <Spinner /> : frozen ? 'Locked' : doc && !rejected ? (live ? 'Retake' : 'Replace') : live ? 'Open camera' : 'Upload'}
       </button>
       {!live ? (
         <input

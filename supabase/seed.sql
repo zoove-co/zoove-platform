@@ -15,7 +15,7 @@ on conflict (slug) do nothing;
 -- Services from the current app designs (Oct 2026): Yoga, Strength, Pilates, Zumba. HIIT was dropped.
 insert into services (vertical, slug, name, tagline, duration_min_minutes, duration_max_minutes, intensity, sort_order) values
   ('fitness', 'yoga',     'Yoga',     'Move. Breathe. Feel good.',           45, 60, 'low_moderate',  1),
-  ('fitness', 'strength', 'Strength', 'Build strength that fits your life.', 45, 60, 'moderate_high', 2),
+  ('fitness', 'strength', 'HIIT/Strength', 'Build strength that fits your life.', 45, 60, 'moderate_high', 2),
   ('fitness', 'pilates',  'Pilates',  'Move with control. Find your center.', 45, 60, 'low_moderate',  3),
   ('fitness', 'zumba',    'Zumba',    'Dance. Sweat. Repeat.',               40, 55, 'moderate_high', 4)
 on conflict (slug) do update set

@@ -7,7 +7,7 @@ import { z } from 'zod';
 
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { AuthGuard, CurrentUser, type AuthUser } from '../identity/auth.guard';
-import { DOCUMENT_KINDS, MAX_FILE_BYTES, PAN_PATTERN, type DocumentKind } from './rules';
+import { DOCUMENT_KINDS, MAX_FILE_BYTES, PAN_PATTERN, PHONE_PATTERN, looksFakePhone, type DocumentKind } from './rules';
 import { TrainerApplicationsService, type ApplicationView } from './trainer-applications.service';
 
 const text = (max: number) => z.string().trim().min(1).max(max);
@@ -20,7 +20,7 @@ const saveSchema = z
     gender: z.enum(['female', 'male', 'other', 'prefer_not_to_say']).optional(),
     email: z.string().trim().toLowerCase().email().max(120).optional(),
     // Typed by the trainer, not verified yet. Indian mobile in international format.
-    phone: z.string().trim().regex(/^\+91[6-9][0-9]{9}$/, 'Enter a 10-digit Indian mobile number').optional(),
+    phone: z.string().trim().regex(PHONE_PATTERN, 'Enter a 10-digit Indian mobile number').refine((value) => !looksFakePhone(value), 'Enter your real mobile number').optional(),
     addressLine: text(200).optional(),
     addressArea: text(120).optional(),
     addressPincode: z.string().trim().regex(/^[1-9][0-9]{5}$/, 'Enter a 6-digit pincode').optional(),
@@ -28,7 +28,7 @@ const saveSchema = z
     experienceYears: z.number().int().min(0).max(60).optional(),
     languages: z.array(z.string().trim().min(1).max(30)).max(10).optional(),
     bio: z.string().trim().max(1000).optional(),
-    panNumber: z.string().trim().toUpperCase().regex(PAN_PATTERN, 'Enter a valid PAN, like ABCDE1234F').optional(),
+    panNumber: z.string().trim().toUpperCase().regex(PAN_PATTERN, 'Enter a valid PAN, like ABCPE1234F').optional(),
     aadhaarLast4: z.string().trim().regex(/^[0-9]{4}$/, 'Enter the last 4 digits only').optional(),
     source: z.string().trim().max(60).optional(),
   })

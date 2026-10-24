@@ -28,7 +28,8 @@ type Form = {
 
 type Errors = Partial<Record<keyof Form, string>>;
 
-const PAN = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+// 3 letters, a holder-type letter (P is a person), 1 letter, 4 digits, 1 letter.
+const PAN = /^[A-Z]{3}[ABCFGHJLPT][A-Z][0-9]{4}[A-Z]$/;
 const GENDERS: [string, string][] = [
   ['female', 'Female'],
   ['male', 'Male'],
@@ -71,6 +72,10 @@ function ageOf(dob: string): number {
   return age;
 }
 
+function pick(all: Errors, key: keyof Form): Errors {
+  return { [key]: all[key] } as Errors;
+}
+
 function validate(step: number, form: Form, view: ApplicationView): Errors {
   const errors: Errors = {};
   if (step === 0) {
@@ -80,7 +85,9 @@ function validate(step: number, form: Form, view: ApplicationView): Errors {
     else if (Number.isNaN(Date.parse(form.dateOfBirth))) errors.dateOfBirth = 'That is not a real date.';
     else if (ageOf(form.dateOfBirth) < 18) errors.dateOfBirth = 'You must be at least 18 years old to train with Zoove.';
     if (!form.gender) errors.gender = 'Choose one option.';
-    if (!/^[6-9][0-9]{9}$/.test(form.phone)) errors.phone = 'Enter a 10-digit Indian mobile number.';
+    if (form.phone.length !== 10) errors.phone = `A mobile number has 10 digits. You entered ${form.phone.length}.`;
+    else if (!/^[6-9]/.test(form.phone)) errors.phone = 'An Indian mobile number starts with 6, 7, 8 or 9.';
+    else if (/^(\d)\1{9}$/.test(form.phone)) errors.phone = 'Enter your real mobile number.';
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())) errors.email = 'Enter a valid email address.';
   }
   if (step === 1) {
@@ -96,8 +103,8 @@ function validate(step: number, form: Form, view: ApplicationView): Errors {
   if (step === 3) {
     const pan = form.panNumber.trim().toUpperCase();
     if (!pan && !view.form.panLast4) errors.panNumber = 'Enter your PAN number.';
-    else if (pan && !PAN.test(pan)) errors.panNumber = 'Enter a valid PAN, like ABCDE1234F.';
-    if (!/^[0-9]{4}$/.test(form.aadhaarLast4)) errors.aadhaarLast4 = 'Enter the last 4 digits of your Aadhaar.';
+    else if (pan && !PAN.test(pan)) errors.panNumber = pan.length !== 10 ? `A PAN has 10 characters. You entered ${pan.length}.` : 'This is not a valid PAN. It looks like ABCPE1234F: 5 letters, 4 digits, 1 letter, and the 4th letter is P for a person.';
+    if (!/^[0-9]{4}$/.test(form.aadhaarLast4)) errors.aadhaarLast4 = `Enter exactly 4 digits. You entered ${form.aadhaarLast4.length}.`;
   }
   return errors;
 }
@@ -202,6 +209,13 @@ export function Wizard({ initial, source, onChange, onExpired }: Props) {
   const doc = (kind: string) => view.documents.find((item) => item.kind === kind);
   const extras = view.documents.filter((item) => item.kind === 'certificate' || item.kind === 'other');
   const locked = !view.canEdit;
+  // While we have asked for changes, only the marked documents (or ones still missing) can be replaced.
+  const asked = view.status === 'changes_requested';
+  const frozen = (kind: string) => {
+    const current = doc(kind);
+    return asked && Boolean(current) && current?.status !== 'rejected';
+  };
+  const hasGoodCertificate = view.documents.some((item) => item.kind === 'certificate' && item.status !== 'rejected');
   const missingDocs = view.missing.filter((key) => key.startsWith('document:'));
 
   async function addCertificate(file: File) {
@@ -267,7 +281,7 @@ export function Wizard({ initial, source, onChange, onExpired }: Props) {
           <Field label="Mobile number" hint="We will call or message this number about your application." error={errors.phone}>
             <div className="phone">
               <span className="prefix">+91</span>
-              <input type="tel" inputMode="numeric" autoComplete="tel-national" maxLength={10} value={form.phone} onChange={(e) => set('phone', e.target.value.replace(/\D/g, '').slice(0, 10))} aria-invalid={Boolean(errors.phone)} />
+              <input type="tel" inputMode="numeric" autoComplete="tel-national" maxLength={10} value={form.phone} onChange={(e) => set('phone', e.target.value.replace(/\D/g, '').slice(0, 10))} onBlur={() => form.phone && setErrors((cur) => ({ ...cur, ...pick(validate(0, form, view), 'phone') }))} aria-invalid={Boolean(errors.phone)} />
             </div>
           </Field>
           <Field label="Email" hint="We send updates about your application here." error={errors.email}>
@@ -330,10 +344,10 @@ export function Wizard({ initial, source, onChange, onExpired }: Props) {
           <p className="muted">We check your identity before anyone is booked with you. These details are stored securely and only the Zoove team can see them.</p>
           <Field
             label="PAN number"
-            hint={view.form.panLast4 ? `Already saved (ends ${view.form.panLast4}). Type a new one only if you want to change it.` : 'Ten characters, like ABCDE1234F.'}
+            hint={view.form.panLast4 ? `Already saved (ends ${view.form.panLast4}). Type a new one only if you want to change it.` : 'Ten characters, like ABCPE1234F.'}
             error={errors.panNumber}
           >
-            <input autoCapitalize="characters" autoCorrect="off" maxLength={10} value={form.panNumber} placeholder={view.form.panLast4 ? `Saved, ends ${view.form.panLast4}` : 'ABCDE1234F'} onChange={(e) => set('panNumber', e.target.value.toUpperCase())} aria-invalid={Boolean(errors.panNumber)} />
+            <input autoCapitalize="characters" autoCorrect="off" maxLength={10} value={form.panNumber} placeholder={view.form.panLast4 ? `Saved, ends ${view.form.panLast4}` : 'ABCPE1234F'} onChange={(e) => set('panNumber', e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} onBlur={() => form.panNumber && setErrors((cur) => ({ ...cur, ...pick(validate(3, form, view), 'panNumber') }))} aria-invalid={Boolean(errors.panNumber)} />
           </Field>
           <Field label="Last 4 digits of Aadhaar" hint="Only the last 4 digits. We never ask for the full number here." error={errors.aadhaarLast4}>
             <input inputMode="numeric" maxLength={4} value={form.aadhaarLast4} onChange={(e) => set('aadhaarLast4', e.target.value.replace(/\D/g, '').slice(0, 4))} aria-invalid={Boolean(errors.aadhaarLast4)} />
@@ -343,13 +357,14 @@ export function Wizard({ initial, source, onChange, onExpired }: Props) {
 
       {step === 4 && (
         <>
+          {asked ? <Banner tone="warn">The Zoove team asked you to change only the documents marked "Please upload again". The rest are locked.</Banner> : null}
           <p className="muted">Clear photos, all four corners visible. JPG, PNG, WebP or PDF, up to 8 MB.</p>
-          <DocUpload kind="aadhaar_front" title="Aadhaar card, front" help="Photo or PDF" doc={doc('aadhaar_front')} allowPdf disabled={locked} onUpdated={update} onExpired={onExpired} />
-          <DocUpload kind="aadhaar_back" title="Aadhaar card, back" help="Photo or PDF" doc={doc('aadhaar_back')} allowPdf disabled={locked} onUpdated={update} onExpired={onExpired} />
-          <DocUpload kind="pan_card" title="PAN card" help="Photo or PDF" doc={doc('pan_card')} allowPdf disabled={locked} onUpdated={update} onExpired={onExpired} />
-          <DocUpload kind="selfie" title="Selfie" help="Taken now with your camera" doc={doc('selfie')} allowPdf={false} live disabled={locked} onUpdated={update} onExpired={onExpired} />
-          <h2 style={{ marginTop: 22 }}>Certificates (optional)</h2>
-          <p className="muted small">Yoga, fitness or other training certificates help us approve you faster.</p>
+          <DocUpload kind="aadhaar_front" title="Aadhaar card, front" help="Photo or PDF" doc={doc('aadhaar_front')} frozen={frozen('aadhaar_front')} allowPdf disabled={locked} onUpdated={update} onExpired={onExpired} />
+          <DocUpload kind="aadhaar_back" title="Aadhaar card, back" help="Photo or PDF" doc={doc('aadhaar_back')} frozen={frozen('aadhaar_back')} allowPdf disabled={locked} onUpdated={update} onExpired={onExpired} />
+          <DocUpload kind="pan_card" title="PAN card" help="Photo or PDF" doc={doc('pan_card')} frozen={frozen('pan_card')} allowPdf disabled={locked} onUpdated={update} onExpired={onExpired} />
+          <DocUpload kind="selfie" title="Selfie" help="Taken now with your camera" doc={doc('selfie')} frozen={frozen('selfie')} allowPdf={false} live disabled={locked} onUpdated={update} onExpired={onExpired} />
+          <h2 style={{ marginTop: 22 }}>Certificates</h2>
+          <p className="muted small">Add at least one yoga, fitness or other training certificate. It is required.</p>
           {extras.map((item) => (
             <div className="doc" key={item.id}>
               <div className="tick ok" aria-hidden>
@@ -357,14 +372,14 @@ export function Wizard({ initial, source, onChange, onExpired }: Props) {
               </div>
               <div className="meta">
                 <div className="name">Certificate</div>
-                <div className="state ok">Uploaded</div>
+                <div className={`state ${item.status === 'rejected' ? 'bad' : 'ok'}`}>{item.status === 'rejected' ? `Please upload again${item.note ? `: ${item.note}` : ''}` : 'Uploaded'}</div>
               </div>
-              <button className="btn small ghost" type="button" disabled={busy || locked} onClick={() => void dropDocument(item.id)}>
+              <button className="btn small ghost" type="button" disabled={busy || locked || (asked && item.status !== 'rejected')} onClick={() => void dropDocument(item.id)}>
                 Remove
               </button>
             </div>
           ))}
-          {extras.length < 10 ? (
+          {extras.length < 10 && !(asked && hasGoodCertificate) ? (
             <label className="btn secondary small" style={{ cursor: 'pointer' }}>
               Add a certificate
               <input
@@ -380,7 +395,7 @@ export function Wizard({ initial, source, onChange, onExpired }: Props) {
               />
             </label>
           ) : null}
-          {missingDocs.length > 0 ? <p className="muted small" style={{ marginTop: 14 }}>Upload all four required documents to continue.</p> : null}
+          {missingDocs.length > 0 ? <p className="muted small" style={{ marginTop: 14 }}>Upload the four documents and at least one certificate to continue.</p> : null}
         </>
       )}
 
