@@ -233,9 +233,9 @@ export class TrainerApplicationsService {
     // File first, row second: a failed upload never leaves a row pointing at nothing.
     await this.storage.put(key, file.buffer, sniffed.mime);
 
-    let replacedKey: string | null = null;
+    let replacedKeys: string[] = [];
     try {
-      replacedKey = await this.db.tx(async (client) => {
+      replacedKeys = await this.db.tx(async (client) => {
         const app = await client.query<{ status: ApplicationStatus }>(`select status from trainer_applications where id = $1 for update`, [application.id]);
         if (!app.rows[0] || !EDITABLE.includes(app.rows[0].status)) throw new DomainError('INVALID_STATE', 'This application can no longer be edited.');
         // While the team has asked for changes, only the documents they marked (or that are still missing) can be replaced.
@@ -248,14 +248,22 @@ export class TrainerApplicationsService {
           const stillGood = current.rows.some((item) => item.status !== 'rejected');
           if (kind === 'other' || stillGood) throw new DomainError('INVALID_STATE', 'This document was not asked to be changed. Only the documents marked "upload again" can be replaced.');
         }
-        let old: string | null = null;
+        let old: string[] = [];
         if ((SINGLE_DOCUMENT_KINDS as readonly string[]).includes(kind)) {
           const replaced = await client.query<{ storage_key: string }>(
             `update trainer_documents set status = 'replaced' where application_id = $1 and kind = $2 and status <> 'replaced' returning storage_key`,
             [application.id, kind],
           );
-          old = replaced.rows[0]?.storage_key ?? null;
+          old = replaced.rows.map((row) => row.storage_key);
         } else {
+          // A certificate the team marked "upload again" is replaced by the new one: its file is deleted too, so nothing stale is kept.
+          if (kind === 'certificate') {
+            const flagged = await client.query<{ storage_key: string }>(
+              `update trainer_documents set status = 'replaced' where application_id = $1 and kind = 'certificate' and status = 'rejected' returning storage_key`,
+              [application.id],
+            );
+            old = flagged.rows.map((row) => row.storage_key);
+          }
           const count = await client.query<{ n: string }>(
             `select count(*) n from trainer_documents where application_id = $1 and kind in ('certificate', 'other') and status <> 'replaced'`,
             [application.id],
@@ -273,7 +281,7 @@ export class TrainerApplicationsService {
       await this.storage.remove(key).catch(() => undefined);
       throw error;
     }
-    if (replacedKey) await this.storage.remove(replacedKey).catch((error: unknown) => this.logger.warn(`Could not remove old file: ${String(error)}`));
+    for (const oldKey of replacedKeys) await this.storage.remove(oldKey).catch((error: unknown) => this.logger.warn(`Could not remove old file: ${String(error)}`));
     return this.get(userId);
   }
 

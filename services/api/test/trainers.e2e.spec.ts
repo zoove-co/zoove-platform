@@ -293,6 +293,18 @@ suite('trainer onboarding', () => {
     expect((await bad({ phone: '+9187654321' })).status).toBe(400);
   });
 
+  it('a flagged certificate is deleted from storage when the new one is uploaded', async () => {
+    const view = await http().get('/v1/trainer-application').set(as(trainerToken)).expect(200);
+    const cert = view.body.documents.find((d: { kind: string }) => d.kind === 'certificate');
+    const oldKey = (await pool.query(`select storage_key from trainer_documents where id = $1`, [cert.id])).rows[0].storage_key as string;
+    await pool.query(`update trainer_documents set status = 'rejected' where id = $1`, [cert.id]);
+    expect(storage.files.has(oldKey)).toBe(true);
+    await upload(trainerToken, 'certificate', PDF, 'cert3.pdf').expect(201);
+    expect(storage.files.has(oldKey)).toBe(false);
+    const after = await http().get('/v1/trainer-application').set(as(trainerToken)).expect(200);
+    expect(after.body.documents.filter((d: { kind: string }) => d.kind === 'certificate')).toHaveLength(1);
+  });
+
   it('lets the trainer fix it and resubmit', async () => {
     await upload(trainerToken, 'pan_card', JPEG, 'pan2.jpg').expect(201);
     const r = await http().post('/v1/trainer-application/submit').set(as(trainerToken)).send({ agree: true }).expect(200);
