@@ -70,6 +70,7 @@ export const Icons = {
   sessions: icon(<><rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></>),
   complaints: icon(<><path d="M5 21V4M5 4h11l-2 4 2 4H5" /></>),
   team: icon(<><path d="M12 3 4.5 6v5.5c0 4.4 3.1 7.7 7.5 9.5 4.4-1.8 7.5-5.1 7.5-9.5V6L12 3Z" /><path d="m9 12 2.2 2.2L15.5 10" /></>),
+  calc: icon(<><rect x="5" y="3.5" width="14" height="17" rx="2.5" /><path d="M8.5 7.5h7M8.5 12h.01M12 12h.01M15.5 12h.01M8.5 16h.01M12 16h.01M15.5 16h.01" /></>),
   back: icon(<path d="M15 5 8 12l7 7" />, 16),
   id: icon(<><rect x="3" y="5" width="18" height="14" rx="2.5" /><circle cx="9" cy="11" r="2" /><path d="M6.5 16c.4-1.4 1.4-2 2.5-2s2.1.6 2.5 2M14.5 10h4M14.5 13.5h3" /></>, 17),
   card: icon(<><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="M3 10h18M7 15h4" /></>, 17),

@@ -99,6 +99,7 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
   const me = useMe();
   const path = usePathname() ?? '/';
   const onTeam = path.startsWith('/team');
+  const onCalc = path.startsWith('/economics');
   return (
     <div className="app">
       <aside className="side">
@@ -108,7 +109,7 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
         </Link>
         <nav className="nav" aria-label="Main">
           {can(me, 'trainers.view') ? (
-            <Link href="/" aria-current={onTeam ? undefined : 'page'}>
+            <Link href="/" aria-current={onTeam || onCalc ? undefined : 'page'}>
               {Icons.users}
               Trainers
               {pending ? <span className="badge">{pending}</span> : null}
@@ -125,6 +126,12 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
             <Link href="/team" aria-current={onTeam ? 'page' : undefined}>
               {Icons.team}
               Team
+            </Link>
+          ) : null}
+          {can(me, 'tools.economics') ? (
+            <Link href="/economics" aria-current={onCalc ? 'page' : undefined}>
+              {Icons.calc}
+              Calculator
             </Link>
           ) : null}
         </nav>

@@ -8,6 +8,7 @@ export const PERMISSION_KEYS = [
   'customers.view',
   'complaints.customers',
   'complaints.trainers',
+  'tools.economics',
 ] as const;
 
 export type Permission = (typeof PERMISSION_KEYS)[number];
@@ -22,6 +23,7 @@ export const PERMISSIONS: PermissionInfo[] = [
   { key: 'customers.view', group: 'Customers', label: 'View customers', hint: 'See customer profiles and bookings.', soon: true },
   { key: 'complaints.customers', group: 'Complaints', label: 'Handle customer complaints', hint: 'Review and resolve customer complaints.', soon: true },
   { key: 'complaints.trainers', group: 'Complaints', label: 'Handle trainer complaints', hint: 'Review and resolve trainer complaints.', soon: true },
+  { key: 'tools.economics', group: 'Tools', label: 'Session economics calculator', hint: 'Use the pricing and trainer payout calculator.', soon: false },
 ];
 
 // Doing something with trainers needs seeing them first, so the switches that act on trainers also turn on "view".
