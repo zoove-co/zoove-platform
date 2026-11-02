@@ -142,6 +142,8 @@ const styles = StyleSheet.create({
   hero: { height: 170, justifyContent: 'flex-end', gap: 4, padding: 18, borderRadius: 22 },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   pill: {
+    minHeight: 44,
+    justifyContent: 'center',
     paddingHorizontal: 14,
     paddingVertical: spacing.sm + 2,
     borderRadius: radius.pill,
@@ -153,6 +155,7 @@ const styles = StyleSheet.create({
   pillText: { fontSize: 12 },
   infoRow: { flexDirection: 'row', gap: 9 },
   demo: {
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,

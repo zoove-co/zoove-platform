@@ -138,7 +138,7 @@ export default function StreakScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHead}>
             <AppText variant="heading">{t('streak.recentTitle')}</AppText>
-            <Pressable accessibilityRole="button" onPress={() => router.push('/orders')} hitSlop={8}>
+            <Pressable accessibilityRole="button" onPress={() => router.push('/orders')} hitSlop={12} style={{ minHeight: 44, justifyContent: 'center' }}>
               <AppText variant="bodyStrong" color={colors.purple}>
                 {t('streak.recentAll')}
               </AppText>
