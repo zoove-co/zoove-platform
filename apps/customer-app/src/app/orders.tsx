@@ -112,6 +112,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingVertical: 10,
+    minHeight: 44,
+    justifyContent: 'center',
     borderRadius: radius.pill,
     backgroundColor: colors.white,
     borderWidth: 0.8,

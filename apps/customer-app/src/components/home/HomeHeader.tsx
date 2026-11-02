@@ -26,7 +26,7 @@ export function HomeHeader({ name, locationLabel, hasUnread, onBell, onAvatar, o
           <Icon name="notifications-outline" size={22} color={colors.ink} />
           {hasUnread ? <View style={styles.dot} /> : null}
         </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Profile" onPress={onAvatar} style={styles.avatar}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Profile" onPress={onAvatar} hitSlop={4} style={styles.avatar}>
           <Icon name="person" size={18} color={colors.purple} />
         </Pressable>
       </View>
@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
   wrap: { gap: 17 },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   greeting: { flex: 1 },
-  bell: { width: 36, height: 38, alignItems: 'center', justifyContent: 'center' },
+  bell: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   dot: {
     position: 'absolute',
     top: 7,

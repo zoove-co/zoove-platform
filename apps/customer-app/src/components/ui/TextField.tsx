@@ -63,6 +63,7 @@ const styles = StyleSheet.create({
     color: colors.ink,
     paddingHorizontal: 12,
     paddingVertical: 11,
+    minHeight: 48,
     borderRadius: radius.sm,
     borderWidth: 0.8,
     borderColor: colors.line,

@@ -94,7 +94,7 @@ export default function AddressesScreen() {
                     </AppText>
                   </Pressable>
                 ) : null}
-                <Pressable accessibilityRole="button" onPress={() => setRemoving(address)}>
+                <Pressable accessibilityRole="button" onPress={() => setRemoving(address)} hitSlop={12} style={{ minHeight: 44, justifyContent: 'center' }}>
                   <AppText variant="bodyStrong" color={colors.danger}>
                     {t('addresses.remove')}
                   </AppText>

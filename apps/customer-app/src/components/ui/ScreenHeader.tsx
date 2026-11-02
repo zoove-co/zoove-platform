@@ -35,9 +35,9 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.line,
   },
   back: {
-    width: 37,
-    height: 37,
-    borderRadius: 19,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: colors.lavender,
     alignItems: 'center',
     justifyContent: 'center',

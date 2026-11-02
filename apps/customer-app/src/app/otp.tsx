@@ -98,7 +98,7 @@ export default function OtpScreen() {
             <AppText color={colors.muted} style={styles.text}>
               {t('auth.otpBody', { email })}
             </AppText>
-            <Pressable accessibilityRole="button" onPress={() => router.back()} hitSlop={8}>
+            <Pressable accessibilityRole="button" onPress={() => router.back()} hitSlop={14}>
               <AppText variant="bodyStrong" color={colors.purple} style={styles.text}>
                 {t('auth.otpChange')}
               </AppText>

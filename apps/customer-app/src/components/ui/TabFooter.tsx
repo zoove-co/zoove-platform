@@ -47,6 +47,6 @@ const styles = StyleSheet.create({
     borderTopColor: colors.line,
     paddingTop: 7,
   },
-  item: { flex: 1, alignItems: 'center', gap: 3, paddingVertical: 2 },
+  item: { flex: 1, alignItems: 'center', gap: 3, minHeight: 48, justifyContent: 'center', paddingVertical: 2 },
   label: { fontFamily: fonts.medium },
 });

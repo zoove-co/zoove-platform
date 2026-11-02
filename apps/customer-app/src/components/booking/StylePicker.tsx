@@ -97,6 +97,8 @@ const styles = StyleSheet.create({
   pill: {
     paddingHorizontal: 14,
     paddingVertical: spacing.sm + 2,
+    minHeight: 44,
+    justifyContent: 'center',
     borderRadius: radius.pill,
     backgroundColor: colors.white,
     borderWidth: 0.8,

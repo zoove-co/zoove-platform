@@ -312,6 +312,7 @@ export const en = {
     profile: 'Edit profile',
     addresses: 'Saved addresses',
     packages: 'Packages & credits',
+    referral: 'Refer a friend',
     support: 'Help & support',
     policy: 'Cancellation policy',
     version: 'Zoove {{version}}',
