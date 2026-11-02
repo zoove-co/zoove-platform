@@ -11,6 +11,7 @@ import {
   type PastCoach,
   type SessionPackage,
   type Profile,
+  type Session,
   type ServiceabilityCheck,
   type AppNotification,
   type Api,
@@ -473,49 +474,87 @@ function currentProfile(): Profile | null {
   return signedInPhone ? (profiles.get(signedInPhone) ?? null) : null;
 }
 
+function startMockSession(identity: string, isEmail: boolean): boolean {
+  const isNewUser = !knownPhones.has(identity);
+  knownPhones.add(identity);
+  if (!profiles.has(identity)) {
+    profiles.set(identity, isEmail
+      ? { phone: null, firstName: null, lastName: null, email: identity }
+      : { phone: identity, firstName: null, lastName: null, email: null });
+  }
+  signedInPhone = identity;
+  return isNewUser;
+}
+
+const mockSession = (identity: string): Session => ({ accessToken: `mock-token-${identity}`, refreshToken: `mock-refresh-${identity}` });
+
+function mockRequestCode(key: string): { resendAfterSeconds: number } {
+  const previous = otpState.get(key);
+  if (previous && Date.now() - previous.requestedAt < OTP_RESEND_SECONDS * 1000) throw new ApiError('OTP_RATE_LIMITED');
+  otpState.set(key, { tries: 0, requestedAt: Date.now() });
+  return { resendAfterSeconds: OTP_RESEND_SECONDS };
+}
+
+function mockCheckCode(key: string, code: string): void {
+  const state = otpState.get(key);
+  if (!state) throw new ApiError('OTP_INVALID');
+  if (state.tries >= OTP_MAX_TRIES) throw new ApiError('OTP_LOCKED');
+  if (code !== OTP_CODE) {
+    state.tries += 1;
+    throw new ApiError(state.tries >= OTP_MAX_TRIES ? 'OTP_LOCKED' : 'OTP_INVALID');
+  }
+  otpState.delete(key);
+}
+
 export const mockApi: Api = {
-  setSession(token) {
+  setSession(session) {
     const prefix = 'mock-token-';
-    if (token?.startsWith(prefix)) {
-      const phone = token.slice(prefix.length);
-      signedInPhone = phone;
-      knownPhones.add(phone);
-      if (!profiles.has(phone)) {
-        profiles.set(phone, { phone, firstName: null, lastName: null, email: null });
+    if (session?.accessToken.startsWith(prefix)) {
+      const identity = session.accessToken.slice(prefix.length);
+      signedInPhone = identity;
+      knownPhones.add(identity);
+      if (!profiles.has(identity)) {
+        profiles.set(identity, identity.includes('@')
+          ? { phone: null, firstName: null, lastName: null, email: identity }
+          : { phone: identity, firstName: null, lastName: null, email: null });
       }
     } else {
       signedInPhone = null;
     }
   },
 
+  onSessionChange() {
+    return () => undefined;
+  },
+
+  async logout() {
+    await wait(100);
+  },
+
+  async requestEmailOtp(email) {
+    await wait(500);
+    const address = email.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(address)) throw new ApiError('INVALID_REQUEST');
+    return mockRequestCode(address);
+  },
+
+  async verifyEmailOtp(email, code) {
+    await wait(500);
+    const address = email.trim().toLowerCase();
+    mockCheckCode(address, code);
+    return { session: mockSession(address), isNewUser: startMockSession(address, true) };
+  },
+
   async requestOtp(phone) {
     await wait(500);
     if (!isIndianMobile(phone)) throw new ApiError('INVALID_PHONE');
-    const previous = otpState.get(phone);
-    if (previous && Date.now() - previous.requestedAt < OTP_RESEND_SECONDS * 1000) {
-      throw new ApiError('OTP_RATE_LIMITED');
-    }
-    otpState.set(phone, { tries: 0, requestedAt: Date.now() });
-    return { resendAfterSeconds: OTP_RESEND_SECONDS };
+    return mockRequestCode(phone);
   },
 
   async verifyOtp(phone, code) {
     await wait(500);
-    const state = otpState.get(phone);
-    if (!state) throw new ApiError('OTP_INVALID');
-    if (state.tries >= OTP_MAX_TRIES) throw new ApiError('OTP_LOCKED');
-    if (code !== OTP_CODE) {
-      state.tries += 1;
-      throw new ApiError(state.tries >= OTP_MAX_TRIES ? 'OTP_LOCKED' : 'OTP_INVALID');
-    }
-    otpState.delete(phone);
-    const isNewUser = !knownPhones.has(phone);
-    knownPhones.add(phone);
-    if (!profiles.has(phone)) {
-      profiles.set(phone, { phone, firstName: null, lastName: null, email: null });
-    }
-    signedInPhone = phone;
-    return { token: `mock-token-${phone}`, isNewUser };
+    mockCheckCode(phone, code);
+    return { session: mockSession(phone), isNewUser: startMockSession(phone, false) };
   },
 
   async getProfile() {

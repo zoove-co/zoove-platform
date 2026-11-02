@@ -6,6 +6,7 @@ import { v7 as uuidv7 } from 'uuid';
 import { AddressesService } from '../addresses/addresses.service';
 import { CatalogService } from '../catalog/catalog.service';
 import { PricingService, type BookingMode } from '../catalog/pricing.service';
+import { notifyCustomer } from '../customer/notify';
 import { DomainError } from '../common/domain-error';
 import { lockFor } from '../common/locks';
 import { DatabaseService } from '../database/database.service';
@@ -42,7 +43,7 @@ export type CreateBookingInput = {
   idempotencyKey: string;
 };
 
-type Row = {
+export type Row = {
   id: string;
   mode: BookingMode;
   status: BookingStatus;
@@ -56,7 +57,7 @@ type Row = {
   request_fingerprint: string;
 };
 
-const SELECT = `select b.id, b.mode, b.status, b.starts_at, b.address_label, b.address_area, b.total_paise,
+export const BOOKING_SELECT = `select b.id, b.mode, b.status, b.starts_at, b.address_label, b.address_area, b.total_paise,
                        b.request_fingerprint, s.slug as service_slug, s.name as service_name, f.name as format_name
                   from bookings b
                   join services s on s.id = b.service_id
@@ -70,6 +71,25 @@ export function canChange(status: BookingStatus, startsAt: Date | null, now: Dat
   if (status === 'matching' || status === 'rematching') return true;
   if (status !== 'confirmed' || !startsAt) return false;
   return startsAt.getTime() - now.getTime() >= CHANGE_WINDOW_MS;
+}
+
+export function bookingFromRow(row: Row, now = new Date()): Booking {
+  return {
+    id: row.id,
+    serviceSlug: row.service_slug,
+    serviceName: row.service_name,
+    formatName: row.format_name,
+    mode: row.mode,
+    status: row.status,
+    startsAt: row.starts_at ? row.starts_at.toISOString() : null,
+    // Coaches arrive with the trainer and matching modules.
+    coach: null,
+    whenLabel: row.starts_at ? formatWhen(row.starts_at) : row.mode === 'instant' ? 'Finding your coach' : 'To be scheduled',
+    addressLabel: row.address_label,
+    areaLabel: row.address_area ?? '',
+    totalPaise: row.total_paise,
+    canChange: canChange(row.status, row.starts_at, now),
+  };
 }
 
 const isUnique = (error: unknown, constraint: string): boolean =>
@@ -86,32 +106,17 @@ export class BookingsService {
   ) {}
 
   private toBooking(row: Row, now = new Date()): Booking {
-    return {
-      id: row.id,
-      serviceSlug: row.service_slug,
-      serviceName: row.service_name,
-      formatName: row.format_name,
-      mode: row.mode,
-      status: row.status,
-      startsAt: row.starts_at ? row.starts_at.toISOString() : null,
-      // Coaches arrive with the trainer and matching modules.
-      coach: null,
-      whenLabel: row.starts_at ? formatWhen(row.starts_at) : row.mode === 'instant' ? 'Finding your coach' : 'To be scheduled',
-      addressLabel: row.address_label,
-      areaLabel: row.address_area ?? '',
-      totalPaise: row.total_paise,
-      canChange: canChange(row.status, row.starts_at, now),
-    };
+    return bookingFromRow(row, now);
   }
 
   async list(userId: string): Promise<Booking[]> {
-    const result = await this.db.query<Row>(`${SELECT} where b.user_id = $1 order by b.created_at desc limit 200`, [userId]);
+    const result = await this.db.query<Row>(`${BOOKING_SELECT} where b.user_id = $1 order by b.created_at desc limit 200`, [userId]);
     const now = new Date();
     return result.rows.map((row) => this.toBooking(row, now));
   }
 
   async get(userId: string, id: string): Promise<Booking> {
-    const result = await this.db.query<Row>(`${SELECT} where b.id = $1 and b.user_id = $2`, [id, userId]);
+    const result = await this.db.query<Row>(`${BOOKING_SELECT} where b.id = $1 and b.user_id = $2`, [id, userId]);
     const row = result.rows[0];
     if (!row) throw new DomainError('NOT_FOUND', 'We could not find that booking.');
     return this.toBooking(row);
@@ -185,6 +190,11 @@ export class BookingsService {
         await this.publish(client, bookingId, 'booking.created', {
           bookingId, userId, serviceSlug: service.slug, mode: input.mode, startsAt: startsAt?.toISOString() ?? null, totalPaise: total,
         });
+        await notifyCustomer(
+          client, userId, 'Booking received',
+          `We are finding a coach for your ${service.name} session${startsAt ? ` on ${formatWhen(startsAt)}` : ''}. We will tell you as soon as one accepts.`,
+          bookingId,
+        );
         return bookingId;
       });
       return this.get(userId, id);
@@ -205,6 +215,7 @@ export class BookingsService {
         await client.query(`update bookings set starts_at = $2 where id = $1`, [id, startsAt]);
         await this.record(client, id, 'rescheduled', 'customer', { from: row.starts_at?.toISOString() ?? null, to: startsAt.toISOString() });
         await this.publish(client, id, 'booking.rescheduled', { bookingId: id, userId, to: startsAt.toISOString() });
+        await notifyCustomer(client, userId, 'Session rescheduled', `Your ${row.service_name} session is now ${formatWhen(startsAt)}.`, id);
       });
     } catch (error) {
       if (isUnique(error, 'bookings_no_double_booking')) throw new DomainError('SLOT_CONFLICT', 'You already have a session at that time.');
@@ -224,6 +235,7 @@ export class BookingsService {
       await client.query(`update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = 'customer' where id = $1`, [id]);
       await this.record(client, id, 'cancelled', 'customer', {});
       await this.publish(client, id, 'booking.cancelled', { bookingId: id, userId, by: 'customer' });
+      await notifyCustomer(client, userId, 'Booking cancelled', `Your ${row.service_name} session${row.starts_at ? ` on ${formatWhen(row.starts_at)}` : ''} was cancelled.`, id);
     });
     return this.get(userId, id);
   }
@@ -239,7 +251,7 @@ export class BookingsService {
   }
 
   private async lock(client: PoolClient, userId: string, id: string): Promise<Row> {
-    const result = await client.query<Row>(`${SELECT} where b.id = $1 and b.user_id = $2 for update of b`, [id, userId]);
+    const result = await client.query<Row>(`${BOOKING_SELECT} where b.id = $1 and b.user_id = $2 for update of b`, [id, userId]);
     const row = result.rows[0];
     if (!row) throw new DomainError('NOT_FOUND', 'We could not find that booking.');
     return row;

@@ -9,7 +9,7 @@ import { EmailProvider } from '../email/email.provider';
 import { loginCodeEmail } from './email-otp.template';
 import { TokenService, type IssuedTokens } from './token.service';
 
-export type EmailAudience = 'trainer' | 'admin';
+export type EmailAudience = 'customer' | 'trainer' | 'admin';
 
 type ChallengeRow = { id: string; code_hash: string; attempts: number };
 type VerifyOutcome =
@@ -125,7 +125,18 @@ export class EmailOtpService {
       // A code is used up only when it is accepted for a real sign-in.
       await client.query('update otp_challenges set consumed_at = now() where id = $1', [challenge.id]);
       if (status !== 'active') return { kind: 'blocked' };
-      // Email sign-in never makes anyone a customer: the trainer role is granted only when an application is approved.
+      // Only the customer app makes a customer. The trainer page and admin panel never do: the trainer role is
+      // granted when an application is approved.
+      if (audience === 'customer') {
+        await client.query(`insert into user_roles (user_id, role) values ($1, 'customer') on conflict do nothing`, [userId]);
+        // Show the proven address in the profile, unless someone already uses it as their profile email.
+        await client.query(
+          `update users set email = verified_email
+            where id = $1 and email is null
+              and not exists (select 1 from users o where lower(o.email) = users.verified_email)`,
+          [userId],
+        );
+      }
       return { kind: 'ok', tokens: await this.tokens.issue(client, userId, device), isNewUser: inserted };
     });
 

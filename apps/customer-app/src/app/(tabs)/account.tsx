@@ -13,6 +13,7 @@ import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { useProfile } from '@/features/auth/hooks';
 import { track } from '@/lib/analytics/track';
 import { useAuth } from '@/lib/auth/useAuth';
+import { FEATURES } from '@/lib/config';
 import { colors, fonts, radius, spacing } from '@/theme';
 
 export default function AccountScreen() {
@@ -55,10 +56,10 @@ export default function AccountScreen() {
             )}
           </View>
           <View style={styles.profileText}>
-            <AppText variant="heading">{hasName ? fullName : (profile?.phone ?? '')}</AppText>
+            <AppText variant="heading">{hasName ? fullName : (profile?.email ?? profile?.phone ?? '')}</AppText>
             {hasName && profile ? (
               <AppText variant="caption" color={colors.muted}>
-                {profile.phone}
+                {profile.phone ?? profile.email}
               </AppText>
             ) : null}
           </View>
@@ -80,7 +81,9 @@ export default function AccountScreen() {
         ) : null}
         <MenuRow icon="location-outline" label={t('account.addresses')} onPress={() => router.push('/addresses')} />
         <MenuRow icon="layers-outline" label={t('account.packages')} onPress={() => router.push('/packages')} />
-        <MenuRow icon="gift-outline" label={t('account.referral')} onPress={() => router.push('/referral')} />
+        <MenuRow icon="gift-outline" label={t('account.referral')} onPress={() =>
+            router.push(FEATURES.referral ? '/referral' : { pathname: '/soon', params: { title: t('account.referral') } })
+          } />
         <MenuRow icon="shield-checkmark-outline" label={t('account.policy')} onPress={() => router.push('/policies')} />
         <MenuRow icon="help-circle-outline" label={t('account.support')} onPress={() => router.push('/help')} />
         <MenuRow icon="log-out-outline" label={t('profile.logout')} onPress={() => setConfirmingLogout(true)} />

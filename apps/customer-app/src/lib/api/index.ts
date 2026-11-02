@@ -1,8 +1,12 @@
+import { USE_MOCK } from '@/lib/config';
+
+import { httpApi } from './http';
 import { mockApi } from './mock';
 import type { Api } from './types';
 
-// Switch to the HTTP client here once the NestJS API exists. Screens never import the mock.
-export const api: Api = mockApi;
+// The real HTTP client talks to the Zoove API (address in EXPO_PUBLIC_API_URL). The mock is development only.
+// Screens never import either one directly.
+export const api: Api = USE_MOCK ? mockApi : httpApi;
 
 export { ApiError } from './types';
 export type {
@@ -36,6 +40,7 @@ export type {
   ServiceDetail,
   ServiceFormat,
   ServiceSummary,
+  Session,
   TimeSlot,
   UpcomingSessionSummary,
 } from './types';

@@ -15,12 +15,10 @@ import { colors, fonts, radius, spacing } from '@/theme';
 
 const LENGTH = 6;
 
-const formatPhone = (e164: string) => `${e164.slice(0, 3)} ${e164.slice(3, 8)} ${e164.slice(8)}`;
-
 export default function OtpScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { phone, resend } = useLocalSearchParams<{ phone?: string; resend?: string }>();
+  const { email, resend } = useLocalSearchParams<{ email?: string; resend?: string }>();
   const status = useAuth((state) => state.status);
   const signIn = useAuth((state) => state.signIn);
   const verify = useVerifyOtp();
@@ -46,17 +44,17 @@ export default function OtpScreen() {
     return () => clearTimeout(timer);
   }, [seconds]);
 
-  if (!phone) return <Redirect href="/" />;
+  if (!email) return <Redirect href="/" />;
 
   const submit = (value: string) => {
     if (verify.isPending) return;
     setError(null);
     verify.mutate(
-      { phone, code: value },
+      { email, code: value },
       {
         onSuccess: (result) => {
           track('otp_verified', { is_new_user: result.isNewUser });
-          void signIn(result.token);
+          void signIn(result.session);
         },
         onError: (err) => {
           setError(authErrorMessage(err, t));
@@ -78,7 +76,7 @@ export default function OtpScreen() {
     if (seconds > 0 || requestOtp.isPending) return;
     setError(null);
     setCode('');
-    requestOtp.mutate(phone, {
+    requestOtp.mutate(email, {
       onSuccess: (result) => {
         track('otp_requested');
         setSeconds(result.resendAfterSeconds);
@@ -98,7 +96,7 @@ export default function OtpScreen() {
               {t('auth.otpTitle')}
             </AppText>
             <AppText color={colors.muted} style={styles.text}>
-              {t('auth.otpBody', { phone: formatPhone(phone) })}
+              {t('auth.otpBody', { email })}
             </AppText>
             <Pressable accessibilityRole="button" onPress={() => router.back()} hitSlop={8}>
               <AppText variant="bodyStrong" color={colors.purple} style={styles.text}>
@@ -129,7 +127,7 @@ export default function OtpScreen() {
               editable={!verify.isPending}
               keyboardType="number-pad"
               textContentType="oneTimeCode"
-              autoComplete="sms-otp"
+              autoComplete="one-time-code"
               maxLength={LENGTH}
               caretHidden
               style={styles.hiddenInput}

@@ -8,6 +8,7 @@ import { APP_CONFIG, type Env } from './config/env';
 import { AddressesModule } from './addresses/addresses.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { CatalogModule } from './catalog/catalog.module';
+import { CustomerModule } from './customer/customer.module';
 import { DatabaseModule } from './database/database.module';
 import { EmailModule } from './email/email.module';
 import { HealthModule } from './health/health.module';
@@ -38,6 +39,7 @@ import { TrainersModule } from './trainers/trainers.module';
     CatalogModule,
     AddressesModule,
     BookingsModule,
+    CustomerModule,
     TrainersModule,
     TeamModule,
     NotificationsModule,

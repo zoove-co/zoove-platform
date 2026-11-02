@@ -69,7 +69,9 @@ function ProfileForm({ profile }: { profile: Profile }) {
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
-        <TextField label={t('profile.phone')} value={profile.phone} onChangeText={() => undefined} editable={false} />
+        {profile.phone ? (
+          <TextField label={t('profile.phone')} value={profile.phone} onChangeText={() => undefined} editable={false} />
+        ) : null}
         <Controller
           control={control}
           name="firstName"

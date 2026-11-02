@@ -5,28 +5,37 @@ export type DayOption = { iso: string; weekday: string; dayOfMonth: number; mont
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
-// Local calendar date as YYYY-MM-DD (not UTC, so "today" matches the customer's clock).
+// Every session is in Mumbai, and the API works in India time, so the app does too: a customer travelling
+// with a phone set to another time zone still sees and books Mumbai times. India has no daylight saving.
+const IST_OFFSET_MS = 330 * 60_000;
+
+// The wall-clock parts of an instant, in India. Read them with the UTC getters of the returned date.
+const ist = (date: Date): Date => new Date(date.getTime() + IST_OFFSET_MS);
+
+// Calendar date in India as YYYY-MM-DD.
 export function toIsoDate(date: Date): string {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  const p = ist(date);
+  return `${p.getUTCFullYear()}-${pad(p.getUTCMonth() + 1)}-${pad(p.getUTCDate())}`;
 }
 
 export function nextDays(count: number, from: Date = new Date()): DayOption[] {
   return Array.from({ length: count }, (_, index) => {
-    const day = new Date(from.getFullYear(), from.getMonth(), from.getDate() + index);
+    const day = ist(new Date(from.getTime() + index * 86_400_000));
     return {
-      iso: toIsoDate(day),
-      weekday: WEEKDAYS[day.getDay()] ?? '',
-      dayOfMonth: day.getDate(),
-      month: MONTHS[day.getMonth()] ?? '',
+      iso: toIsoDate(new Date(from.getTime() + index * 86_400_000)),
+      weekday: WEEKDAYS[day.getUTCDay()] ?? '',
+      dayOfMonth: day.getUTCDate(),
+      month: MONTHS[day.getUTCMonth()] ?? '',
     };
   });
 }
 
 export function formatClock(date: Date): string {
-  const hours = date.getHours();
+  const p = ist(date);
+  const hours = p.getUTCHours();
   const suffix = hours >= 12 ? 'PM' : 'AM';
   const hours12 = hours % 12 === 0 ? 12 : hours % 12;
-  return `${hours12}:${pad(date.getMinutes())} ${suffix}`;
+  return `${hours12}:${pad(p.getUTCMinutes())} ${suffix}`;
 }
 
 // "5 min ago", "3 hrs ago", "2 days ago"
@@ -43,5 +52,6 @@ export function formatAgo(iso: string, now: number = Date.now()): string {
 // "Tue, 14 Oct · 7:00 AM"
 export function formatWhen(startsAt: string): string {
   const date = new Date(startsAt);
-  return `${WEEKDAYS[date.getDay()] ?? ''}, ${date.getDate()} ${MONTHS[date.getMonth()] ?? ''} · ${formatClock(date)}`;
+  const p = ist(date);
+  return `${WEEKDAYS[p.getUTCDay()] ?? ''}, ${p.getUTCDate()} ${MONTHS[p.getUTCMonth()] ?? ''} · ${formatClock(date)}`;
 }

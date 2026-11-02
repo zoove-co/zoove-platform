@@ -18,6 +18,7 @@ import { AppText } from '@/components/ui/AppText';
 import { useHomeData } from '@/features/home/useHomeData';
 import { track } from '@/lib/analytics/track';
 import { bannerImages, serviceImages } from '@/lib/images';
+import { FEATURES } from '@/lib/config';
 import { colors, radius, spacing } from '@/theme';
 
 export default function HomeScreen() {
@@ -100,7 +101,7 @@ export default function HomeScreen() {
       label: t('home.bannerParty'),
       onPress: () => {
         track('banner_tapped', { banner: 'party' });
-        router.push('/party');
+        router.push(FEATURES.partyPlan ? '/party' : { pathname: '/soon', params: { title: t('home.bannerParty') } });
       },
     },
   ];

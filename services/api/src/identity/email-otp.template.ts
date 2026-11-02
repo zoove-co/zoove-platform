@@ -1,8 +1,9 @@
 import type { EmailMessage } from '../email/email.provider';
 
 // Plain, short and branded. The code is the only thing that matters in this email.
-export function loginCodeEmail(to: string, code: string, validMinutes: number, audience: 'trainer' | 'admin'): EmailMessage {
-  const purpose = audience === 'admin' ? 'sign in to the Zoove admin panel' : 'continue your Zoove trainer application';
+export function loginCodeEmail(to: string, code: string, validMinutes: number, audience: 'customer' | 'trainer' | 'admin'): EmailMessage {
+  const purpose =
+    audience === 'admin' ? 'sign in to the Zoove admin panel' : audience === 'customer' ? 'sign in to Zoove' : 'continue your Zoove trainer application';
   const text = [
     `Your Zoove code is ${code}`,
     '',

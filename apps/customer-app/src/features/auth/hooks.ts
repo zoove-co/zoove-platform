@@ -2,13 +2,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api, type ProfileUpdate } from '@/lib/api';
 
+// Sign-in is by emailed code for now. The phone (SMS) calls stay on the API for when SMS is approved.
 export function useRequestOtp() {
-  return useMutation({ mutationFn: (phone: string) => api.requestOtp(phone) });
+  return useMutation({ mutationFn: (email: string) => api.requestEmailOtp(email) });
 }
 
 export function useVerifyOtp() {
   return useMutation({
-    mutationFn: ({ phone, code }: { phone: string; code: string }) => api.verifyOtp(phone, code),
+    mutationFn: ({ email, code }: { email: string; code: string }) => api.verifyEmailOtp(email, code),
   });
 }
 

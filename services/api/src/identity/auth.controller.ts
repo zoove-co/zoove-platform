@@ -17,11 +17,11 @@ const verifySchema = z.object({
   audience: z.enum(['customer', 'trainer']).default('customer'),
 });
 const emailField = z.string().trim().toLowerCase().pipe(z.email().max(200));
-const emailRequestSchema = z.object({ email: emailField, audience: z.enum(['trainer', 'admin']).default('trainer') });
+const emailRequestSchema = z.object({ email: emailField, audience: z.enum(['customer', 'trainer', 'admin']).default('trainer') });
 const emailVerifySchema = z.object({
   email: emailField,
   code: z.string().regex(/^\d{6}$/, 'The code has 6 digits'),
-  audience: z.enum(['trainer', 'admin']).default('trainer'),
+  audience: z.enum(['customer', 'trainer', 'admin']).default('trainer'),
 });
 const refreshSchema = z.object({ refreshToken: z.string().min(20).max(200) });
 
@@ -81,11 +81,11 @@ export class AuthController {
   @Post('email-otp/request')
   @HttpCode(200)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Send a one-time code by email (trainer page and admin panel)' })
+  @ApiOperation({ summary: 'Send a one-time code by email (customer app, trainer page and admin panel)' })
   @ApiBody({
     schema: {
       type: 'object',
-      properties: { email: { type: 'string', example: 'akash@example.com' }, audience: { type: 'string', enum: ['trainer', 'admin'], default: 'trainer' } },
+      properties: { email: { type: 'string', example: 'akash@example.com' }, audience: { type: 'string', enum: ['customer', 'trainer', 'admin'], default: 'trainer' } },
       required: ['email'],
     },
   })
@@ -97,14 +97,14 @@ export class AuthController {
   @Post('email-otp/verify')
   @HttpCode(200)
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Check the emailed code and sign in. Never creates a customer; admin needs the admin role.' })
+  @ApiOperation({ summary: 'Check the emailed code and sign in. Audience customer creates the customer on first login; admin needs the admin role.' })
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
         email: { type: 'string', example: 'akash@example.com' },
         code: { type: 'string', example: '123456' },
-        audience: { type: 'string', enum: ['trainer', 'admin'], default: 'trainer' },
+        audience: { type: 'string', enum: ['customer', 'trainer', 'admin'], default: 'trainer' },
       },
       required: ['email', 'code'],
     },

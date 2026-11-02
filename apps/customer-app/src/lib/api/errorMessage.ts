@@ -13,7 +13,17 @@ export function authErrorMessage(error: unknown, t: TFunction): string {
       case 'OTP_LOCKED':
         return t('auth.otpLocked');
       case 'OTP_RATE_LIMITED':
+      case 'TOO_MANY_REQUESTS':
         return t('auth.otpRateLimited');
+      case 'INVALID_REQUEST':
+        return t('auth.emailError');
+      case 'EMAIL_FAILED':
+      case 'SMS_FAILED':
+        return t('auth.sendFailed');
+      case 'ACCOUNT_BLOCKED':
+        return t('auth.blocked');
+      case 'NETWORK':
+        return t('errors.network');
       default:
         break;
     }
@@ -35,6 +45,11 @@ export function bookingErrorMessage(error: unknown, t: TFunction): string {
         return t('addresses.inUse');
       case 'CHANGE_WINDOW_CLOSED':
         return t('session.changeError');
+      case 'NETWORK':
+        return t('errors.network');
+      case 'IDEMPOTENCY_KEY_REUSED':
+      case 'TOO_MANY_REQUESTS':
+        return t('errors.tryAgain');
       default:
         break;
     }

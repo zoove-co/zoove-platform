@@ -36,7 +36,7 @@ function Welcome() {
   const insets = useSafeAreaInsets();
   const requestOtp = useRequestOtp();
 
-  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [touched, setTouched] = useState(false);
   const [focused, setFocused] = useState(false);
   // The sheet's own height, measured once, so the logo can start in the middle of the screen
@@ -60,24 +60,24 @@ function Welcome() {
     ]).start();
   }, [sheetHeight, logoIn, lift]);
 
-  const valid = /^[6-9][0-9]{9}$/.test(phone);
-  const showError = touched && !valid && phone.length > 0;
+  const address = email.trim().toLowerCase();
+  const valid = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(address) && address.length <= 200;
+  const showError = touched && !valid && email.length > 0;
 
-  const goToOtp = (resend: number, e164: string) =>
-    router.push({ pathname: '/otp', params: { phone: e164, resend: String(resend) } });
+  const goToOtp = (resend: number, to: string) =>
+    router.push({ pathname: '/otp', params: { email: to, resend: String(resend) } });
 
   const submit = () => {
     setTouched(true);
     if (!valid || requestOtp.isPending) return;
-    const e164 = `+91${phone}`;
-    requestOtp.mutate(e164, {
+    requestOtp.mutate(address, {
       onSuccess: (result) => {
         track('otp_requested');
-        goToOtp(result.resendAfterSeconds, e164);
+        goToOtp(result.resendAfterSeconds, address);
       },
       onError: (error) => {
         // A code was already sent a moment ago: take the customer to the code screen instead.
-        if (error instanceof ApiError && error.code === 'OTP_RATE_LIMITED') goToOtp(30, e164);
+        if (error instanceof ApiError && error.code === 'OTP_RATE_LIMITED') goToOtp(30, address);
       },
     });
   };
@@ -132,7 +132,7 @@ function Welcome() {
 
         <View style={styles.field}>
           <AppText variant="caption" color={colors.muted} style={styles.label}>
-            {t('auth.phoneLabel')}
+            {t('auth.emailLabel')}
           </AppText>
           <View
             style={[
@@ -140,33 +140,31 @@ function Welcome() {
               focused && styles.phoneRowFocused,
               showError && styles.phoneRowError,
             ]}>
-            <AppText variant="bodyStrong" style={styles.prefix}>
-              +91
-            </AppText>
-            <View style={styles.divider} />
             <TextInput
-              accessibilityLabel={t('auth.phoneLabel')}
-              value={phone}
-              onChangeText={(value) => setPhone(value.replace(/[^0-9]/g, '').slice(0, 10))}
+              accessibilityLabel={t('auth.emailLabel')}
+              value={email}
+              onChangeText={(value) => setEmail(value.replace(/\s/g, '').slice(0, 200))}
               onFocus={() => setFocused(true)}
               onBlur={() => {
                 setFocused(false);
                 setTouched(true);
               }}
               onSubmitEditing={submit}
-              placeholder={t('auth.phonePlaceholder')}
+              placeholder={t('auth.emailPlaceholder')}
               placeholderTextColor="rgba(8, 11, 15, 0.3)"
-              keyboardType="number-pad"
+              keyboardType="email-address"
               returnKeyType="done"
-              autoComplete="tel"
-              textContentType="telephoneNumber"
-              maxLength={10}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="email"
+              textContentType="emailAddress"
+              maxLength={200}
               style={[styles.input, Platform.OS === 'web' && styles.inputWeb]}
             />
           </View>
           {showError ? (
             <AppText variant="caption" color={colors.danger}>
-              {t('auth.phoneError')}
+              {t('auth.emailError')}
             </AppText>
           ) : null}
           {apiError ? (
@@ -221,15 +219,12 @@ const styles = StyleSheet.create({
   },
   phoneRowFocused: { borderColor: colors.purple, borderWidth: 1.5 },
   phoneRowError: { borderColor: colors.danger, borderWidth: 1.5 },
-  prefix: { paddingHorizontal: 16, fontSize: 16 },
-  divider: { width: 1, height: 24, backgroundColor: colors.line },
   input: {
     flex: 1,
     height: '100%',
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     fontFamily: fonts.medium,
-    fontSize: 17,
-    letterSpacing: 0.5,
+    fontSize: 16,
     color: colors.ink,
   },
   inputWeb: { outlineStyle: 'none' } as unknown as TextStyle,

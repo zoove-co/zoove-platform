@@ -41,7 +41,7 @@ suite('email sign-in (trainer page and admin panel)', () => {
   // Pretend the previous code was asked a while ago so the resend wait never blocks a test.
   const age = (email: string) => pool.query(`update otp_challenges set created_at = created_at - interval '2 minutes' where email = $1`, [email.toLowerCase()]);
 
-  async function login(email: string, audience: 'trainer' | 'admin' = 'trainer') {
+  async function login(email: string, audience: 'customer' | 'trainer' | 'admin' = 'trainer') {
     await age(email);
     await http().post('/v1/auth/email-otp/request').send({ email, audience }).expect(200);
     return http().post('/v1/auth/email-otp/verify').send({ email, code: CODE, audience });
@@ -77,6 +77,21 @@ suite('email sign-in (trainer page and admin panel)', () => {
     expect(user.rows[0]).toMatchObject({ phone_e164: null, email: null });
     const roles = await pool.query(`select role from user_roles where user_id = $1`, [user.rows[0].id]);
     expect(roles.rows).toEqual([]);
+  });
+
+  it('customer audience creates a customer, shows the email in the profile and can use the customer API', async () => {
+    const verified = await login('buyer@example.com', 'customer');
+    expect(verified.status).toBe(200);
+    expect(verified.body.isNewUser).toBe(true);
+    const roles = await pool.query(`select r.role from user_roles r join users u on u.id = r.user_id where u.verified_email = 'buyer@example.com'`);
+    expect(roles.rows).toEqual([{ role: 'customer' }]);
+    const me = await http().get('/v1/me').set(as(verified.body.token)).expect(200);
+    expect(me.body).toMatchObject({ phone: null, email: 'buyer@example.com', firstName: null });
+    await http().patch('/v1/me').set(as(verified.body.token)).send({ firstName: 'Buyer' }).expect(200);
+    const again = await login('Buyer@example.com', 'customer');
+    expect(again.body.isNewUser).toBe(false);
+    const list = await http().get('/v1/addresses').set(as(again.body.token)).expect(200);
+    expect(list.body).toEqual([]);
   });
 
   it('the same address in another case is the same account, and the refresh token works', async () => {

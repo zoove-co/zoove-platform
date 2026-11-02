@@ -40,6 +40,11 @@ export default function RootLayout() {
     void hydrateAuth();
   }, [hydrateAuth]);
 
+  // Signing out (or the server ending the session) must not leave one customer's data in memory for the next.
+  useEffect(() => {
+    if (authStatus === 'signedOut') queryClient.clear();
+  }, [authStatus, queryClient]);
+
   const ready = (fontsLoaded || Boolean(fontError)) && authStatus !== 'loading';
 
   useEffect(() => {

@@ -15,7 +15,17 @@ export type ApiErrorCode =
   | 'INVALID_PHONE'
   | 'OTP_INVALID'
   | 'OTP_LOCKED'
-  | 'OTP_RATE_LIMITED';
+  | 'OTP_RATE_LIMITED'
+  | 'UNAUTHORIZED'
+  | 'ACCOUNT_BLOCKED'
+  | 'EMAIL_TAKEN'
+  | 'EMAIL_FAILED'
+  | 'SMS_FAILED'
+  | 'IDEMPOTENCY_KEY_REUSED'
+  | 'TOO_MANY_REQUESTS'
+  | 'NOT_AVAILABLE' // the feature has no backend yet
+  | 'NETWORK' // no connection, or the server did not answer in time
+  | 'INTERNAL';
 
 // Every API failure carries a stable code so screens can show a specific message.
 export class ApiError extends Error {
@@ -187,7 +197,7 @@ export interface ServiceabilityCheck {
 }
 
 export interface Profile {
-  phone: string; // E.164, e.g. +919876543210
+  phone: string | null; // E.164, e.g. +919876543210. Null when the customer signed in with email.
   firstName: string | null;
   lastName: string | null;
   email: string | null;
@@ -203,8 +213,14 @@ export interface OtpRequestResult {
   resendAfterSeconds: number;
 }
 
+// What the device keeps. The access token is short lived; the refresh token (single use) gets a new pair.
+export interface Session {
+  accessToken: string;
+  refreshToken: string;
+}
+
 export interface OtpVerifyResult {
-  token: string;
+  session: Session;
   isNewUser: boolean;
 }
 
@@ -254,9 +270,16 @@ export interface StreakData {
 
 export interface Api {
   // Tells the API which session this device holds (null = signed out).
-  setSession(token: string | null): void;
+  setSession(session: Session | null): void;
+  // Called when the API swaps tokens in the background, or when the session is no longer valid (null).
+  onSessionChange(listener: (session: Session | null) => void): () => void;
+  // Sign-in by emailed code is what the app uses today; the phone (SMS) pair is kept for when SMS is approved.
+  requestEmailOtp(email: string): Promise<OtpRequestResult>;
+  verifyEmailOtp(email: string, code: string): Promise<OtpVerifyResult>;
   requestOtp(phone: string): Promise<OtpRequestResult>;
   verifyOtp(phone: string, code: string): Promise<OtpVerifyResult>;
+  // Best effort: tells the server to forget this device's session.
+  logout(): Promise<void>;
   getProfile(): Promise<Profile>;
   updateProfile(input: ProfileUpdate): Promise<Profile>;
   getHome(): Promise<HomeData>;
