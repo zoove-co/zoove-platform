@@ -277,16 +277,34 @@ suite('addresses, slots and bookings', () => {
     });
 
     it('books for Duo, Loved one and Group, records who it is for, and rejects anything else', async () => {
-      const send = (participant: string, day: number) =>
-        http().post('/v1/bookings').set(as(token)).send({ serviceSlug: 'yoga', formatSlug: 'power-yoga', mode: 'scheduled', participant, addressId, startsAt: slot(day), idempotencyKey: key() });
+      const send = (participant: string, day: number, extra: object = {}) =>
+        http().post('/v1/bookings').set(as(token)).send({ serviceSlug: 'yoga', formatSlug: 'power-yoga', mode: 'scheduled', participant, addressId, startsAt: slot(day), idempotencyKey: key(), ...extra });
+      const get = async (id: string) => (await http().get(`/v1/bookings/${id}`).set(as(token)).expect(200)).body;
       const duo = (await send('duo', 3).expect(201)).body;
-      expect((await http().get(`/v1/bookings/${duo.id}`).set(as(token)).expect(200)).body).toMatchObject({ participant: 'duo' });
-      await send('loved_one', 4).expect(201);
-      await send('group', 5).expect(201);
+      expect(await get(duo.id)).toMatchObject({ participant: 'duo', groupSize: null, recipient: null });
+      const loved = (await send('loved_one', 4, { recipient: { name: 'Asha Rao', phone: '+919876543210' } }).expect(201)).body;
+      expect(await get(loved.id)).toMatchObject({ participant: 'loved_one', recipient: { name: 'Asha Rao', phone: '+919876543210' } });
+      const group = (await send('group', 5, { groupSize: 6 }).expect(201)).body;
+      expect(await get(group.id)).toMatchObject({ participant: 'group', groupSize: 6, recipient: null });
       const personal = (await http().post('/v1/bookings').set(as(token)).send({ serviceSlug: 'yoga', formatSlug: 'power-yoga', mode: 'scheduled', addressId, startsAt: slot(6), idempotencyKey: key() }).expect(201)).body;
-      expect((await http().get(`/v1/bookings/${personal.id}`).set(as(token)).expect(200)).body.participant).toBe('personal');
-      const r = await send('couple', 7).expect(400);
-      expect(r.body.error.code).toBe('INVALID_REQUEST');
+      expect((await get(personal.id)).participant).toBe('personal');
+      expect((await send('couple', 7).expect(400)).body.error.code).toBe('INVALID_REQUEST');
+    });
+
+    it('needs the right details for Loved one and Group', async () => {
+      const send = (participant: string, extra: object) =>
+        http().post('/v1/bookings').set(as(token)).send({ serviceSlug: 'yoga', formatSlug: 'power-yoga', mode: 'scheduled', participant, addressId, startsAt: slot(8), idempotencyKey: key(), ...extra });
+      const bad = [
+        () => send('group', {}),
+        () => send('group', { groupSize: 2 }),
+        () => send('group', { groupSize: 31 }),
+        () => send('duo', { groupSize: 4 }),
+        () => send('loved_one', {}),
+        () => send('loved_one', { recipient: { name: 'A', phone: '+919876543210' } }),
+        () => send('loved_one', { recipient: { name: 'Asha Rao', phone: '12345' } }),
+        () => send('personal', { recipient: { name: 'Asha Rao', phone: '+919876543210' } }),
+      ];
+      for (const attempt of bad) expect((await attempt().expect(400)).body.error.code).toBe('INVALID_REQUEST');
     });
 
     it('allows several instant bookings (open question 19)', async () => {

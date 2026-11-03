@@ -91,11 +91,18 @@ export interface TimeSlot {
   available: boolean;
 }
 
+export interface Recipient {
+  name: string;
+  phone: string; // +91XXXXXXXXXX
+}
+
 export interface BookingInput {
   serviceSlug: string;
   formatSlug: string;
   mode: BookingMode;
   participant: Participant;
+  groupSize?: number; // Group: how many people (3 to 30)
+  recipient?: Recipient; // Loved one: who the session is for
   addressId: string;
   startsAt?: string;
   // A coach the customer has had before. If not free at that time, another coach is matched.
@@ -146,6 +153,8 @@ export interface Booking {
   formatName: string;
   mode: BookingMode;
   participant: Participant;
+  groupSize: number | null;
+  recipient: Recipient | null;
   status: BookingStatus;
   startsAt: string | null; // null for instant bookings until a coach accepts
   coach: CoachRef | null; // null until a coach is assigned, and while we find a new one

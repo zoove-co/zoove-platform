@@ -23,6 +23,8 @@ export type Booking = {
   formatName: string;
   mode: BookingMode;
   participant: Participant;
+  groupSize: number | null;
+  recipient: { name: string; phone: string } | null;
   status: BookingStatus;
   startsAt: string | null;
   coach: { id: string; name: string } | null;
@@ -42,6 +44,8 @@ export type CreateBookingInput = {
   formatSlug: string;
   mode: BookingMode;
   participant: Participant;
+  groupSize?: number;
+  recipient?: { name: string; phone: string };
   addressId: string;
   startsAt?: string;
   preferredCoachId?: string;
@@ -52,6 +56,9 @@ export type Row = {
   id: string;
   mode: BookingMode;
   participant: Participant;
+  group_size: number | null;
+  recipient_name: string | null;
+  recipient_phone: string | null;
   status: BookingStatus;
   starts_at: Date | null;
   address_label: string;
@@ -64,7 +71,7 @@ export type Row = {
   request_fingerprint: string;
 };
 
-export const BOOKING_SELECT = `select b.id, b.mode, b.participant, b.status, b.starts_at, b.address_label, b.address_area, b.total_paise,
+export const BOOKING_SELECT = `select b.id, b.mode, b.participant, b.group_size, b.recipient_name, b.recipient_phone, b.status, b.starts_at, b.address_label, b.address_area, b.total_paise,
                        b.request_fingerprint, s.slug as service_slug, s.name as service_name, f.name as format_name, s.duration_max_minutes
                   from bookings b
                   join services s on s.id = b.service_id
@@ -94,6 +101,8 @@ export function bookingFromRow(row: Row, now = new Date()): Booking {
     formatName: row.format_name,
     mode: row.mode,
     participant: row.participant,
+    groupSize: row.group_size,
+    recipient: row.recipient_name && row.recipient_phone ? { name: row.recipient_name, phone: row.recipient_phone } : null,
     status: row.status,
     startsAt: row.starts_at ? row.starts_at.toISOString() : null,
     // Coaches arrive with the trainer and matching modules.
@@ -157,7 +166,7 @@ export class BookingsService {
 
   async create(userId: string, input: CreateBookingInput): Promise<Booking> {
     const fingerprint = createHash('sha256')
-      .update(JSON.stringify([input.serviceSlug, input.formatSlug, input.mode, input.participant, input.addressId, input.startsAt ?? null, input.preferredCoachId ?? null]))
+      .update(JSON.stringify([input.serviceSlug, input.formatSlug, input.mode, input.participant, input.groupSize ?? null, input.recipient?.name ?? null, input.recipient?.phone ?? null, input.addressId, input.startsAt ?? null, input.preferredCoachId ?? null]))
       .digest('hex');
     try {
       const id = await this.db.tx(async (client) => {
@@ -194,12 +203,12 @@ export class BookingsService {
 
         const bookingId = uuidv7();
         await client.query(
-          `insert into bookings (id, user_id, service_id, format_id, mode, participant, address_id, address_label, address_line,
+          `insert into bookings (id, user_id, service_id, format_id, mode, participant, group_size, recipient_name, recipient_phone, address_id, address_label, address_line,
                                  address_area, address_pincode, starts_at, status, preferred_coach_id, total_paise,
                                  idempotency_key, request_fingerprint)
-           values ($1, $2, $3, $4, $5::booking_mode, $16, $6, $7, $8, $9, $10, $11, 'matching', $12, $13, $14, $15)`,
+           values ($1, $2, $3, $4, $5::booking_mode, $16, $17, $18, $19, $6, $7, $8, $9, $10, $11, 'matching', $12, $13, $14, $15)`,
           [bookingId, userId, service.id, format.id, input.mode, address.id, address.label, address.line, address.area,
-           address.pincode, startsAt, input.preferredCoachId ?? null, total, input.idempotencyKey, fingerprint, input.participant],
+           address.pincode, startsAt, input.preferredCoachId ?? null, total, input.idempotencyKey, fingerprint, input.participant, input.groupSize ?? null, input.recipient?.name ?? null, input.recipient?.phone ?? null],
         );
         await this.record(client, bookingId, 'created', 'customer', { mode: input.mode, participant: input.participant, startsAt: startsAt?.toISOString() ?? null });
         await this.publish(client, bookingId, 'booking.created', {

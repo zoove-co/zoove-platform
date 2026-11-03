@@ -109,6 +109,8 @@ export default function SessionDetailScreen() {
               {booking.formatName} · {participantLabel(booking.participant, t)}
             </AppText>
             <DetailRow icon="calendar-outline" text={booking.whenLabel} />
+            {booking.groupSize ? <DetailRow icon="people-outline" text={t('booking.groupSizeValue', { count: booking.groupSize })} /> : null}
+            {booking.recipient ? <DetailRow icon="person-add-outline" text={`${booking.recipient.name} · ${booking.recipient.phone}`} /> : null}
           </View>
         </View>
 

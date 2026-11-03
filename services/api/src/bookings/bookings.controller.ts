@@ -14,10 +14,18 @@ const createSchema = z.object({
   mode: z.enum(['instant', 'scheduled', 'demo']),
   // Duo, Loved one and Group are priced like Personal until questions 5, 8 and 9 are answered.
   participant: z.enum(['personal', 'duo', 'loved_one', 'group']).default('personal'),
+  // Group: how many people. Loved one: who the session is for (name and Indian mobile number).
+  groupSize: z.number().int().min(3).max(30).optional(),
+  recipient: z.object({ name: z.string().trim().min(2).max(80), phone: z.string().regex(/^\+91[6-9]\d{9}$/, 'Enter a valid Indian mobile number.') }).optional(),
   addressId: z.uuid(),
   startsAt: z.iso.datetime({ offset: true }).optional(),
   preferredCoachId: z.uuid().optional(),
   idempotencyKey: z.string().min(8).max(100),
+}).superRefine((value, ctx) => {
+  if (value.participant === 'group' && value.groupSize === undefined) ctx.addIssue({ code: 'custom', path: ['groupSize'], message: 'Tell us how many people are joining.' });
+  if (value.participant !== 'group' && value.groupSize !== undefined) ctx.addIssue({ code: 'custom', path: ['groupSize'], message: 'Group size is only for Group bookings.' });
+  if (value.participant === 'loved_one' && !value.recipient) ctx.addIssue({ code: 'custom', path: ['recipient'], message: 'Tell us who the session is for.' });
+  if (value.participant !== 'loved_one' && value.recipient) ctx.addIssue({ code: 'custom', path: ['recipient'], message: 'Name and number are only for Loved one bookings.' });
 });
 const rescheduleSchema = z.object({ startsAt: z.iso.datetime({ offset: true }) });
 const slotsSchema = z.object({ service: z.string().trim().min(1).max(60), date: z.string() });

@@ -23,7 +23,7 @@ import { track } from '@/lib/analytics/track';
 import { bookingErrorMessage } from '@/lib/api/errorMessage';
 import { ApiError, type Address, type BookingMode, type BookingResult, type Participant } from '@/lib/api';
 import { formatWhen, nextDays } from '@/lib/dates';
-import { participantLabel } from '@/lib/participant';
+import { GROUP_MIN, isValidRecipientName, normalizeIndianMobile, participantLabel } from '@/lib/participant';
 import { colors, spacing } from '@/theme';
 
 const LAST_STEP = 3;
@@ -43,6 +43,9 @@ export default function BookingScreen() {
   const { data: pastCoaches } = usePastCoaches();
 
   const [participant, setParticipant] = useState<Participant>('personal');
+  const [groupSize, setGroupSize] = useState(4);
+  const [recipientName, setRecipientName] = useState('');
+  const [recipientPhone, setRecipientPhone] = useState('');
   const [serviceSlug, setServiceSlug] = useState(params.service || 'yoga');
   const [formatSlug, setFormatSlug] = useState<string | undefined>(params.format || undefined);
   const [dayIso, setDayIso] = useState(() => nextDays(1)[0]?.iso ?? '');
@@ -90,7 +93,7 @@ export default function BookingScreen() {
 
   const canAdvance =
     step === 0
-      ? true
+      ? participant !== 'loved_one' || (isValidRecipientName(recipientName) && normalizeIndianMobile(recipientPhone) !== null)
       : step === 1
         ? Boolean(service && format)
         : step === 2
@@ -122,10 +125,19 @@ export default function BookingScreen() {
     track('address_confirmed', { serviceable: address.serviceable });
   };
 
+  // Only what belongs to the chosen kind of booking is sent; the API refuses anything extra.
+  const details = {
+    groupSize: participant === 'group' ? Math.max(GROUP_MIN, groupSize) : undefined,
+    recipient:
+      participant === 'loved_one' && normalizeIndianMobile(recipientPhone)
+        ? { name: recipientName.trim(), phone: normalizeIndianMobile(recipientPhone) as string }
+        : undefined,
+  };
+
   const onConfirm = () => {
     if (createBooking.isPending || !service || !format || !selectedAddress) return;
     // The key belongs to one exact request: if anything was changed after a dropped connection, use a new key.
-    const signature = [serviceSlug, format.slug, mode, selectedAddress.id, instant ? '' : slotStartsAt, chosenCoach?.id].join('|');
+    const signature = [serviceSlug, format.slug, mode, selectedAddress.id, instant ? '' : slotStartsAt, chosenCoach?.id, participant, details.groupSize, details.recipient?.name, details.recipient?.phone].join('|');
     if (!idempotencyKey.current || idempotencyKey.current.signature !== signature) {
       idempotencyKey.current = { key: newKey(), signature };
     }
@@ -135,6 +147,8 @@ export default function BookingScreen() {
         formatSlug: format.slug,
         mode,
         participant,
+        groupSize: details.groupSize,
+        recipient: details.recipient,
         addressId: selectedAddress.id,
         startsAt: instant ? undefined : slotStartsAt,
         preferredCoachId: showCoachPicker ? chosenCoach?.id : undefined,
@@ -226,7 +240,16 @@ export default function BookingScreen() {
             scrollRef.current?.scrollToEnd({ animated: true });
           }
         }}>
-        <ParticipantPicker value={participant} onChange={setParticipant} />
+        <ParticipantPicker
+          value={participant}
+          onChange={setParticipant}
+          groupSize={groupSize}
+          onGroupSize={setGroupSize}
+          recipientName={recipientName}
+          onRecipientName={setRecipientName}
+          recipientPhone={recipientPhone}
+          onRecipientPhone={setRecipientPhone}
+        />
 
         {step >= 1 ? (
           <StylePicker
