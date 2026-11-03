@@ -9,11 +9,12 @@ import {
 } from '@expo-google-fonts/inter';
 import { Kalam_700Bold } from '@expo-google-fonts/kalam';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 
 import { track } from '@/lib/analytics/track';
 import { useAuth } from '@/lib/auth/useAuth';
@@ -35,6 +36,12 @@ export default function RootLayout() {
   const [queryClient] = useState(
     () => new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1 } } }),
   );
+
+  // Coming back to the app from the background refreshes whatever is on screen.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (status) => focusManager.setFocused(status === 'active'));
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     void hydrateAuth();

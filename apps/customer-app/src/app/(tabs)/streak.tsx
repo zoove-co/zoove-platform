@@ -14,6 +14,7 @@ import { track } from '@/lib/analytics/track';
 import type { StreakDay } from '@/lib/api';
 import { serviceImages } from '@/lib/images';
 import { colors, radius, spacing } from '@/theme';
+import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus';
 
 // Your Streak. Everything here is computed by the API from bookings (see StreakData); the screen only
 // draws it. Parts of Pratik's prototype are not built yet because the rules are open: milestones, the
@@ -22,6 +23,7 @@ export default function StreakScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const { data, isPending, isError, refetch } = useStreak();
+  useRefetchOnFocus(refetch);
 
   useEffect(() => {
     track('streak_viewed');

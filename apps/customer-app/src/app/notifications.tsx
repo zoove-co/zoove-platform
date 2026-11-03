@@ -12,11 +12,13 @@ import { TabFooter } from '@/components/ui/TabFooter';
 import { useMarkNotificationsRead, useNotifications } from '@/features/account/hooks';
 import { formatAgo } from '@/lib/dates';
 import { colors, radius, spacing } from '@/theme';
+import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus';
 
 export default function NotificationsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const { data, isPending, isError, refetch } = useNotifications();
+  useRefetchOnFocus(refetch);
   const markRead = useMarkNotificationsRead();
   const hasUnread = data?.some((item) => !item.read) ?? false;
 

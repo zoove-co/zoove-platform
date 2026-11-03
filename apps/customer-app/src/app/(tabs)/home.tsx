@@ -20,11 +20,13 @@ import { track } from '@/lib/analytics/track';
 import { bannerImages, serviceImages } from '@/lib/images';
 import { FEATURES } from '@/lib/config';
 import { colors, radius, spacing } from '@/theme';
+import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus';
 
 export default function HomeScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const { data, isPending, isError, refetch } = useHomeData();
+  useRefetchOnFocus(refetch);
 
   const [addressOpen, setAddressOpen] = useState(false);
   const openSoon = (title: string) => router.push({ pathname: '/soon', params: { title } });

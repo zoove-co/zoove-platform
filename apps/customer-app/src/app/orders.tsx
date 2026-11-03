@@ -13,6 +13,7 @@ import { useBookings } from '@/features/booking/hooks';
 import { isActiveStatus } from '@/lib/api/status';
 import { track } from '@/lib/analytics/track';
 import { colors, radius, spacing } from '@/theme';
+import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus';
 
 type Tab = 'upcoming' | 'past';
 
@@ -20,6 +21,7 @@ export default function OrdersScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const { data, isPending, isError, refetch } = useBookings();
+  useRefetchOnFocus(refetch);
   const [tab, setTab] = useState<Tab>('upcoming');
 
   useEffect(() => {
