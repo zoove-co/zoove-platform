@@ -229,7 +229,12 @@ export default function HomeScreen() {
           status={session.status}
           done={session.sessionsDoneThisWeek}
           goal={session.weeklyGoal}
-          onPress={() => router.push({ pathname: '/session/[id]', params: { id: session.id } })}
+          count={session.upcomingCount}
+          onPress={() =>
+            session.upcomingCount > 1
+              ? router.push('/orders')
+              : router.push({ pathname: '/session/[id]', params: { id: session.id } })
+          }
         />
       ) : null}
     </SafeAreaView>

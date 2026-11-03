@@ -71,7 +71,7 @@ suite('home, notifications, streak', () => {
 
     const home = await http().get('/v1/home').set(as(token)).expect(200);
     expect(home.body).toMatchObject({ customerFirstName: 'Asha', locationLabel: 'Home · Bandra West', locationServiceable: true, hasUnreadNotifications: true });
-    expect(home.body.upcomingSession).toMatchObject({ id: booked.body.id, serviceName: 'Yoga', status: 'matching' });
+    expect(home.body.upcomingSession).toMatchObject({ id: booked.body.id, serviceName: 'Yoga', status: 'matching', upcomingCount: 1 });
 
     const list = await http().get('/v1/notifications').set(as(token)).expect(200);
     expect(list.body).toHaveLength(1);

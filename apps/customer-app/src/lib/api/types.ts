@@ -163,6 +163,7 @@ export interface UpcomingSessionSummary {
   status: BookingStatus;
   sessionsDoneThisWeek: number;
   weeklyGoal: number;
+  upcomingCount: number; // all active sessions, so the home bar can say "+N more"
 }
 
 export interface HomeData {

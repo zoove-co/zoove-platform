@@ -34,6 +34,7 @@ export const en = {
     academyVerified: 'Trusted\n& Verified',
     findingCoachEyebrow: 'FINDING A NEW COACH',
     upcomingEyebrow: 'UPCOMING SESSION  ·  {{done}}/{{goal}} THIS WEEK',
+    upcomingMore: '+{{count}} more',
     errorTitle: 'We could not load your home screen',
     retry: 'Try again',
   },

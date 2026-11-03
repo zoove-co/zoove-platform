@@ -453,6 +453,7 @@ function upcomingFromBookings(): HomeData['upcomingSession'] {
     status: next.status,
     sessionsDoneThisWeek: doneThisWeek,
     weeklyGoal: WEEKLY_GOAL,
+    upcomingCount: active.length,
   };
 }
 

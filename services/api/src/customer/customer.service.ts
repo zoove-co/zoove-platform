@@ -17,7 +17,7 @@ export type HomeData = {
   scheduled: { pricePaise: number };
   demo: { pricePaise: number; originalPricePaise: number };
   services: { slug: string; name: string }[];
-  upcomingSession: { id: string; serviceName: string; whenLabel: string; status: Booking['status']; sessionsDoneThisWeek: number; weeklyGoal: number } | null;
+  upcomingSession: { id: string; serviceName: string; whenLabel: string; status: Booking['status']; sessionsDoneThisWeek: number; weeklyGoal: number; upcomingCount: number } | null;
   weekly: { done: number; goal: number };
 };
 export type StreakData = {
@@ -78,7 +78,7 @@ export class CustomerService {
       },
       services: services.map((item) => ({ slug: item.slug, name: item.name })),
       upcomingSession: upcoming
-        ? { id: upcoming.id, serviceName: upcoming.serviceName, whenLabel: upcoming.whenLabel, status: upcoming.status, sessionsDoneThisWeek: done, weeklyGoal: WEEKLY_GOAL }
+        ? { id: upcoming.id, serviceName: upcoming.serviceName, whenLabel: upcoming.whenLabel, status: upcoming.status, sessionsDoneThisWeek: done, weeklyGoal: WEEKLY_GOAL, upcomingCount: bookings.rows.filter((row) => ACTIVE.has(row.status)).length }
         : null,
       weekly: { done, goal: WEEKLY_GOAL },
     };

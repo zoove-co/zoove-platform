@@ -12,10 +12,11 @@ type Props = {
   status: BookingStatus;
   done: number;
   goal: number;
+  count: number;
   onPress: () => void;
 };
 
-export function UpcomingDock({ serviceName, whenLabel, status, done, goal, onPress }: Props) {
+export function UpcomingDock({ serviceName, whenLabel, status, done, goal, count, onPress }: Props) {
   const { t } = useTranslation();
   return (
     <Pressable
@@ -39,6 +40,11 @@ export function UpcomingDock({ serviceName, whenLabel, status, done, goal, onPre
         <AppText variant="bodyStrong" numberOfLines={1}>
           {serviceName}  ·  {whenLabel}
         </AppText>
+        {count > 1 ? (
+          <AppText variant="micro" color={colors.purple}>
+            {t('home.upcomingMore', { count: count - 1 })}
+          </AppText>
+        ) : null}
       </View>
       <Icon name="chevron-up" size={14} color={colors.purple} />
     </Pressable>
