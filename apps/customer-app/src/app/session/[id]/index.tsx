@@ -1,5 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { formatInr } from '@zoove/shared';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -130,6 +131,14 @@ export default function SessionDetailScreen() {
           <DetailRow icon="home-outline" text={t('booking.formatValue')} />
           <DetailRow icon="person-outline" text={coachText} />
           <DetailRow icon="location-outline" text={`${booking.addressLabel} · ${booking.areaLabel}`} />
+          <DetailRow
+            icon="pricetag-outline"
+            text={
+              booking.discountPaise > 0
+                ? `${formatInr(booking.totalPaise)} · ${t('discount.applied', { code: booking.discountCode ?? '', label: `−${formatInr(booking.discountPaise)}` })}`
+                : formatInr(booking.totalPaise)
+            }
+          />
         </View>
 
         {!active ? (

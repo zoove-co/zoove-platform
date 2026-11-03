@@ -276,6 +276,8 @@ const bookingRecords: BookingRecord[] = [
     addressLabel: 'Home',
     areaLabel: 'Bandra West, Mumbai',
     totalPaise: prices.scheduled,
+    discountPaise: 0,
+    discountCode: null,
     addressId: 'addr-home',
     coach: COACHES[0] ?? null,
     cancelledCoachIds: [],
@@ -300,6 +302,8 @@ const bookingRecords: BookingRecord[] = [
       addressLabel: 'Home',
       areaLabel: 'Bandra West, Mumbai',
       totalPaise: prices.scheduled,
+      discountPaise: 0,
+      discountCode: null,
       addressId: 'addr-home',
       coach: COACHES[1] ?? null,
       cancelledCoachIds: [],
@@ -516,6 +520,9 @@ function mockCheckCode(key: string, code: string): void {
   otpState.delete(key);
 }
 
+// Codes you can try in development: MOCK50 is half price, MOCK10 is 10% off.
+const MOCK_CODES: Record<string, number> = { MOCK50: 50, MOCK10: 10 };
+
 export const mockApi: Api = {
   setSession(session) {
     const prefix = 'mock-token-';
@@ -698,6 +705,18 @@ export const mockApi: Api = {
     return slotsFor(isoDate);
   },
 
+  async previewDiscount(input) {
+    await wait(350);
+    const code = input.code.trim().toUpperCase().replace(/[\s-]/g, '');
+    const percent = MOCK_CODES[code];
+    if (!percent) throw new ApiError('DISCOUNT_INVALID');
+    const detail = serviceDetails[input.serviceSlug];
+    if (!detail) throw new ApiError('NOT_FOUND');
+    const list = detail.pricePaise[input.mode];
+    const discountPaise = Math.floor((list * percent) / 100);
+    return { code, label: `${percent}% off`, listPaise: list, discountPaise, totalPaise: list - discountPaise };
+  },
+
   async createBooking(input) {
     await wait(600);
     settle();
@@ -716,13 +735,17 @@ export const mockApi: Api = {
         : input.startsAt
           ? formatWhen(input.startsAt)
           : 'To be scheduled';
+    const mockPercent = input.discountCode ? MOCK_CODES[input.discountCode.trim().toUpperCase()] : undefined;
+    if (input.discountCode && !mockPercent) throw new ApiError('DISCOUNT_INVALID');
+    const listPrice = detail.pricePaise[input.mode];
+    const discountPaise = mockPercent ? Math.floor((listPrice * mockPercent) / 100) : 0;
     const result: BookingResult = {
       id: `mock-${Date.now()}`,
       serviceName: detail.name,
       formatName: format?.name ?? detail.name,
       mode: input.mode,
       whenLabel,
-      totalPaise: detail.pricePaise[input.mode],
+      totalPaise: listPrice - discountPaise,
     };
     bookingRecords.push({
       id: result.id,
@@ -739,6 +762,8 @@ export const mockApi: Api = {
       addressLabel: address.label,
       areaLabel: address.area,
       totalPaise: result.totalPaise,
+      discountPaise,
+      discountCode: mockPercent && input.discountCode ? input.discountCode.trim().toUpperCase() : null,
       addressId: address.id,
       preferredCoachId: input.preferredCoachId,
       coach: input.mode === 'instant' ? null : pickCoach(input.preferredCoachId, input.startsAt ?? null, []),

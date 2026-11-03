@@ -30,6 +30,7 @@ export type {
   Address,
   Api,
   Booking,
+  DiscountQuote,
   BookingInput,
   BookingMode,
   BookingResult,

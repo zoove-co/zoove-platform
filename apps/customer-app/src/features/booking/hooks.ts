@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { api, type BookingInput, type BookingStatus, type NewAddress, type PartyPlanInput } from '@/lib/api';
+import { api, type BookingInput, type BookingMode, type BookingStatus, type NewAddress, type PartyPlanInput } from '@/lib/api';
 
 // Waiting on the system to find a coach: keep the screen fresh without the customer pulling.
 const isSearchingStatus = (status: BookingStatus | undefined) => status === 'matching' || status === 'rematching';
@@ -140,4 +140,8 @@ export function useSimulateTrainerCancel(id: string) {
     },
     onSettled: () => refresh(id),
   });
+}
+
+export function usePreviewDiscount() {
+  return useMutation({ mutationFn: (input: { code: string; serviceSlug: string; mode: BookingMode }) => api.previewDiscount(input) });
 }

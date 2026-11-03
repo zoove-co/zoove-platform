@@ -100,6 +100,7 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
   const path = usePathname() ?? '/';
   const onTeam = path.startsWith('/team');
   const onCalc = path.startsWith('/economics');
+  const onDiscounts = path.startsWith('/discounts');
   return (
     <div className="app">
       <aside className="side">
@@ -109,7 +110,7 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
         </Link>
         <nav className="nav" aria-label="Main">
           {can(me, 'trainers.view') ? (
-            <Link href="/" aria-current={onTeam || onCalc ? undefined : 'page'}>
+            <Link href="/" aria-current={onTeam || onCalc || onDiscounts ? undefined : 'page'}>
               {Icons.users}
               Trainers
               {pending ? <span className="badge">{pending}</span> : null}
@@ -122,6 +123,12 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
               <span className="soontag">Soon</span>
             </span>
           ))}
+          {can(me, 'discounts.manage') ? (
+            <Link href="/discounts" aria-current={onDiscounts ? 'page' : undefined}>
+              {Icons.tag}
+              Discount codes
+            </Link>
+          ) : null}
           {me?.isOwner ? (
             <Link href="/team" aria-current={onTeam ? 'page' : undefined}>
               {Icons.team}

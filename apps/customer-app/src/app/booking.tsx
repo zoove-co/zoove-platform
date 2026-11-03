@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AddressPicker } from '@/components/booking/AddressPicker';
 import { BookingSuccess } from '@/components/booking/BookingSuccess';
 import { CoachPicker } from '@/components/booking/CoachPicker';
+import { DiscountField } from '@/components/booking/DiscountField';
 import { ParticipantPicker } from '@/components/booking/ParticipantPicker';
 import { ReviewCard } from '@/components/booking/ReviewCard';
 import { SchedulePicker } from '@/components/booking/SchedulePicker';
@@ -21,7 +22,7 @@ import { useAddresses, useCreateBooking, usePastCoaches, useService } from '@/fe
 import { useHomeData } from '@/features/home/useHomeData';
 import { track } from '@/lib/analytics/track';
 import { bookingErrorMessage } from '@/lib/api/errorMessage';
-import { ApiError, type Address, type BookingMode, type BookingResult, type Participant } from '@/lib/api';
+import { ApiError, type Address, type BookingMode, type BookingResult, type DiscountQuote, type Participant } from '@/lib/api';
 import { formatWhen, nextDays } from '@/lib/dates';
 import { GROUP_MIN, isValidRecipientName, normalizeIndianMobile, participantLabel } from '@/lib/participant';
 import { colors, spacing } from '@/theme';
@@ -43,6 +44,7 @@ export default function BookingScreen() {
   const { data: pastCoaches } = usePastCoaches();
 
   const [participant, setParticipant] = useState<Participant>('personal');
+  const [discount, setDiscount] = useState<DiscountQuote | null>(null);
   const [groupSize, setGroupSize] = useState(4);
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
@@ -88,7 +90,10 @@ export default function BookingScreen() {
   const chosenCoach = coaches.find((coach) => coach.id === preferredCoachId);
   const hours = home?.instant.etaHours ?? 4;
   const instant = mode === 'instant';
-  const totalPaise = service?.pricePaise[mode];
+  const listPaise = service?.pricePaise[mode];
+  // The code was checked for one service and mode; if the price it was checked against is not the one shown, it is not used.
+  const activeDiscount = discount && discount.listPaise === listPaise ? discount : null;
+  const totalPaise = listPaise === undefined ? undefined : activeDiscount ? activeDiscount.totalPaise : listPaise;
   const priceLabel = totalPaise === undefined ? '' : formatInr(totalPaise);
 
   const canAdvance =
@@ -102,6 +107,7 @@ export default function BookingScreen() {
 
   const onServiceChange = (slug: string) => {
     setServiceSlug(slug);
+    setDiscount(null);
     setFormatSlug(undefined);
   };
 
@@ -137,7 +143,7 @@ export default function BookingScreen() {
   const onConfirm = () => {
     if (createBooking.isPending || !service || !format || !selectedAddress) return;
     // The key belongs to one exact request: if anything was changed after a dropped connection, use a new key.
-    const signature = [serviceSlug, format.slug, mode, selectedAddress.id, instant ? '' : slotStartsAt, chosenCoach?.id, participant, details.groupSize, details.recipient?.name, details.recipient?.phone].join('|');
+    const signature = [serviceSlug, format.slug, mode, selectedAddress.id, instant ? '' : slotStartsAt, chosenCoach?.id, activeDiscount?.code, participant, details.groupSize, details.recipient?.name, details.recipient?.phone].join('|');
     if (!idempotencyKey.current || idempotencyKey.current.signature !== signature) {
       idempotencyKey.current = { key: newKey(), signature };
     }
@@ -152,6 +158,7 @@ export default function BookingScreen() {
         addressId: selectedAddress.id,
         startsAt: instant ? undefined : slotStartsAt,
         preferredCoachId: showCoachPicker ? chosenCoach?.id : undefined,
+        discountCode: activeDiscount?.code,
         idempotencyKey: idempotencyKey.current.key,
       },
       {
@@ -313,9 +320,14 @@ export default function BookingScreen() {
                 label: t('booking.rowAddress'),
                 value: selectedAddress ? `${selectedAddress.label} · ${selectedAddress.area}` : '',
               },
+              ...(activeDiscount ? [{ label: t('discount.row'), value: `−${formatInr(activeDiscount.discountPaise)} (${activeDiscount.label})` }] : []),
               { label: t('booking.rowTotal'), value: priceLabel, emphasized: true },
             ]}
           />
+        ) : null}
+
+        {step >= 3 && service && format ? (
+          <DiscountField serviceSlug={serviceSlug} mode={mode} applied={activeDiscount} onApplied={setDiscount} />
         ) : null}
 
         {createBooking.isError ? (

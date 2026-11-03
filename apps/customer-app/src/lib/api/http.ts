@@ -8,6 +8,7 @@ import {
   type AppNotification,
   type Booking,
   type BookingResult,
+  type DiscountQuote,
   type HomeData,
   type OtpRequestResult,
   type OtpVerifyResult,
@@ -27,6 +28,7 @@ const KNOWN_CODES: ReadonlySet<string> = new Set<ApiErrorCode>([
   'CHANGE_WINDOW_CLOSED', 'INVALID_REQUEST', 'INVALID_PHONE', 'OTP_INVALID', 'OTP_LOCKED', 'OTP_RATE_LIMITED',
   'UNAUTHORIZED', 'ACCOUNT_BLOCKED', 'EMAIL_TAKEN', 'EMAIL_FAILED', 'SMS_FAILED', 'IDEMPOTENCY_KEY_REUSED',
   'TOO_MANY_REQUESTS', 'NOT_AVAILABLE', 'NETWORK', 'INTERNAL', 'CONSENT_REQUIRED', 'HAS_ACTIVE_BOOKINGS', 'FORBIDDEN',
+  'DISCOUNT_INVALID', 'DISCOUNT_EXPIRED', 'DISCOUNT_USED', 'DISCOUNT_NOT_APPLICABLE',
 ]);
 
 type TokenReply = { token: string; refreshToken: string; expiresInSeconds: number; isNewUser?: boolean };
@@ -185,6 +187,8 @@ export const httpApi: Api = {
   },
 
   getSlots: (serviceSlug, isoDate) => call<TimeSlot[]>('GET', `/v1/slots?service=${encodeURIComponent(serviceSlug)}&date=${encodeURIComponent(isoDate)}`),
+
+  previewDiscount: (input) => call<DiscountQuote>('POST', '/v1/discounts/preview', input),
 
   async createBooking(input): Promise<BookingResult> {
     const booking = await call<Booking>('POST', '/v1/bookings', input);

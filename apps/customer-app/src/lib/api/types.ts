@@ -23,6 +23,10 @@ export type ApiErrorCode =
   | 'SMS_FAILED'
   | 'IDEMPOTENCY_KEY_REUSED'
   | 'CONSENT_REQUIRED'
+  | 'DISCOUNT_INVALID'
+  | 'DISCOUNT_EXPIRED'
+  | 'DISCOUNT_USED'
+  | 'DISCOUNT_NOT_APPLICABLE'
   | 'HAS_ACTIVE_BOOKINGS'
   | 'FORBIDDEN'
   | 'TOO_MANY_REQUESTS'
@@ -99,6 +103,15 @@ export interface Recipient {
   phone: string; // +91XXXXXXXXXX
 }
 
+// A discount code checked for one session: what comes off and what is left to pay. Worked out by the server.
+export interface DiscountQuote {
+  code: string;
+  label: string; // "50% off"
+  listPaise: Paise;
+  discountPaise: Paise;
+  totalPaise: Paise;
+}
+
 export interface BookingInput {
   serviceSlug: string;
   formatSlug: string;
@@ -110,6 +123,7 @@ export interface BookingInput {
   startsAt?: string;
   // A coach the customer has had before. If not free at that time, another coach is matched.
   preferredCoachId?: string;
+  discountCode?: string;
   // Same key = same booking. A retry after a dropped connection must never double-book.
   idempotencyKey: string;
 }
@@ -164,7 +178,9 @@ export interface Booking {
   whenLabel: string;
   addressLabel: string;
   areaLabel: string;
-  totalPaise: Paise;
+  totalPaise: Paise; // what the customer pays, after any discount
+  discountPaise: Paise;
+  discountCode: string | null;
   // Decided by the server (rule lives in the API, never in the app).
   canChange: boolean;
   inProgress: boolean; // a confirmed session whose time is running now
@@ -312,6 +328,8 @@ export interface Api {
   listNotifications(): Promise<AppNotification[]>;
   markNotificationsRead(): Promise<void>;
   getSlots(serviceSlug: string, isoDate: string): Promise<TimeSlot[]>;
+  // Checks a discount code for a session and returns the new total. Nothing is used up until the booking is made.
+  previewDiscount(input: { code: string; serviceSlug: string; mode: BookingMode }): Promise<DiscountQuote>;
   createBooking(input: BookingInput): Promise<BookingResult>;
   getBooking(id: string): Promise<Booking>;
   listBookings(): Promise<Booking[]>;

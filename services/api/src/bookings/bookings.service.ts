@@ -10,6 +10,7 @@ import { notifyCustomer } from '../customer/notify';
 import { DomainError } from '../common/domain-error';
 import { lockFor } from '../common/locks';
 import { DatabaseService } from '../database/database.service';
+import { DiscountsService, normaliseCode } from '../discounts/discounts.service';
 import { CHANGE_WINDOW_MS, dayRange, formatClock, formatWhen, isSlotStart, slotStarts, withinHorizon } from './rules';
 
 export type Participant = 'personal' | 'duo' | 'loved_one' | 'group';
@@ -31,7 +32,9 @@ export type Booking = {
   whenLabel: string;
   addressLabel: string;
   areaLabel: string;
-  totalPaise: number;
+  totalPaise: number; // what the customer pays, after any discount
+  discountPaise: number;
+  discountCode: string | null;
   canChange: boolean;
   // A confirmed session whose scheduled time is running now (start until start + the service's longest length). Derived from the clock until trainers can check in.
   inProgress: boolean;
@@ -49,6 +52,7 @@ export type CreateBookingInput = {
   addressId: string;
   startsAt?: string;
   preferredCoachId?: string;
+  discountCode?: string;
   idempotencyKey: string;
 };
 
@@ -64,6 +68,8 @@ export type Row = {
   address_label: string;
   address_area: string | null;
   total_paise: number;
+  discount_paise: number;
+  discount_code: string | null;
   service_slug: string;
   service_name: string;
   format_name: string;
@@ -71,7 +77,7 @@ export type Row = {
   request_fingerprint: string;
 };
 
-export const BOOKING_SELECT = `select b.id, b.mode, b.participant, b.group_size, b.recipient_name, b.recipient_phone, b.status, b.starts_at, b.address_label, b.address_area, b.total_paise,
+export const BOOKING_SELECT = `select b.id, b.mode, b.participant, b.group_size, b.recipient_name, b.recipient_phone, b.status, b.starts_at, b.address_label, b.address_area, b.total_paise, b.discount_paise, b.discount_code,
                        b.request_fingerprint, s.slug as service_slug, s.name as service_name, f.name as format_name, s.duration_max_minutes
                   from bookings b
                   join services s on s.id = b.service_id
@@ -111,6 +117,8 @@ export function bookingFromRow(row: Row, now = new Date()): Booking {
     addressLabel: row.address_label,
     areaLabel: row.address_area ?? '',
     totalPaise: row.total_paise,
+    discountPaise: row.discount_paise,
+    discountCode: row.discount_code,
     canChange: canChange(row.status, row.starts_at, now),
     inProgress: isInProgress(row.status, row.starts_at, row.duration_max_minutes, now),
   };
@@ -127,6 +135,7 @@ export class BookingsService {
     private readonly catalog: CatalogService,
     private readonly pricing: PricingService,
     private readonly addresses: AddressesService,
+    private readonly discounts: DiscountsService,
   ) {}
 
   private toBooking(row: Row, now = new Date()): Booking {
@@ -166,7 +175,7 @@ export class BookingsService {
 
   async create(userId: string, input: CreateBookingInput): Promise<Booking> {
     const fingerprint = createHash('sha256')
-      .update(JSON.stringify([input.serviceSlug, input.formatSlug, input.mode, input.participant, input.groupSize ?? null, input.recipient?.name ?? null, input.recipient?.phone ?? null, input.addressId, input.startsAt ?? null, input.preferredCoachId ?? null]))
+      .update(JSON.stringify([input.serviceSlug, input.formatSlug, input.mode, input.participant, input.groupSize ?? null, input.recipient?.name ?? null, input.recipient?.phone ?? null, input.addressId, input.startsAt ?? null, input.preferredCoachId ?? null, input.discountCode ? normaliseCode(input.discountCode) : null]))
       .digest('hex');
     try {
       const id = await this.db.tx(async (client) => {
@@ -198,19 +207,24 @@ export class BookingsService {
           startsAt = this.assertBookableSlot(input.startsAt);
         }
 
-        const total = await this.pricing.priceFor(client, service.id, input.mode);
-        if (total === null) throw new DomainError('INTERNAL', 'No price is set for this session.');
+        const listPrice = await this.pricing.priceFor(client, service.id, input.mode);
+        if (listPrice === null) throw new DomainError('INTERNAL', 'No price is set for this session.');
 
         const bookingId = uuidv7();
+        // The code is checked and used up inside this same transaction: if the booking fails, the code is not spent.
+        const discount = input.discountCode ? await this.discounts.quote(client, userId, input.discountCode, listPrice, 'session', true) : null;
+        const total = discount ? discount.totalPaise : listPrice;
         await client.query(
           `insert into bookings (id, user_id, service_id, format_id, mode, participant, group_size, recipient_name, recipient_phone, address_id, address_label, address_line,
                                  address_area, address_pincode, starts_at, status, preferred_coach_id, total_paise,
-                                 idempotency_key, request_fingerprint)
-           values ($1, $2, $3, $4, $5::booking_mode, $16, $17, $18, $19, $6, $7, $8, $9, $10, $11, 'matching', $12, $13, $14, $15)`,
+                                 idempotency_key, request_fingerprint, discount_code, discount_paise)
+           values ($1, $2, $3, $4, $5::booking_mode, $16, $17, $18, $19, $6, $7, $8, $9, $10, $11, 'matching', $12, $13, $14, $15, $20, $21)`,
           [bookingId, userId, service.id, format.id, input.mode, address.id, address.label, address.line, address.area,
-           address.pincode, startsAt, input.preferredCoachId ?? null, total, input.idempotencyKey, fingerprint, input.participant, input.groupSize ?? null, input.recipient?.name ?? null, input.recipient?.phone ?? null],
+           address.pincode, startsAt, input.preferredCoachId ?? null, total, input.idempotencyKey, fingerprint, input.participant, input.groupSize ?? null, input.recipient?.name ?? null, input.recipient?.phone ?? null,
+           discount?.code ?? null, discount?.discountPaise ?? 0],
         );
-        await this.record(client, bookingId, 'created', 'customer', { mode: input.mode, participant: input.participant, startsAt: startsAt?.toISOString() ?? null });
+        if (discount) await this.discounts.redeem(client, userId, discount, bookingId);
+        await this.record(client, bookingId, 'created', 'customer', { mode: input.mode, participant: input.participant, startsAt: startsAt?.toISOString() ?? null, discountCode: discount?.code ?? null, discountPaise: discount?.discountPaise ?? 0 });
         await this.publish(client, bookingId, 'booking.created', {
           bookingId, userId, serviceSlug: service.slug, mode: input.mode, startsAt: startsAt?.toISOString() ?? null, totalPaise: total,
         });
@@ -257,6 +271,7 @@ export class BookingsService {
         throw new DomainError('CHANGE_WINDOW_CLOSED', 'This session can no longer be cancelled.');
       }
       await client.query(`update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = 'customer' where id = $1`, [id]);
+      await this.discounts.releaseForBooking(client, id);
       await this.record(client, id, 'cancelled', 'customer', {});
       await this.publish(client, id, 'booking.cancelled', { bookingId: id, userId, by: 'customer' });
       await notifyCustomer(client, userId, 'Booking cancelled', `Your ${row.service_name} session${row.starts_at ? ` on ${formatWhen(row.starts_at)}` : ''} was cancelled.`, id);

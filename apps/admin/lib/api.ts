@@ -152,6 +152,48 @@ export const listTeam = () => api<{ members: Member[]; permissions: PermissionIn
 export const addMember = (input: MemberInput & { email: string }) => api<Member>('/v1/admin/team', { method: 'POST', json: input });
 export const updateMember = (id: string, patch: Partial<MemberInput> & { active?: boolean }) => api<Member>(`/v1/admin/team/${id}`, { method: 'PATCH', json: patch });
 
+// ---- Discount codes (mirror the API) ----
+
+export type DiscountReason = 'goodwill' | 'emergency' | 'misconduct' | 'referral' | 'promo' | 'other';
+export type DiscountCode = {
+  id: string;
+  code: string;
+  kind: 'percent' | 'flat';
+  percentOff: number | null;
+  flatOffPaise: number | null;
+  maxDiscountPaise: number | null;
+  reason: DiscountReason;
+  note: string | null;
+  customerEmail: string | null;
+  maxRedemptions: number;
+  perUserLimit: number;
+  used: number;
+  minOrderPaise: number;
+  appliesTo: 'any' | 'session' | 'package';
+  expiresAt: string | null;
+  status: 'active' | 'expired' | 'used_up' | 'disabled';
+  createdBy: string | null;
+  createdAt: string;
+};
+export type NewDiscountCode = {
+  code?: string;
+  kind: 'percent' | 'flat';
+  percentOff?: number;
+  flatOffPaise?: number;
+  maxDiscountPaise?: number;
+  reason: DiscountReason;
+  note?: string;
+  customerEmail?: string;
+  maxRedemptions: number;
+  perUserLimit: number;
+  minOrderPaise: number;
+  appliesTo: 'any' | 'session' | 'package';
+  expiresAt?: string;
+};
+export const listDiscountCodes = () => api<DiscountCode[]>('/v1/admin/discount-codes');
+export const createDiscountCode = (input: NewDiscountCode) => api<DiscountCode>('/v1/admin/discount-codes', { method: 'POST', json: input });
+export const disableDiscountCode = (id: string) => api<DiscountCode>(`/v1/admin/discount-codes/${id}/disable`, { method: 'POST', json: {} });
+
 // ---- Trainer applications (mirror the API) ----
 
 export type Status = 'submitted' | 'in_review' | 'changes_requested' | 'approved' | 'rejected';

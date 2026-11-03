@@ -9,6 +9,7 @@ export const PERMISSION_KEYS = [
   'complaints.customers',
   'complaints.trainers',
   'tools.economics',
+  'discounts.manage',
 ] as const;
 
 export type Permission = (typeof PERMISSION_KEYS)[number];
@@ -23,6 +24,7 @@ export const PERMISSIONS: PermissionInfo[] = [
   { key: 'customers.view', group: 'Customers', label: 'View customers', hint: 'See customer profiles and bookings.', soon: true },
   { key: 'complaints.customers', group: 'Complaints', label: 'Handle customer complaints', hint: 'Review and resolve customer complaints.', soon: true },
   { key: 'complaints.trainers', group: 'Complaints', label: 'Handle trainer complaints', hint: 'Review and resolve trainer complaints.', soon: true },
+  { key: 'discounts.manage', group: 'Tools', label: 'Discount codes', hint: 'Create and switch off discount codes (goodwill, emergencies, referrals). Every code is recorded with who made it.', soon: false },
   { key: 'tools.economics', group: 'Tools', label: 'Session economics calculator', hint: 'Use the pricing and trainer payout calculator.', soon: false },
 ];
 

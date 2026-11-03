@@ -20,6 +20,7 @@ const createSchema = z.object({
   addressId: z.uuid(),
   startsAt: z.iso.datetime({ offset: true }).optional(),
   preferredCoachId: z.uuid().optional(),
+  discountCode: z.string().trim().min(3).max(40).optional(),
   idempotencyKey: z.string().min(8).max(100),
 }).superRefine((value, ctx) => {
   if (value.participant === 'group' && value.groupSize === undefined) ctx.addIssue({ code: 'custom', path: ['groupSize'], message: 'Tell us how many people are joining.' });
