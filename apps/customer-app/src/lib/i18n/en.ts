@@ -133,6 +133,7 @@ export const en = {
   session: {
     title: 'Upcoming session',
     statusConfirmed: 'Confirmed',
+    statusLive: 'Session on',
     statusMatching: 'Matching your coach',
     statusRematching: 'Finding a new coach',
     coachName: 'Coach {{name}}',

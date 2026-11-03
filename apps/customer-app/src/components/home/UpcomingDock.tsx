@@ -13,10 +13,11 @@ type Props = {
   done: number;
   goal: number;
   count: number;
+  inProgress: boolean;
   onPress: () => void;
 };
 
-export function UpcomingDock({ serviceName, whenLabel, status, done, goal, count, onPress }: Props) {
+export function UpcomingDock({ serviceName, whenLabel, status, done, goal, count, inProgress, onPress }: Props) {
   const { t } = useTranslation();
   return (
     <Pressable
@@ -24,18 +25,20 @@ export function UpcomingDock({ serviceName, whenLabel, status, done, goal, count
       accessibilityLabel={`${serviceName}, ${whenLabel}`}
       onPress={onPress}
       style={({ pressed }) => [styles.dock, { opacity: pressed ? 0.88 : 1 }]}>
-      <View style={styles.badge}>
+      <View style={[styles.badge, inProgress && styles.badgeLive]}>
         <Icon
           name={status === 'rematching' ? 'search-outline' : 'calendar-outline'}
           size={18}
-          color={colors.purple}
+          color={inProgress ? colors.success : colors.purple}
         />
       </View>
       <View style={styles.text}>
-        <AppText variant="eyebrow" color={colors.purple} style={styles.eyebrow}>
-          {status === 'rematching'
-            ? t('home.findingCoachEyebrow')
-            : t('home.upcomingEyebrow', { done, goal })}
+        <AppText variant="eyebrow" color={inProgress ? colors.success : colors.purple} style={styles.eyebrow}>
+          {inProgress
+            ? t('session.statusLive').toUpperCase()
+            : status === 'rematching'
+              ? t('home.findingCoachEyebrow')
+              : t('home.upcomingEyebrow', { done, goal })}
         </AppText>
         <AppText variant="bodyStrong" numberOfLines={1}>
           {serviceName}  ·  {whenLabel}
@@ -74,6 +77,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  badgeLive: { backgroundColor: 'rgba(31, 157, 85, 0.14)' },
   text: { flex: 1, gap: 3 },
   eyebrow: { fontSize: 9, letterSpacing: 1 },
 });

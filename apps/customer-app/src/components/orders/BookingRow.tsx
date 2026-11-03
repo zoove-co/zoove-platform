@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
+import { StatusChip } from '@/components/orders/StatusChip';
 import { Icon } from '@/components/ui/Icon';
 import type { Booking } from '@/lib/api';
 import { isActiveStatus } from '@/lib/api/status';
@@ -42,11 +43,7 @@ export function BookingRow({ booking, onPress }: Props) {
           {booking.whenLabel} · {booking.areaLabel}
         </AppText>
         <View style={styles.meta}>
-          <View style={[styles.status, !active && styles.statusInactive]}>
-            <AppText variant="micro" color={active ? colors.purple : colors.muted} style={styles.statusText}>
-              {statusLabel}
-            </AppText>
-          </View>
+          <StatusChip label={booking.inProgress ? t('session.statusLive') : statusLabel} active={active} live={booking.inProgress} />
           <AppText variant="caption" color={colors.muted}>
             {formatInr(booking.totalPaise)}
           </AppText>

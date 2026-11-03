@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { AddressesService } from '../addresses/addresses.service';
-import { BOOKING_SELECT, bookingFromRow, type Booking, type Row } from '../bookings/bookings.service';
+import { BOOKING_SELECT, bookingFromRow, isInProgress, type Booking, type Row } from '../bookings/bookings.service';
 import { CatalogService } from '../catalog/catalog.service';
 import { DatabaseService } from '../database/database.service';
 import { DAY_MS, INSTANT_ETA_HOURS, WEEKLY_GOAL, WEEK_MS, istIsoDate, istWeekStart } from './customer.rules';
@@ -17,7 +17,7 @@ export type HomeData = {
   scheduled: { pricePaise: number };
   demo: { pricePaise: number; originalPricePaise: number };
   services: { slug: string; name: string }[];
-  upcomingSession: { id: string; serviceName: string; whenLabel: string; status: Booking['status']; sessionsDoneThisWeek: number; weeklyGoal: number; upcomingCount: number } | null;
+  upcomingSession: { id: string; serviceName: string; whenLabel: string; status: Booking['status']; sessionsDoneThisWeek: number; weeklyGoal: number; upcomingCount: number; inProgress: boolean } | null;
   weekly: { done: number; goal: number };
 };
 export type StreakData = {
@@ -61,7 +61,9 @@ export class CustomerService {
     const price = (mode: Mode) => prices.rows.find((row) => row.mode === mode);
     const weekStart = istWeekStart(now).getTime();
     const done = bookings.rows.filter((row) => row.status === 'completed' && row.starts_at && row.starts_at.getTime() >= weekStart && row.starts_at.getTime() < weekStart + WEEK_MS).length;
-    const next = bookings.rows.find((row) => ACTIVE.has(row.status));
+    const activeRows = bookings.rows.filter((row) => ACTIVE.has(row.status));
+    // A session that is on right now comes first, then the soonest.
+    const next = activeRows.find((row) => isInProgress(row.status, row.starts_at, row.duration_max_minutes, now)) ?? activeRows[0];
     const upcoming = next ? bookingFromRow(next, now) : null;
 
     return {
@@ -78,7 +80,7 @@ export class CustomerService {
       },
       services: services.map((item) => ({ slug: item.slug, name: item.name })),
       upcomingSession: upcoming
-        ? { id: upcoming.id, serviceName: upcoming.serviceName, whenLabel: upcoming.whenLabel, status: upcoming.status, sessionsDoneThisWeek: done, weeklyGoal: WEEKLY_GOAL, upcomingCount: bookings.rows.filter((row) => ACTIVE.has(row.status)).length }
+        ? { id: upcoming.id, serviceName: upcoming.serviceName, whenLabel: upcoming.whenLabel, status: upcoming.status, sessionsDoneThisWeek: done, weeklyGoal: WEEKLY_GOAL, upcomingCount: activeRows.length, inProgress: upcoming.inProgress }
         : null,
       weekly: { done, goal: WEEKLY_GOAL },
     };

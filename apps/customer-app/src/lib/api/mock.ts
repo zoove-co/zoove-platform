@@ -249,7 +249,7 @@ function pickCoach(preferredId: string | undefined, startsAt: string | null, bus
   return COACHES.find((item) => coachAvailable(item.id, startsAt, busy)) ?? null;
 }
 
-type BookingRecord = Omit<Booking, 'canChange'> & {
+type BookingRecord = Omit<Booking, 'canChange' | 'inProgress'> & {
   addressId: string | null;
   preferredCoachId?: string;
   // Coaches who cancelled this booking, so a replacement is never the same person.
@@ -394,7 +394,9 @@ const toBooking = (record: BookingRecord): Booking => {
   void _a;
   void _p;
   void _c;
-  return { ...rest, canChange: isChangeable(record) };
+  const start = record.startsAt ? new Date(record.startsAt).getTime() : null;
+  const inProgress = record.status === 'confirmed' && start !== null && start <= Date.now() && Date.now() < start + 60 * 60_000;
+  return { ...rest, canChange: isChangeable(record), inProgress };
 };
 
 // ---------------------------------------------------------------------------
@@ -454,6 +456,7 @@ function upcomingFromBookings(): HomeData['upcomingSession'] {
     sessionsDoneThisWeek: doneThisWeek,
     weeklyGoal: WEEKLY_GOAL,
     upcomingCount: active.length,
+    inProgress: next.status === 'confirmed' && !!next.startsAt && new Date(next.startsAt).getTime() <= Date.now() && Date.now() < new Date(next.startsAt).getTime() + 60 * 60_000,
   };
 }
 

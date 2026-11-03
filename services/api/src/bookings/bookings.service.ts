@@ -28,6 +28,8 @@ export type Booking = {
   areaLabel: string;
   totalPaise: number;
   canChange: boolean;
+  // A confirmed session whose scheduled time is running now (start until start + the service's longest length). Derived from the clock until trainers can check in.
+  inProgress: boolean;
 };
 
 export type TimeSlot = { id: string; startsAt: string; label: string; available: boolean };
@@ -54,11 +56,12 @@ export type Row = {
   service_slug: string;
   service_name: string;
   format_name: string;
+  duration_max_minutes: number;
   request_fingerprint: string;
 };
 
 export const BOOKING_SELECT = `select b.id, b.mode, b.status, b.starts_at, b.address_label, b.address_area, b.total_paise,
-                       b.request_fingerprint, s.slug as service_slug, s.name as service_name, f.name as format_name
+                       b.request_fingerprint, s.slug as service_slug, s.name as service_name, f.name as format_name, s.duration_max_minutes
                   from bookings b
                   join services s on s.id = b.service_id
                   join service_formats f on f.id = b.format_id`;
@@ -71,6 +74,12 @@ export function canChange(status: BookingStatus, startsAt: Date | null, now: Dat
   if (status === 'matching' || status === 'rematching') return true;
   if (status !== 'confirmed' || !startsAt) return false;
   return startsAt.getTime() - now.getTime() >= CHANGE_WINDOW_MS;
+}
+
+export function isInProgress(status: BookingStatus, startsAt: Date | null, durationMaxMinutes: number, now: Date): boolean {
+  if (status !== 'confirmed' || !startsAt) return false;
+  const start = startsAt.getTime();
+  return start <= now.getTime() && now.getTime() < start + durationMaxMinutes * 60_000;
 }
 
 export function bookingFromRow(row: Row, now = new Date()): Booking {
@@ -89,6 +98,7 @@ export function bookingFromRow(row: Row, now = new Date()): Booking {
     areaLabel: row.address_area ?? '',
     totalPaise: row.total_paise,
     canChange: canChange(row.status, row.starts_at, now),
+    inProgress: isInProgress(row.status, row.starts_at, row.duration_max_minutes, now),
   };
 }
 

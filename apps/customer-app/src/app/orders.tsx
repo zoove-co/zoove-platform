@@ -35,7 +35,7 @@ export default function OrdersScreen() {
       // Soonest first; instant bookings still matching have no time yet, so they sit at the top.
       upcoming: all
         .filter((b) => isActiveStatus(b.status))
-        .sort((a, b) => (a.startsAt ? time(a.startsAt) : 0) - (b.startsAt ? time(b.startsAt) : 0)),
+        .sort((a, b) => Number(b.inProgress) - Number(a.inProgress) || (a.startsAt ? time(a.startsAt) : 0) - (b.startsAt ? time(b.startsAt) : 0)),
       // Most recent first.
       past: all
         .filter((b) => !isActiveStatus(b.status))

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { StatusChip } from '@/components/orders/StatusChip';
 import { AppText } from '@/components/ui/AppText';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Icon, type IconName } from '@/components/ui/Icon';
@@ -102,11 +103,7 @@ export default function SessionDetailScreen() {
             <Icon name="fitness-outline" size={32} color={colors.white} />
           </LinearGradient>
           <View style={styles.cardText}>
-            <View style={[styles.status, !active && styles.statusInactive]}>
-              <AppText variant="micro" color={active ? colors.purple : colors.muted} style={styles.statusText}>
-                {statusLabel}
-              </AppText>
-            </View>
+            <StatusChip label={booking.inProgress ? t('session.statusLive') : statusLabel} active={active} live={booking.inProgress} />
             <AppText variant="heading">
               {booking.formatName} · {t('booking.personal')}
             </AppText>

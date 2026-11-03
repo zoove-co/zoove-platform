@@ -154,6 +154,7 @@ export interface Booking {
   totalPaise: Paise;
   // Decided by the server (rule lives in the API, never in the app).
   canChange: boolean;
+  inProgress: boolean; // a confirmed session whose time is running now
 }
 
 export interface UpcomingSessionSummary {
@@ -163,6 +164,7 @@ export interface UpcomingSessionSummary {
   status: BookingStatus;
   sessionsDoneThisWeek: number;
   weeklyGoal: number;
+  inProgress: boolean;
   upcomingCount: number; // all active sessions, so the home bar can say "+N more"
 }
 

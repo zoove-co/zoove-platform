@@ -232,6 +232,7 @@ export default function HomeScreen() {
           done={session.sessionsDoneThisWeek}
           goal={session.weeklyGoal}
           count={session.upcomingCount}
+          inProgress={session.inProgress}
           onPress={() =>
             session.upcomingCount > 1
               ? router.push('/orders')
