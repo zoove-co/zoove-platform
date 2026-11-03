@@ -12,8 +12,8 @@ const createSchema = z.object({
   serviceSlug: z.string().trim().min(1).max(60),
   formatSlug: z.string().trim().min(1).max(60),
   mode: z.enum(['instant', 'scheduled', 'demo']),
-  // Duo, Loved one and Group are not open yet (questions 5, 8, 9), so only Personal is accepted.
-  participant: z.literal('personal').default('personal'),
+  // Duo, Loved one and Group are priced like Personal until questions 5, 8 and 9 are answered.
+  participant: z.enum(['personal', 'duo', 'loved_one', 'group']).default('personal'),
   addressId: z.uuid(),
   startsAt: z.iso.datetime({ offset: true }).optional(),
   preferredCoachId: z.uuid().optional(),

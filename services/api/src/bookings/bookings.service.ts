@@ -12,6 +12,8 @@ import { lockFor } from '../common/locks';
 import { DatabaseService } from '../database/database.service';
 import { CHANGE_WINDOW_MS, dayRange, formatClock, formatWhen, isSlotStart, slotStarts, withinHorizon } from './rules';
 
+export type Participant = 'personal' | 'duo' | 'loved_one' | 'group';
+
 export type BookingStatus = 'matching' | 'confirmed' | 'rematching' | 'completed' | 'cancelled';
 
 export type Booking = {
@@ -20,6 +22,7 @@ export type Booking = {
   serviceName: string;
   formatName: string;
   mode: BookingMode;
+  participant: Participant;
   status: BookingStatus;
   startsAt: string | null;
   coach: { id: string; name: string } | null;
@@ -38,7 +41,7 @@ export type CreateBookingInput = {
   serviceSlug: string;
   formatSlug: string;
   mode: BookingMode;
-  participant: 'personal';
+  participant: Participant;
   addressId: string;
   startsAt?: string;
   preferredCoachId?: string;
@@ -48,6 +51,7 @@ export type CreateBookingInput = {
 export type Row = {
   id: string;
   mode: BookingMode;
+  participant: Participant;
   status: BookingStatus;
   starts_at: Date | null;
   address_label: string;
@@ -60,7 +64,7 @@ export type Row = {
   request_fingerprint: string;
 };
 
-export const BOOKING_SELECT = `select b.id, b.mode, b.status, b.starts_at, b.address_label, b.address_area, b.total_paise,
+export const BOOKING_SELECT = `select b.id, b.mode, b.participant, b.status, b.starts_at, b.address_label, b.address_area, b.total_paise,
                        b.request_fingerprint, s.slug as service_slug, s.name as service_name, f.name as format_name, s.duration_max_minutes
                   from bookings b
                   join services s on s.id = b.service_id
@@ -89,6 +93,7 @@ export function bookingFromRow(row: Row, now = new Date()): Booking {
     serviceName: row.service_name,
     formatName: row.format_name,
     mode: row.mode,
+    participant: row.participant,
     status: row.status,
     startsAt: row.starts_at ? row.starts_at.toISOString() : null,
     // Coaches arrive with the trainer and matching modules.
@@ -189,14 +194,14 @@ export class BookingsService {
 
         const bookingId = uuidv7();
         await client.query(
-          `insert into bookings (id, user_id, service_id, format_id, mode, address_id, address_label, address_line,
+          `insert into bookings (id, user_id, service_id, format_id, mode, participant, address_id, address_label, address_line,
                                  address_area, address_pincode, starts_at, status, preferred_coach_id, total_paise,
                                  idempotency_key, request_fingerprint)
-           values ($1, $2, $3, $4, $5::booking_mode, $6, $7, $8, $9, $10, $11, 'matching', $12, $13, $14, $15)`,
+           values ($1, $2, $3, $4, $5::booking_mode, $16, $6, $7, $8, $9, $10, $11, 'matching', $12, $13, $14, $15)`,
           [bookingId, userId, service.id, format.id, input.mode, address.id, address.label, address.line, address.area,
-           address.pincode, startsAt, input.preferredCoachId ?? null, total, input.idempotencyKey, fingerprint],
+           address.pincode, startsAt, input.preferredCoachId ?? null, total, input.idempotencyKey, fingerprint, input.participant],
         );
-        await this.record(client, bookingId, 'created', 'customer', { mode: input.mode, startsAt: startsAt?.toISOString() ?? null });
+        await this.record(client, bookingId, 'created', 'customer', { mode: input.mode, participant: input.participant, startsAt: startsAt?.toISOString() ?? null });
         await this.publish(client, bookingId, 'booking.created', {
           bookingId, userId, serviceSlug: service.slug, mode: input.mode, startsAt: startsAt?.toISOString() ?? null, totalPaise: total,
         });

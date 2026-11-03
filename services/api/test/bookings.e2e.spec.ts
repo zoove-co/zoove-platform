@@ -276,12 +276,16 @@ suite('addresses, slots and bookings', () => {
       await http().post('/v1/bookings').set(as(token)).send({ ...body, serviceSlug: 'yoga', formatSlug: 'nope' }).expect(404);
     });
 
-    it('accepts only Personal for now', async () => {
-      const r = await http()
-        .post('/v1/bookings')
-        .set(as(token))
-        .send({ serviceSlug: 'yoga', formatSlug: 'power-yoga', mode: 'scheduled', participant: 'duo', addressId, startsAt: slot(3), idempotencyKey: key() })
-        .expect(400);
+    it('books for Duo, Loved one and Group, records who it is for, and rejects anything else', async () => {
+      const send = (participant: string, day: number) =>
+        http().post('/v1/bookings').set(as(token)).send({ serviceSlug: 'yoga', formatSlug: 'power-yoga', mode: 'scheduled', participant, addressId, startsAt: slot(day), idempotencyKey: key() });
+      const duo = (await send('duo', 3).expect(201)).body;
+      expect((await http().get(`/v1/bookings/${duo.id}`).set(as(token)).expect(200)).body).toMatchObject({ participant: 'duo' });
+      await send('loved_one', 4).expect(201);
+      await send('group', 5).expect(201);
+      const personal = (await http().post('/v1/bookings').set(as(token)).send({ serviceSlug: 'yoga', formatSlug: 'power-yoga', mode: 'scheduled', addressId, startsAt: slot(6), idempotencyKey: key() }).expect(201)).body;
+      expect((await http().get(`/v1/bookings/${personal.id}`).set(as(token)).expect(200)).body.participant).toBe('personal');
+      const r = await send('couple', 7).expect(400);
       expect(r.body.error.code).toBe('INVALID_REQUEST');
     });
 

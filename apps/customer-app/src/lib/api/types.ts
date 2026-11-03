@@ -145,6 +145,7 @@ export interface Booking {
   serviceName: string;
   formatName: string;
   mode: BookingMode;
+  participant: Participant;
   status: BookingStatus;
   startsAt: string | null; // null for instant bookings until a coach accepts
   coach: CoachRef | null; // null until a coach is assigned, and while we find a new one

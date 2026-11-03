@@ -13,12 +13,11 @@ type Props = { value: Participant; onChange: (value: Participant) => void };
 
 export function ParticipantPicker({ value, onChange }: Props) {
   const { t } = useTranslation();
-  // Only "Personal" is in the first release (see docs/prototype-v1-analysis.md, section 5).
   const options: { id: Participant; title: string; subtitle: string; enabled: boolean }[] = [
     { id: 'personal', title: t('booking.personal'), subtitle: t('booking.personalSub'), enabled: true },
-    { id: 'duo', title: t('booking.duo'), subtitle: t('booking.duoSub'), enabled: false },
-    { id: 'loved_one', title: t('booking.lovedOne'), subtitle: t('booking.lovedOneSub'), enabled: false },
-    { id: 'group', title: t('booking.group'), subtitle: t('booking.groupSub'), enabled: false },
+    { id: 'duo', title: t('booking.duo'), subtitle: t('booking.duoSub'), enabled: true },
+    { id: 'loved_one', title: t('booking.lovedOne'), subtitle: t('booking.lovedOneSub'), enabled: true },
+    { id: 'group', title: t('booking.group'), subtitle: t('booking.groupSub'), enabled: true },
   ];
 
   return (

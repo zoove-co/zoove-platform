@@ -23,6 +23,7 @@ import { track } from '@/lib/analytics/track';
 import { bookingErrorMessage } from '@/lib/api/errorMessage';
 import { ApiError, type Address, type BookingMode, type BookingResult, type Participant } from '@/lib/api';
 import { formatWhen, nextDays } from '@/lib/dates';
+import { participantLabel } from '@/lib/participant';
 import { colors, spacing } from '@/theme';
 
 const LAST_STEP = 3;
@@ -89,10 +90,8 @@ export default function BookingScreen() {
 
   const canAdvance =
     step === 0
-      ? participant === 'personal'
-      : participant !== 'personal'
-        ? false
-        : step === 1
+      ? true
+      : step === 1
         ? Boolean(service && format)
         : step === 2
           ? Boolean(selectedAddress?.serviceable) && (instant || Boolean(slotStartsAt))
@@ -279,7 +278,7 @@ export default function BookingScreen() {
             stepNumber={String((instant ? 4 : 5) + (showCoachPicker ? 1 : 0))}
             heading={t('booking.reviewTitle')}
             detail={t('booking.reviewDetail')}
-            title={`${format.name} · ${t('booking.personal')}`}
+            title={`${format.name} · ${participantLabel(participant, t)}`}
             subtitle={service.tagline}
             priceLabel={priceLabel}
             footnote={t('booking.prototypeNote')}

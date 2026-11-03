@@ -16,6 +16,7 @@ import { useBooking, useCancelBooking, useSimulateTrainerCancel } from '@/featur
 import { api } from '@/lib/api';
 import { isActiveStatus } from '@/lib/api/status';
 import { track } from '@/lib/analytics/track';
+import { participantLabel } from '@/lib/participant';
 import { colors, fonts, radius, spacing } from '@/theme';
 
 function DetailRow({ icon, text }: { icon: IconName; text: string }) {
@@ -105,7 +106,7 @@ export default function SessionDetailScreen() {
           <View style={styles.cardText}>
             <StatusChip label={booking.inProgress ? t('session.statusLive') : statusLabel} active={active} live={booking.inProgress} />
             <AppText variant="heading">
-              {booking.formatName} · {t('booking.personal')}
+              {booking.formatName} · {participantLabel(booking.participant, t)}
             </AppText>
             <DetailRow icon="calendar-outline" text={booking.whenLabel} />
           </View>
