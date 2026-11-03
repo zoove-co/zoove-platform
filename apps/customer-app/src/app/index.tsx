@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Wordmark } from '@/components/brand/Wordmark';
 import { AppText } from '@/components/ui/AppText';
+import { Checkbox } from '@/components/ui/Checkbox';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { useRequestOtp } from '@/features/auth/hooks';
 import { track } from '@/lib/analytics/track';
@@ -38,6 +39,7 @@ function Welcome() {
 
   const [email, setEmail] = useState('');
   const [touched, setTouched] = useState(false);
+  const [agreed, setAgreed] = useState(false);
   const [focused, setFocused] = useState(false);
   // The sheet's own height, measured once, so the logo can start in the middle of the screen
   // and settle in the middle of what is left above the sheet on any screen size.
@@ -65,11 +67,11 @@ function Welcome() {
   const showError = touched && !valid && email.length > 0;
 
   const goToOtp = (resend: number, to: string) =>
-    router.push({ pathname: '/otp', params: { email: to, resend: String(resend) } });
+    router.push({ pathname: '/otp', params: { email: to, resend: String(resend), agreed: agreed ? '1' : '0' } });
 
   const submit = () => {
     setTouched(true);
-    if (!valid || requestOtp.isPending) return;
+    if (!valid || !agreed || requestOtp.isPending) return;
     requestOtp.mutate(address, {
       onSuccess: (result) => {
         track('otp_requested');
@@ -177,13 +179,22 @@ function Welcome() {
         <View style={styles.actions}>
           <PrimaryButton
             label={t('auth.continue')}
-            disabled={!valid}
+            disabled={!valid || !agreed}
             loading={requestOtp.isPending}
             onPress={submit}
           />
-          <AppText variant="caption" color={colors.muted} style={styles.legal}>
-            {t('auth.legal')}
-          </AppText>
+          <Checkbox checked={agreed} onChange={setAgreed} label={t('auth.agreeLabel')}>
+            <AppText variant="caption" color={colors.muted}>
+              {t('auth.agree')}{' '}
+              <AppText variant="caption" color={colors.purple} style={styles.link} onPress={() => router.push('/policies')}>
+                {t('auth.terms')}
+              </AppText>{' '}
+              {t('auth.and')}{' '}
+              <AppText variant="caption" color={colors.purple} style={styles.link} onPress={() => router.push('/policies')}>
+                {t('auth.privacy')}
+              </AppText>
+            </AppText>
+          </Checkbox>
         </View>
       </Animated.View>
     </KeyboardAvoidingView>
@@ -229,5 +240,5 @@ const styles = StyleSheet.create({
   },
   inputWeb: { outlineStyle: 'none' } as unknown as TextStyle,
   actions: { gap: spacing.md },
-  legal: { textAlign: 'center' },
+  link: { fontFamily: fonts.bold },
 });

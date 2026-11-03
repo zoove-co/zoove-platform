@@ -22,6 +22,9 @@ export type ApiErrorCode =
   | 'EMAIL_FAILED'
   | 'SMS_FAILED'
   | 'IDEMPOTENCY_KEY_REUSED'
+  | 'CONSENT_REQUIRED'
+  | 'HAS_ACTIVE_BOOKINGS'
+  | 'FORBIDDEN'
   | 'TOO_MANY_REQUESTS'
   | 'NOT_AVAILABLE' // the feature has no backend yet
   | 'NETWORK' // no connection, or the server did not answer in time
@@ -288,13 +291,16 @@ export interface Api {
   onSessionChange(listener: (session: Session | null) => void): () => void;
   // Sign-in by emailed code is what the app uses today; the phone (SMS) pair is kept for when SMS is approved.
   requestEmailOtp(email: string): Promise<OtpRequestResult>;
-  verifyEmailOtp(email: string, code: string): Promise<OtpVerifyResult>;
+  // acceptedTerms: the customer ticked "I agree to the Terms and Privacy Policy". A new customer is refused without it.
+  verifyEmailOtp(email: string, code: string, acceptedTerms?: boolean): Promise<OtpVerifyResult>;
   requestOtp(phone: string): Promise<OtpRequestResult>;
   verifyOtp(phone: string, code: string): Promise<OtpVerifyResult>;
   // Best effort: tells the server to forget this device's session.
   logout(): Promise<void>;
   getProfile(): Promise<Profile>;
   updateProfile(input: ProfileUpdate): Promise<Profile>;
+  // Wipes the personal details and ends every sign-in. Refused (HAS_ACTIVE_BOOKINGS) while a session is upcoming.
+  deleteAccount(): Promise<void>;
   getHome(): Promise<HomeData>;
   getService(slug: string): Promise<ServiceDetail>;
   listAddresses(): Promise<Address[]>;

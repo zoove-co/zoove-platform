@@ -9,7 +9,8 @@ export function useRequestOtp() {
 
 export function useVerifyOtp() {
   return useMutation({
-    mutationFn: ({ email, code }: { email: string; code: string }) => api.verifyEmailOtp(email, code),
+    mutationFn: ({ email, code, acceptedTerms }: { email: string; code: string; acceptedTerms: boolean }) =>
+      api.verifyEmailOtp(email, code, acceptedTerms),
   });
 }
 
@@ -27,4 +28,8 @@ export function useUpdateProfile() {
         queryClient.invalidateQueries({ queryKey: ['home'] }),
       ]),
   });
+}
+
+export function useDeleteAccount() {
+  return useMutation({ mutationFn: () => api.deleteAccount() });
 }

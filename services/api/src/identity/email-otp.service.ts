@@ -6,6 +6,7 @@ import { DomainError } from '../common/domain-error';
 import { APP_CONFIG, type Env } from '../config/env';
 import { DatabaseService } from '../database/database.service';
 import { EmailProvider } from '../email/email.provider';
+import { TERMS_VERSION } from './consent';
 import { loginCodeEmail } from './email-otp.template';
 import { TokenService, type IssuedTokens } from './token.service';
 
@@ -16,7 +17,8 @@ type VerifyOutcome =
   | { kind: 'ok'; tokens: IssuedTokens; isNewUser: boolean }
   | { kind: 'invalid' }
   | { kind: 'locked' }
-  | { kind: 'blocked' };
+  | { kind: 'blocked' }
+  | { kind: 'consent' };
 
 export type EmailVerifyResult = IssuedTokens & { isNewUser: boolean };
 
@@ -74,7 +76,13 @@ export class EmailOtpService {
     return { resendAfterSeconds };
   }
 
-  async verify(email: string, code: string, device: Record<string, unknown>, audience: EmailAudience): Promise<EmailVerifyResult> {
+  async verify(
+    email: string,
+    code: string,
+    device: Record<string, unknown>,
+    audience: EmailAudience,
+    acceptedTerms = false,
+  ): Promise<EmailVerifyResult> {
     const outcome = await this.db.tx<VerifyOutcome>(async (client) => {
       await client.query('select pg_advisory_xact_lock(hashtext($1))', [`email:${email}`]);
 
@@ -109,6 +117,12 @@ export class EmailOtpService {
         status = row.status;
         await client.query('update users set last_login_at = now() where id = $1', [userId]);
       } else {
+        // A new customer must have agreed to the Terms and Privacy Policy. Checked before anything is created,
+        // and before the code is used up, so they can tick the box and try the same code again.
+        if (audience === 'customer' && !acceptedTerms) {
+          const existing = await client.query(`select 1 from users where verified_email = $1`, [email]);
+          if (existing.rows.length === 0) return { kind: 'consent' };
+        }
         const user = await client.query<{ id: string; status: string; inserted: boolean }>(
           `insert into users (id, verified_email, last_login_at) values ($1, $2, now())
            on conflict (verified_email) where verified_email is not null do update set last_login_at = now()
@@ -129,6 +143,15 @@ export class EmailOtpService {
       // granted when an application is approved.
       if (audience === 'customer') {
         await client.query(`insert into user_roles (user_id, role) values ($1, 'customer') on conflict do nothing`, [userId]);
+        if (acceptedTerms) {
+          // One row per document and version, so a re-sign-in does not pile up duplicates.
+          await client.query(
+            `insert into consents (user_id, kind, version, accepted, ip)
+             select $1, k, $2, true, $3::inet from unnest(array['terms', 'privacy']) as k
+              where not exists (select 1 from consents c where c.user_id = $1 and c.kind = k and c.version = $2 and c.accepted)`,
+            [userId, TERMS_VERSION, typeof device.ip === 'string' ? device.ip : null],
+          );
+        }
         // Show the proven address in the profile, unless someone already uses it as their profile email.
         await client.query(
           `update users set email = verified_email
@@ -145,6 +168,8 @@ export class EmailOtpService {
         return { ...outcome.tokens, isNewUser: outcome.isNewUser };
       case 'locked':
         throw new DomainError('OTP_LOCKED', 'Too many wrong codes. Please ask for a new code.');
+      case 'consent':
+        throw new DomainError('CONSENT_REQUIRED', 'Please agree to the Terms and Privacy Policy to continue.');
       case 'blocked':
         throw new DomainError('ACCOUNT_BLOCKED', 'This account cannot sign in. Please contact support.');
       default:

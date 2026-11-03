@@ -18,7 +18,7 @@ const LENGTH = 6;
 export default function OtpScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { email, resend } = useLocalSearchParams<{ email?: string; resend?: string }>();
+  const { email, resend, agreed } = useLocalSearchParams<{ email?: string; resend?: string; agreed?: string }>();
   const status = useAuth((state) => state.status);
   const signIn = useAuth((state) => state.signIn);
   const verify = useVerifyOtp();
@@ -50,7 +50,7 @@ export default function OtpScreen() {
     if (verify.isPending) return;
     setError(null);
     verify.mutate(
-      { email, code: value },
+      { email, code: value, acceptedTerms: agreed === '1' },
       {
         onSuccess: (result) => {
           track('otp_verified', { is_new_user: result.isNewUser });

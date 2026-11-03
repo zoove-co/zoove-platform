@@ -10,8 +10,9 @@ import { AppText } from '@/components/ui/AppText';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Icon } from '@/components/ui/Icon';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
-import { useProfile } from '@/features/auth/hooks';
 import { track } from '@/lib/analytics/track';
+import { useDeleteAccount, useProfile } from '@/features/auth/hooks';
+import { deleteAccountErrorMessage } from '@/lib/api/errorMessage';
 import { useAuth } from '@/lib/auth/useAuth';
 import { FEATURES } from '@/lib/config';
 import { colors, fonts, radius, spacing } from '@/theme';
@@ -23,6 +24,8 @@ export default function AccountScreen() {
   const signOut = useAuth((state) => state.signOut);
   const { data: profile } = useProfile();
   const [confirmingLogout, setConfirmingLogout] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const deleteAccount = useDeleteAccount();
 
   const fullName = [profile?.firstName, profile?.lastName].filter(Boolean).join(' ');
   const hasName = Boolean(profile?.firstName);
@@ -38,6 +41,18 @@ export default function AccountScreen() {
     queryClient.clear();
     await signOut();
     router.replace('/');
+  };
+
+  const remove = () => {
+    deleteAccount.mutate(undefined, {
+      onSuccess: async () => {
+        track('account_deleted');
+        setConfirmingDelete(false);
+        queryClient.clear();
+        await signOut();
+        router.replace('/');
+      },
+    });
   };
 
   return (
@@ -87,6 +102,14 @@ export default function AccountScreen() {
         <MenuRow icon="shield-checkmark-outline" label={t('account.policy')} onPress={() => router.push('/policies')} />
         <MenuRow icon="help-circle-outline" label={t('account.support')} onPress={() => router.push('/help')} />
         <MenuRow icon="log-out-outline" label={t('profile.logout')} onPress={() => setConfirmingLogout(true)} />
+        <MenuRow
+          icon="trash-outline"
+          label={t('profile.delete')}
+          onPress={() => {
+            deleteAccount.reset();
+            setConfirmingDelete(true);
+          }}
+        />
       </ScrollView>
 
       <ConfirmDialog
@@ -98,6 +121,17 @@ export default function AccountScreen() {
         cancelLabel={t('profile.logoutKeep')}
         onConfirm={() => void logout()}
         onCancel={() => setConfirmingLogout(false)}
+      />
+      <ConfirmDialog
+        visible={confirmingDelete}
+        destructive
+        title={t('profile.deleteTitle')}
+        body={deleteAccount.isError ? deleteAccountErrorMessage(deleteAccount.error, t) : t('profile.deleteBody')}
+        confirmLabel={t('profile.deleteConfirm')}
+        cancelLabel={t('profile.deleteKeep')}
+        loading={deleteAccount.isPending}
+        onConfirm={remove}
+        onCancel={() => setConfirmingDelete(false)}
       />
     </SafeAreaView>
   );

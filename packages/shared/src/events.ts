@@ -33,6 +33,7 @@ export const TRACKED_EVENTS = [
   'account_viewed',
   'profile_completed',
   'signed_out',
+  'account_deleted',
 ] as const;
 
 export type TrackedEventName = (typeof TRACKED_EVENTS)[number];

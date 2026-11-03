@@ -44,7 +44,7 @@ suite('email sign-in (trainer page and admin panel)', () => {
   async function login(email: string, audience: 'customer' | 'trainer' | 'admin' = 'trainer') {
     await age(email);
     await http().post('/v1/auth/email-otp/request').send({ email, audience }).expect(200);
-    return http().post('/v1/auth/email-otp/verify').send({ email, code: CODE, audience });
+    return http().post('/v1/auth/email-otp/verify').send({ email, code: CODE, audience, acceptedTerms: audience === 'customer' ? true : undefined });
   }
 
   beforeAll(async () => {

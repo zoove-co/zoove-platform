@@ -22,6 +22,8 @@ const emailVerifySchema = z.object({
   email: emailField,
   code: z.string().regex(/^\d{6}$/, 'The code has 6 digits'),
   audience: z.enum(['customer', 'trainer', 'admin']).default('trainer'),
+  // The customer app sends true once the person has ticked "I agree to the Terms and Privacy Policy".
+  acceptedTerms: z.boolean().optional(),
 });
 const refreshSchema = z.object({ refreshToken: z.string().min(20).max(200) });
 
@@ -105,13 +107,14 @@ export class AuthController {
         email: { type: 'string', example: 'akash@example.com' },
         code: { type: 'string', example: '123456' },
         audience: { type: 'string', enum: ['customer', 'trainer', 'admin'], default: 'trainer' },
+        acceptedTerms: { type: 'boolean', description: 'Required for a new customer: agreed to the Terms and Privacy Policy.' },
       },
       required: ['email', 'code'],
     },
   })
   @ApiOkResponse({ schema: tokenResponse })
   verifyEmailOtp(@Body(new ZodValidationPipe(emailVerifySchema)) body: z.infer<typeof emailVerifySchema>, @Req() request: Request): Promise<EmailVerifyResult> {
-    return this.emailOtp.verify(body.email, body.code, deviceOf(request), body.audience);
+    return this.emailOtp.verify(body.email, body.code, deviceOf(request), body.audience, body.acceptedTerms === true);
   }
 
   @Post('refresh')

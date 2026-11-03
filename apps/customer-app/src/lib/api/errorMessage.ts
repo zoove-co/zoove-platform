@@ -22,6 +22,8 @@ export function authErrorMessage(error: unknown, t: TFunction): string {
         return t('auth.sendFailed');
       case 'ACCOUNT_BLOCKED':
         return t('auth.blocked');
+      case 'CONSENT_REQUIRED':
+        return t('auth.consentRequired');
       case 'NETWORK':
         return t('errors.network');
       default:
@@ -55,4 +57,13 @@ export function bookingErrorMessage(error: unknown, t: TFunction): string {
     }
   }
   return t('booking.error');
+}
+
+export function deleteAccountErrorMessage(error: unknown, t: TFunction): string {
+  if (error instanceof ApiError) {
+    if (error.code === 'HAS_ACTIVE_BOOKINGS') return t('profile.deleteHasBookings');
+    if (error.code === 'FORBIDDEN') return t('profile.deleteForbidden');
+    if (error.code === 'NETWORK') return t('errors.network');
+  }
+  return t('profile.deleteError');
 }

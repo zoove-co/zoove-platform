@@ -29,6 +29,54 @@ export class UsersService {
     return toProfile(row);
   }
 
+  // Delete my account. The row stays (orders, payments) but every personal detail is removed, the sign-in is
+  // ended on all devices, and the same email can start a fresh account later.
+  async deleteAccount(userId: string): Promise<void> {
+    await this.db.tx(async (client) => {
+      const found = await client.query<{ status: string }>(`select status from users where id = $1 for update`, [userId]);
+      if (found.rows[0]?.status !== 'active') throw new DomainError('NOT_FOUND', 'Profile not found.');
+
+      // Staff and trainers have their own accounts and are removed by an admin, never from the customer app.
+      const roles = await client.query(`select 1 from user_roles where user_id = $1 and role in ('admin', 'trainer')`, [userId]);
+      if (roles.rows.length > 0) throw new DomainError('FORBIDDEN', 'This account cannot be deleted here. Please contact support.');
+
+      // Never leave a coach on the way to a customer who no longer exists.
+      const live = await client.query<{ count: string }>(
+        `select count(*) from bookings where user_id = $1 and status in ('matching', 'confirmed', 'rematching')`,
+        [userId],
+      );
+      const liveCount = Number(live.rows[0]?.count ?? 0);
+      if (liveCount > 0) {
+        throw new DomainError('HAS_ACTIVE_BOOKINGS', 'Cancel your upcoming sessions before deleting your account.', { count: liveCount });
+      }
+
+      await client.query(
+        `update users set status = 'deleted', phone_e164 = null, email = null, verified_email = null,
+                first_name = null, last_name = null, full_name = null
+          where id = $1`,
+        [userId],
+      );
+      await client.query(`delete from refresh_tokens where user_id = $1`, [userId]);
+      await client.query(`delete from customer_notifications where user_id = $1`, [userId]);
+      await client.query(`delete from customer_profiles where user_id = $1`, [userId]);
+      // Addresses stay only because past bookings point at them: the details and the pin are wiped.
+      await client.query(
+        `update addresses set label = 'Deleted', line1 = 'Deleted', line2 = null, locality = null, pincode = null,
+                latitude = null, longitude = null, location = null, is_default = false, deleted_at = coalesce(deleted_at, now())
+          where user_id = $1`,
+        [userId],
+      );
+      // The same on every booking snapshot, including the other person's name and number on Loved-one bookings.
+      await client.query(
+        `update bookings set address_label = 'Deleted', address_line = 'Deleted', address_area = null, address_pincode = null,
+                recipient_name = null, recipient_phone = null
+          where user_id = $1`,
+        [userId],
+      );
+      await client.query(`insert into audit_log (actor_user_id, action, entity_type, entity_id) values ($1, 'customer.account_deleted', 'user', $1)`, [userId]);
+    });
+  }
+
   async updateProfile(
     userId: string,
     input: { firstName?: string | undefined; lastName?: string | undefined; email?: string | undefined },

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Patch, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiOperation, ApiTags, type ApiResponseSchemaHost } from '@nestjs/swagger';
 import { z } from 'zod';
 
@@ -37,6 +37,13 @@ export class MeController {
   @ApiOkResponse({ schema: profileSchema })
   get(@CurrentUser() user: AuthUser): Promise<Profile> {
     return this.users.getProfile(user.id);
+  }
+
+  @Delete()
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Delete my account: personal details are wiped and sign-in ends on every device. Refused while a session is upcoming.' })
+  async remove(@CurrentUser() user: AuthUser): Promise<void> {
+    await this.users.deleteAccount(user.id);
   }
 
   @Patch()

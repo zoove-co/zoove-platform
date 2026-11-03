@@ -26,7 +26,7 @@ const KNOWN_CODES: ReadonlySet<string> = new Set<ApiErrorCode>([
   'SLOT_UNAVAILABLE', 'SLOT_CONFLICT', 'NOT_SERVICEABLE', 'ADDRESS_NOT_FOUND', 'ADDRESS_IN_USE', 'NOT_FOUND',
   'CHANGE_WINDOW_CLOSED', 'INVALID_REQUEST', 'INVALID_PHONE', 'OTP_INVALID', 'OTP_LOCKED', 'OTP_RATE_LIMITED',
   'UNAUTHORIZED', 'ACCOUNT_BLOCKED', 'EMAIL_TAKEN', 'EMAIL_FAILED', 'SMS_FAILED', 'IDEMPOTENCY_KEY_REUSED',
-  'TOO_MANY_REQUESTS', 'NOT_AVAILABLE', 'NETWORK', 'INTERNAL',
+  'TOO_MANY_REQUESTS', 'NOT_AVAILABLE', 'NETWORK', 'INTERNAL', 'CONSENT_REQUIRED', 'HAS_ACTIVE_BOOKINGS', 'FORBIDDEN',
 ]);
 
 type TokenReply = { token: string; refreshToken: string; expiresInSeconds: number; isNewUser?: boolean };
@@ -140,7 +140,7 @@ export const httpApi: Api = {
   },
 
   requestEmailOtp: (email) => call<OtpRequestResult>('POST', '/v1/auth/email-otp/request', { email: email.trim(), audience: 'customer' }, false),
-  verifyEmailOtp: async (email, code) => toSession(await call<TokenReply>('POST', '/v1/auth/email-otp/verify', { email: email.trim(), code, audience: 'customer' }, false)),
+  verifyEmailOtp: async (email, code, acceptedTerms) => toSession(await call<TokenReply>('POST', '/v1/auth/email-otp/verify', { email: email.trim(), code, audience: 'customer', acceptedTerms: acceptedTerms === true }, false)),
   requestOtp: (phone) => call<OtpRequestResult>('POST', '/v1/auth/otp/request', { phone }, false),
   verifyOtp: async (phone, code) => toSession(await call<TokenReply>('POST', '/v1/auth/otp/verify', { phone, code, audience: 'customer' }, false)),
 
@@ -153,6 +153,9 @@ export const httpApi: Api = {
 
   getProfile: () => call<Profile>('GET', '/v1/me'),
   updateProfile: (input) => call<Profile>('PATCH', '/v1/me', input),
+  deleteAccount: async () => {
+    await call<unknown>('DELETE', '/v1/me');
+  },
   getHome: () => call<HomeData>('GET', '/v1/home'),
 
   async getService(slug): Promise<ServiceDetail> {

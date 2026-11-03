@@ -548,9 +548,10 @@ export const mockApi: Api = {
     return mockRequestCode(address);
   },
 
-  async verifyEmailOtp(email, code) {
+  async verifyEmailOtp(email, code, acceptedTerms) {
     await wait(500);
     const address = email.trim().toLowerCase();
+    if (!knownPhones.has(address) && !acceptedTerms) throw new ApiError('CONSENT_REQUIRED');
     mockCheckCode(address, code);
     return { session: mockSession(address), isNewUser: startMockSession(address, true) };
   },
@@ -584,6 +585,17 @@ export const mockApi: Api = {
     profile.lastName = input.lastName?.trim() || null;
     profile.email = input.email?.trim() || null;
     return { ...profile };
+  },
+
+  async deleteAccount() {
+    await wait(400);
+    const count = bookingRecords.filter((record) => isActiveStatus(record.status)).length;
+    if (count > 0) throw new ApiError('HAS_ACTIVE_BOOKINGS');
+    if (signedInPhone) {
+      profiles.delete(signedInPhone);
+      knownPhones.delete(signedInPhone);
+    }
+    signedInPhone = null;
   },
 
   async getHome() {
