@@ -1,6 +1,6 @@
 import { formatInr } from '@zoove/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -67,7 +67,7 @@ export default function BookingScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const scrollToEndNext = useRef(false);
 
   const { data: service, isError: serviceFailed, refetch: refetchService } = useService(serviceSlug);

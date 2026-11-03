@@ -1,10 +1,11 @@
 import { Image } from 'expo-image';
 import { useEffect, useRef, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, View, type ImageSourcePropType } from 'react-native';
+import type { ImageSource } from 'expo-image';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 
 import { colors, radius } from '@/theme';
 
-export type Banner = { key: string; image: ImageSourcePropType; label: string; onPress: () => void };
+export type Banner = { key: string; image: ImageSource; label: string; onPress: () => void };
 
 const ADVANCE_MS = 4500;
 

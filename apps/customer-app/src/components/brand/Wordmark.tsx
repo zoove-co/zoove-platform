@@ -1,4 +1,4 @@
-import { Image } from 'react-native';
+import { Image } from 'expo-image';
 
 import { logoImage } from '@/lib/images';
 
@@ -10,8 +10,9 @@ export function Wordmark({ width = 220, tint }: { width?: number; tint?: string 
     <Image
       source={logoImage}
       accessibilityLabel="Zoove"
-      resizeMode="contain"
-      style={{ width, height: width / RATIO, tintColor: tint }}
+      contentFit="contain"
+      tintColor={tint}
+      style={{ width, height: width / RATIO }}
     />
   );
 }

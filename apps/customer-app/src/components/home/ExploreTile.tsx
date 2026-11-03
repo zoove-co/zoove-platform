@@ -1,13 +1,14 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, StyleSheet, type ImageSourcePropType } from 'react-native';
+import type { ImageSource } from 'expo-image';
+import { Pressable, StyleSheet } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { colors, radius, spacing } from '@/theme';
 
 type Props = {
   name: string;
-  imageSource?: ImageSourcePropType;
+  imageSource?: ImageSource;
   onPress: () => void;
 };
 

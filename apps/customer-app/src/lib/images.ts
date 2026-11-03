@@ -1,4 +1,4 @@
-import type { ImageSourcePropType } from 'react-native';
+import type { ImageSource } from 'expo-image';
 
 import bannerBookForYou from '../../assets/zoove/banners/book-for-you.jpg';
 import bannerFlexible from '../../assets/zoove/banners/flexible-scheduling.jpg';
@@ -35,11 +35,11 @@ import serviceZumba from '../../assets/zoove/services/zumba.jpg';
 // resized for mobile. Later, banners and tiles should be served by the admin panel (decision D13);
 // the keys below stay the same, so only this file changes.
 
-export const logoImage: ImageSourcePropType = logo;
-export const demoTrainerImage: ImageSourcePropType = demoTrainerPhoto;
+export const logoImage: ImageSource = logo;
+export const demoTrainerImage: ImageSource = demoTrainerPhoto;
 
 // Keyed by service slug.
-export const serviceImages: Partial<Record<string, ImageSourcePropType>> = {
+export const serviceImages: Partial<Record<string, ImageSource>> = {
   yoga: serviceYoga,
   strength: serviceStrength,
   pilates: servicePilates,
@@ -47,7 +47,7 @@ export const serviceImages: Partial<Record<string, ImageSourcePropType>> = {
 };
 
 // Keyed by format slug (the styles inside a service).
-export const formatImages: Partial<Record<string, ImageSourcePropType>> = {
+export const formatImages: Partial<Record<string, ImageSource>> = {
   'power-yoga': powerYoga,
   'vinyasa-yoga': vinyasaYoga,
   'hatha-yoga': hathaYoga,

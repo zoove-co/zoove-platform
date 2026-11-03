@@ -25,7 +25,7 @@ export default function TabsLayout() {
         options={{
           title: t('tabs.home'),
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={color} />
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={color as string} />
           ),
         }}
       />
@@ -34,7 +34,7 @@ export default function TabsLayout() {
         options={{
           title: t('tabs.streak'),
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'flash' : 'flash-outline'} size={22} color={color} />
+            <Ionicons name={focused ? 'flash' : 'flash-outline'} size={22} color={color as string} />
           ),
         }}
       />
@@ -43,7 +43,7 @@ export default function TabsLayout() {
         options={{
           title: t('tabs.account'),
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'person-circle' : 'person-circle-outline'} size={24} color={color} />
+            <Ionicons name={focused ? 'person-circle' : 'person-circle-outline'} size={24} color={color as string} />
           ),
         }}
       />

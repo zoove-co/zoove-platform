@@ -1,5 +1,5 @@
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,7 +30,7 @@ export default function OtpScreen() {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 30;
   });
   const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<ComponentRef<typeof TextInput>>(null);
 
   // Once the session exists, move on. Doing it here (not right after signIn) lets the router
   // see the new signed-in state before it navigates to a protected screen.
