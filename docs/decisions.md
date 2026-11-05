@@ -135,3 +135,6 @@ Trainers apply through a web page now and through the trainer app later. Both us
 - Packages: reminders 7 days and 1 day before the end, once when it ends with sessions unused (ops emailed). No automatic refund (open question 63).
 
 ## Not decided (waiting on Pratik): see open-questions.md
+
+## Trainer app uses the same application as the Join Zoove page
+Decision: the trainer app (Expo) and apps/trainer-web both use the same /v1/trainer-application and /v1/trainer/jobs endpoints and the same email-code sign-in. Both stay. A trainer can start on one and continue on the other. The app has no status logic of its own.

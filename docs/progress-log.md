@@ -235,3 +235,9 @@ Missing endpoints (the app's mock has them, the API does not):
 - Customer app first build: login, Home, booking flow, orders, account, addresses, notifications, packages.
 - Flutter prototype analysed and compared against our app (`docs/flutter-prototype-comparison.md`).
 - React Native + Expo confirmed as the right choice; updates to JavaScript and images can ship over the air without store review, native changes cannot.
+
+## Trainer mobile app (apps/trainer-app)
+- Expo app for trainers. Same API, database, admin panel and application as the Join Zoove page, so status is identical in both.
+- Signed out: email code sign-in. Not approved: 6-step application wizard with document upload (camera, gallery or PDF), saved step by step, then the pending / changes requested / rejected / on-hold screen. Approved and active: Open jobs, My sessions (address after accepting, Session done, I cannot make it), Profile.
+- The server decides which screen shows (`destinationFor`), the app keeps no status of its own.
+- Not done: push to trainers from the API (email only today), EAS project id and push credentials, Sentry, `?ref=` tracking, trainer account deletion.
