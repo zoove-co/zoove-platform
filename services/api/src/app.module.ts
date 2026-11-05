@@ -14,6 +14,7 @@ import { DiscountsModule } from './discounts/discounts.module';
 import { EmailModule } from './email/email.module';
 import { HealthModule } from './health/health.module';
 import { IdentityModule } from './identity/identity.module';
+import { MaintenanceModule } from './maintenance/maintenance.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PackagesModule } from './packages/packages.module';
@@ -53,6 +54,7 @@ import { TrainersModule } from './trainers/trainers.module';
     TrainersModule,
     TeamModule,
     NotificationsModule,
+    MaintenanceModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

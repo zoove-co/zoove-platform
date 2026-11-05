@@ -4,6 +4,13 @@ import * as Sentry from '@sentry/react-native';
 // With no EXPO_PUBLIC_SENTRY_DSN (local development) nothing is sent.
 const dsn = (process.env.EXPO_PUBLIC_SENTRY_DSN ?? '').trim();
 
+// Even if an error message carries a customer's email or phone by mistake, it is removed before it leaves the phone.
+// (The API has the same function in services/api/src/monitoring/scrub.ts.)
+const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+const PHONE = /(?:\+?91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}\b/g;
+const TOKEN = /\b(?:Bearer\s+)?eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g;
+export const scrubText = (value: string): string => value.replace(TOKEN, '[token]').replace(EMAIL, '[email]').replace(PHONE, '[phone]');
+
 export function initMonitoring(): void {
   if (!dsn) return;
   Sentry.init({
@@ -12,6 +19,12 @@ export function initMonitoring(): void {
     sendDefaultPii: false,
     tracesSampleRate: 0,
     enableAutoSessionTracking: true,
+    beforeSend: (event) => {
+      if (event.message) event.message = scrubText(event.message);
+      for (const v of event.exception?.values ?? []) if (v.value) v.value = scrubText(v.value);
+      for (const b of event.breadcrumbs ?? []) if (b.message) b.message = scrubText(b.message);
+      return event;
+    },
   });
 }
 

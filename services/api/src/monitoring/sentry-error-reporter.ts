@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/node';
 
 import type { ErrorContext, ErrorReporter } from './error-reporter';
+import { scrubEvent } from './scrub';
 
 export type SentrySettings = { dsn: string; environment: string; release?: string };
 
@@ -15,6 +16,7 @@ export function initSentry(settings: SentrySettings): void {
     dataCollection: { userInfo: false, cookies: false, httpHeaders: false, httpBodies: [], urlQueryParams: false },
     // Errors only for now. Performance tracing can be switched on later by setting a sample rate.
     tracesSampleRate: 0,
+    beforeSend: (event) => scrubEvent(event),
   });
 }
 

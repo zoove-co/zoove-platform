@@ -1,6 +1,6 @@
 {
-  "version": "2026-11-05",
-  "updated": "5 November 2026",
+  "version": "2026-11-06",
+  "updated": "6 November 2026",
   "contact": "admin@zoove.co",
   "docs": {
     "terms": {
@@ -17,6 +17,7 @@
           "heading": "2. Your account",
           "body": [
             "You sign in with your email or mobile number and a one-time code. Give us correct details and keep your code private. You are responsible for what happens under your account.",
+            "You must be 18 or older to create an account.",
             "If you book for someone else, you confirm they agree and that the details you give for them are right."
           ]
         },
@@ -106,13 +107,23 @@
         {
           "heading": "Where it is stored",
           "body": [
-            "Your data is stored with our cloud database provider. We keep it only as long as needed to run your account and meet legal obligations."
+            "Your data is stored in a secured cloud database in India. Our application server runs in Singapore, so your data passes through it when you use the app. Some service providers listed below process data outside India.",
+            "We keep data only as long as needed. Sign-in codes are deleted within a day. Expired sign-in sessions are deleted after 30 days. The network address saved with your consent is removed after a year, or when you delete your account. Booking and payment records are kept as long as accounts, disputes and the law require."
+          ]
+        },
+        {
+          "heading": "Service providers",
+          "body": [
+            "We use these providers to run Zoove: Supabase (database and file storage), Render (our server), Resend (email), MSG91 (SMS) and Sentry (crash reports, which are cleaned of names, emails and phone numbers before they are sent).",
+            "They handle data only to provide their service to us."
           ]
         },
         {
           "heading": "Your choices",
           "body": [
-            "You can edit your details in the app, remove optional health details, and manage your addresses. To ask for a copy of your data or to delete your account, write to admin@zoove.co."
+            "You can edit your details in the app, remove optional health details, and manage your addresses.",
+            "You can delete your account in the app (cancel upcoming sessions first). Your name, phone, email, addresses and health details are then removed; we keep only the booking and payment records the law and accounting require, without your personal details.",
+            "To ask for a copy of your data or to correct it, write to admin@zoove.co."
           ]
         },
         {
@@ -122,9 +133,16 @@
           ]
         },
         {
-          "heading": "Changes and contact",
+          "heading": "If something goes wrong",
           "body": [
-            "If this policy changes, the app will ask you to agree again. Questions or complaints: admin@zoove.co. We reply within 24 hours."
+            "If a security incident affects your personal data, we will tell you and the authorities as the law requires."
+          ]
+        },
+        {
+          "heading": "Changes, contact and complaints",
+          "body": [
+            "If this policy changes, the app will ask you to agree again.",
+            "Questions, requests or complaints about your data: admin@zoove.co. We reply within 24 hours."
           ]
         }
       ]

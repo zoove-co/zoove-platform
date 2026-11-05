@@ -5,6 +5,7 @@ import { AllExceptionsFilter } from '../src/common/all-exceptions.filter';
 import { DomainError } from '../src/common/domain-error';
 import { parseEnv } from '../src/config/env';
 import type { ErrorReporter } from '../src/monitoring/error-reporter';
+import { scrubEvent, scrubText } from '../src/monitoring/scrub';
 
 function run(exception: unknown) {
   const captured: unknown[] = [];
@@ -34,5 +35,18 @@ describe('error monitoring', () => {
     expect(parseEnv({ ...base, SENTRY_DSN: '' }).SENTRY_DSN).toBeUndefined();
     expect(parseEnv({ ...base, SENTRY_DSN: 'https://k@o1.ingest.sentry.io/1' }).SENTRY_DSN).toContain('sentry.io');
     expect(() => parseEnv({ ...base, SENTRY_DSN: 'not a url' })).toThrow();
+  });
+});
+
+describe('report scrubbing', () => {
+  it('removes emails, phone numbers and tokens from error text', () => {
+    expect(scrubText('failed for riya@example.com and +91 98765 43210 / 9876543210')).toBe('failed for [email] and [phone] / [phone]');
+    expect(scrubText('Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcdefghijklmnop')).toBe('[token]');
+    expect(scrubText('Booking 8f2c failed')).toBe('Booking 8f2c failed');
+  });
+
+  it('cleans every text field of a report', () => {
+    const event = scrubEvent({ message: 'x a@b.co', exception: { values: [{ value: 'call 9876543210' }] }, breadcrumbs: [{ message: 'user a@b.co' }] });
+    expect(JSON.stringify(event)).not.toMatch(/a@b\.co|9876543210/);
   });
 });

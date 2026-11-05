@@ -57,6 +57,8 @@ export class UsersService {
         [userId],
       );
       await client.query(`delete from refresh_tokens where user_id = $1`, [userId]);
+      // The consent record stays as proof; the network address recorded with it goes.
+      await client.query(`update consents set ip = null where user_id = $1`, [userId]);
       await client.query(`delete from customer_notifications where user_id = $1`, [userId]);
       await client.query(`delete from customer_profiles where user_id = $1`, [userId]);
       await client.query(`delete from referral_codes where user_id = $1`, [userId]);

@@ -47,8 +47,8 @@ suite('consent at sign-in and deleting an account', () => {
     expect(ok.body.isNewUser).toBe(true);
     const rows = await pool.query(`select kind, version, accepted from consents order by kind`);
     expect(rows.rows).toEqual([
-      { kind: 'privacy', version: '2026-11-05', accepted: true },
-      { kind: 'terms', version: '2026-11-05', accepted: true },
+      { kind: 'privacy', version: '2026-11-06', accepted: true },
+      { kind: 'terms', version: '2026-11-06', accepted: true },
     ]);
   });
 
