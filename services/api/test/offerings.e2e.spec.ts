@@ -2,7 +2,19 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Pool } from 'pg';
 import request from 'supertest';
 
+import { EmailProvider, type EmailMessage } from '../src/email/email.provider';
+import { OutboxWorkerService } from '../src/notifications/outbox-worker.service';
 import { CODE, signIn, startApp } from './helpers';
+
+class MemoryEmail extends EmailProvider {
+  sent: EmailMessage[] = [];
+  send(message: EmailMessage): Promise<void> {
+    this.sent.push(message);
+    return Promise.resolve();
+  }
+}
+const mail = new MemoryEmail();
+process.env.OPS_NOTIFY_EMAILS = 'ops@zoove.test';
 
 const url = process.env.TEST_DATABASE_URL;
 const suite = url ? describe : describe.skip;
@@ -45,7 +57,7 @@ suite('offerings, rewards and trainer cancellation', () => {
   }
 
   beforeAll(async () => {
-    ({ app, pool } = await startApp(url as string));
+    ({ app, pool } = await startApp(url as string, (builder) => builder.overrideProvider(EmailProvider).useValue(mail)));
     await pool.query(`update clusters set status = 'active', activated_at = now() where slug = 'bandra-khar'`);
   });
   afterAll(async () => {
@@ -245,6 +257,35 @@ suite('offerings, rewards and trainer cancellation', () => {
       expect(again).toMatchObject({ status: 'confirmed', trainerName: 'Bela Rao' });
       expect((await http().get('/v1/notifications').set(as(me)).expect(200)).body.some((x: { title: string }) => x.title === 'Coach assigned')).toBe(true);
       expect((await http().get('/v1/admin/sessions/summary').set(as(owner)).expect(200)).body).toEqual({ needsTrainer: 0, trainerCancelled: 0 });
+    });
+
+    it('emails ops with the session code and a link when a trainer cancels', async () => {
+      const { booking } = await confirmed();
+      mail.sent = [];
+      await http().post(`/v1/admin/sessions/${booking.id}/trainer-cancel`).set(as(owner)).send({ reason: 'Family emergency' }).expect(200);
+      const worker = app.get(OutboxWorkerService);
+      for (let i = 0; i < 3; i += 1) await worker.runOnce();
+      const note = mail.sent.find((m) => m.to === 'ops@zoove.test');
+      expect(note?.subject).toContain(booking.sessionCode);
+      expect(note?.text).toContain('Family emergency');
+      expect(note?.text).toContain(`/sessions?code=${booking.sessionCode}`);
+    });
+
+    it('moving a confirmed session to a time its trainer is busy sends it back to finding a coach', async () => {
+      const address = await addressFor(me);
+      const other = await addressFor(friend);
+      const a = (await book(me, address, 3).expect(201)).body;
+      const b = (await book(friend, other, 4).expect(201)).body;
+      const trainer = await makeTrainer('Asha');
+      await http().post(`/v1/admin/sessions/${a.id}/assign`).set(as(owner)).send({ trainerId: trainer }).expect(200);
+      await http().post(`/v1/admin/sessions/${b.id}/assign`).set(as(owner)).send({ trainerId: trainer }).expect(200);
+      // Free slot: the trainer stays.
+      expect((await http().post(`/v1/bookings/${a.id}/reschedule`).set(as(me)).send({ startsAt: slot(6) }).expect(201)).body).toMatchObject({ status: 'confirmed' });
+      // Busy slot (the trainer's other session): back to finding a coach, and the customer is told.
+      const moved = (await http().post(`/v1/bookings/${a.id}/reschedule`).set(as(me)).send({ startsAt: slot(4) }).expect(201)).body;
+      expect(moved).toMatchObject({ status: 'rematching', coach: null, trainerCancelled: false });
+      expect((await pool.query(`select coach_id from bookings where id = $1`, [a.id])).rows[0].coach_id).toBeNull();
+      expect((await http().get('/v1/notifications').set(as(me)).expect(200)).body.some((x: { body: string }) => x.body.includes('not free then'))).toBe(true);
     });
 
     it('while finding a trainer the customer can wait, reschedule or cancel', async () => {

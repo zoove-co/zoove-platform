@@ -275,10 +275,15 @@ export class BookingsService {
           throw new DomainError('CHANGE_WINDOW_CLOSED', 'This session can no longer be changed.');
         }
         const startsAt = this.assertBookableSlot(startsAtInput);
-        await client.query(`update bookings set starts_at = $2 where id = $1`, [id, startsAt]);
-        await this.record(client, id, 'rescheduled', 'customer', { from: row.starts_at?.toISOString() ?? null, to: startsAt.toISOString() });
+        // A trainer already on this session may be busy at the new time: then the session goes back to "finding a coach".
+        const clash = row.status === 'confirmed' && row.coach_id
+          ? (await client.query(`select 1 from bookings where coach_id = $1 and status = 'confirmed' and starts_at = $2 and id <> $3 limit 1`, [row.coach_id, startsAt, id])).rows[0]
+          : null;
+        if (clash) await client.query(`update bookings set starts_at = $2, status = 'rematching', coach_id = null where id = $1`, [id, startsAt]);
+        else await client.query(`update bookings set starts_at = $2 where id = $1`, [id, startsAt]);
+        await this.record(client, id, 'rescheduled', 'customer', { from: row.starts_at?.toISOString() ?? null, to: startsAt.toISOString(), coachFreed: Boolean(clash) });
         await this.publish(client, id, 'booking.rescheduled', { bookingId: id, userId, to: startsAt.toISOString() });
-        await notifyCustomer(client, userId, 'Session rescheduled', `Your ${row.service_name} session is now ${formatWhen(startsAt)}.`, id);
+        await notifyCustomer(client, userId, 'Session rescheduled', `Your ${row.service_name} session is now ${formatWhen(startsAt)}.${clash ? ' Your coach is not free then, so we are finding another coach and will tell you as soon as one is assigned.' : ''}`, id);
       });
     } catch (error) {
       if (isUnique(error, 'bookings_no_double_booking')) throw new DomainError('SLOT_CONFLICT', 'You already have a session at that time.');
