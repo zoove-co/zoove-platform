@@ -5,9 +5,11 @@ import { AppText } from '@/components/ui/AppText';
 import { Banner } from '@/components/ui/Banner';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Chip } from '@/components/ui/Chip';
 import { Screen } from '@/components/ui/Screen';
 import { TextField } from '@/components/ui/TextField';
 import { cancelJob, completeJob, errorMessage, type JobBoard } from '@/lib/api';
+import { SessionNote } from '@/features/jobs/SessionNote';
 import { useJobs, useSetBoard, whoFor } from '@/lib/useJobs';
 import { colors } from '@/theme';
 
@@ -20,6 +22,7 @@ export default function Sessions() {
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [showDone, setShowDone] = useState(false);
 
   async function run(id: string, action: () => Promise<JobBoard>, done: string) {
     setBusy(id);
@@ -46,23 +49,40 @@ export default function Sessions() {
   }
 
   const mine = jobs.data?.mine ?? [];
+  const done = jobs.data?.done ?? [];
   return (
     <Screen refreshing={jobs.isRefetching} onRefresh={() => void jobs.refetch()}>
       <AppText variant="screenTitle">My sessions</AppText>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <Chip label="Upcoming" selected={!showDone} onPress={() => setShowDone(false)} />
+        <Chip label={`Completed${jobs.data?.doneCount ? ` (${jobs.data.doneCount})` : ''}`} selected={showDone} onPress={() => setShowDone(true)} />
+      </View>
       {error ? <Banner tone="bad">{error}</Banner> : null}
       {note && !error ? <Banner tone="good">{note}</Banner> : null}
       {jobs.isError && !jobs.data ? <Banner tone="bad">{errorMessage(jobs.error)}</Banner> : null}
-      {jobs.data && mine.length === 0 ? (
+      {!showDone && jobs.data && mine.length === 0 ? (
         <Card soft>
           <AppText variant="body" color={colors.muted}>No sessions yet. Pick one from Open jobs, or our team may assign you one and email you.</AppText>
         </Card>
       ) : null}
-      {mine.map((job) => (
+      {showDone && jobs.data && done.length === 0 ? (
+        <Card soft><AppText variant="body" color={colors.muted}>Sessions you finish will appear here.</AppText></Card>
+      ) : null}
+      {showDone ? done.map((job) => (
+        <Card key={job.id}>
+          <AppText variant="heading">{job.whenLabel}</AppText>
+          <AppText variant="body">{`${job.serviceName} · ${job.formatName} · ${whoFor(job)}`}</AppText>
+          <AppText variant="caption" color={colors.muted}>{`${job.customerFirstName} · Session ${job.sessionCode}`}</AppText>
+          <SessionNote id={job.id} note={job.note} />
+        </Card>
+      )) : mine.map((job) => (
         <Card key={job.id}>
           <AppText variant="heading">{job.whenLabel}</AppText>
           <AppText variant="body">{`${job.serviceName} · ${job.formatName} · ${whoFor(job)}`}</AppText>
           <AppText variant="body" color={colors.muted}>{`${job.customerFirstName} · ${job.addressLabel}: ${job.addressLine}${job.pincode ? `, ${job.pincode}` : ''}`}</AppText>
           <AppText variant="caption" color={colors.muted}>{`Session ${job.sessionCode}`}</AppText>
+
+          <SessionNote id={job.id} note={job.note} />
 
           {job.canComplete ? (
             <View style={{ marginTop: 10 }}>

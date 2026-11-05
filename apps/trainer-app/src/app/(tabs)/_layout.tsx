@@ -33,6 +33,7 @@ export default function TabsLayout() {
         tabBarStyle: { backgroundColor: colors.white, borderTopColor: colors.line },
         sceneStyle: { backgroundColor: colors.background },
       }}>
+      <Tabs.Screen name="today" options={{ title: 'Today', tabBarIcon: ({ color, size }) => <Icon name="home-outline" color={String(color)} size={size} /> }} />
       <Tabs.Screen name="jobs" options={{ title: 'Open jobs', ...(openCount > 0 ? { tabBarBadge: openCount } : {}), tabBarIcon: ({ color, size }) => <Icon name="flash-outline" color={String(color)} size={size} /> }} />
       <Tabs.Screen name="sessions" options={{ title: 'My sessions', tabBarIcon: ({ color, size }) => <Icon name="calendar-outline" color={String(color)} size={size} /> }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: ({ color, size }) => <Icon name="person-outline" color={String(color)} size={size} /> }} />

@@ -6,6 +6,7 @@ import { DatabaseService } from '../database/database.service';
 import { EmailProvider, type EmailMessage } from '../email/email.provider';
 import { ERROR_REPORTER, type ErrorReporter } from '../monitoring/error-reporter';
 import { referralRewardEmail } from './customer-emails';
+import { ExpoPushChannel } from './channels/expo-push.channel';
 import { CustomerMessageService } from './customer-message.service';
 import { jobAssignedEmail, jobAvailableEmail, jobCancelledEmail, jobMovedEmail } from './trainer-job-emails';
 import { packageExpiredOpsEmail, partyRequestedEmail, sessionNotClosedEmail, sessionOverdueEmail, sessionUnfilledEmail, teamInviteEmail, trainerCancelledEmail } from './team-emails';
@@ -31,6 +32,7 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly db: DatabaseService,
     private readonly email: EmailProvider,
     private readonly customerMessages: CustomerMessageService,
+    private readonly push: ExpoPushChannel,
     @Inject(APP_CONFIG) private readonly config: Env,
     @Inject(ERROR_REPORTER) private readonly reporter: ErrorReporter,
   ) {}
@@ -138,10 +140,14 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
         `select coalesce(u.verified_email, u.email, ta.email) as email, ta.first_name
            from trainers t join users u on u.id = t.user_id join trainer_applications ta on ta.id = t.application_id where t.user_id = $1 and t.status = 'active'`, [p.trainerId]);
       const trainer = who.rows[0];
-      if (!trainer?.email) return; // no email on file or no longer active: nothing to send
+      if (!trainer) return; // no longer an active trainer: nothing to send
       const ctx = { firstName: trainer.first_name ?? 'there', sessionCode: p.sessionCode ?? '', serviceName: p.serviceName ?? 'a', when: p.when ?? '', area: p.area ?? '' };
       const build = { 'trainer.job_assigned': jobAssignedEmail, 'trainer.job_moved': jobMovedEmail, 'trainer.job_available': jobAvailableEmail }[event.event_type];
-      await this.email.send(build ? build(trainer.email, ctx, this.config.TRAINER_SITE_URL) : jobCancelledEmail(trainer.email, { ...ctx, ...(p.reason ? { reason: p.reason } : {}) }, this.config.TRAINER_SITE_URL));
+      if (trainer.email) await this.email.send(build ? build(trainer.email, ctx, this.config.TRAINER_SITE_URL) : jobCancelledEmail(trainer.email, { ...ctx, ...(p.reason ? { reason: p.reason } : {}) }, this.config.TRAINER_SITE_URL));
+      // The phone alert goes after the email, so a retry of a failed email never buzzes the phone twice. It is best effort.
+      const detail = [ctx.serviceName, ctx.when, ctx.area].filter(Boolean).join(' · ');
+      const title = { 'trainer.job_available': 'New job near you', 'trainer.job_assigned': 'A session was assigned to you', 'trainer.job_moved': 'Session time changed', 'trainer.job_cancelled': 'A session was cancelled' }[event.event_type] ?? 'Zoove';
+      try { await this.push.deliver({ userId: p.trainerId, title, body: detail || 'Open the Zoove Trainer app', bookingId: p.bookingId ?? null }); } catch (error) { this.logger.warn(`Trainer push failed: ${error instanceof Error ? error.message : String(error)}`); }
       return;
     }
     if (event.event_type === 'referral.reward_granted') {

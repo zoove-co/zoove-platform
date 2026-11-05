@@ -13,12 +13,14 @@ export type OpenJob = {
   participant: string; groupSize: number | null; area: string | null;
 };
 // A job the trainer already holds. The full address and the customer's first name are shown only here, never on an open job.
-export type MyJob = OpenJob & { customerFirstName: string; addressLabel: string; addressLine: string; pincode: string | null; canCancel: boolean; canComplete: boolean };
-export type JobBoard = { open: OpenJob[]; mine: MyJob[] };
+export type MyJob = OpenJob & { customerFirstName: string; addressLabel: string; addressLine: string; pincode: string | null; canCancel: boolean; canComplete: boolean; note: string };
+// A session this trainer finished, newest first (the last 30).
+export type DoneJob = OpenJob & { customerFirstName: string; completedAt: string | null; note: string };
+export type JobBoard = { open: OpenJob[]; mine: MyJob[]; done: DoneJob[]; doneCount: number };
 
 type Row = {
   id: string; mode: string; participant: string; group_size: number | null; starts_at: Date | null; address_area: string | null; address_pincode: string | null;
-  address_label: string; address_line: string; service_name: string; format_name: string; full_name: string | null;
+  address_label: string; address_line: string; service_name: string; format_name: string; full_name: string | null; note?: string | null; completed_at?: Date | null;
 };
 const COLS = `b.id, b.mode, b.participant, b.group_size, b.starts_at, b.address_area, b.address_pincode, b.address_label, b.address_line, s.name as service_name, f.name as format_name, u.full_name`;
 const FROM = `from bookings b join services s on s.id = b.service_id join service_formats f on f.id = b.format_id join users u on u.id = b.user_id`;
@@ -42,7 +44,7 @@ export class TrainerJobsService {
   async board(userId: string): Promise<JobBoard> {
     await this.assertActiveTrainer(userId);
     const now = new Date();
-    const [open, mine] = await Promise.all([
+    const [open, mine, done, doneCount] = await Promise.all([
       // Open = no trainer yet, not started, this trainer has not dropped it, and this trainer is not busy at that time.
       this.db.query<Row>(
         `select ${COLS} ${FROM}
@@ -52,17 +54,24 @@ export class TrainerJobsService {
             and (b.starts_at is null or not exists (select 1 from bookings x where x.coach_id = $1::uuid and x.status = 'confirmed' and x.starts_at = b.starts_at))
           order by b.starts_at nulls first, b.created_at limit 100`, [userId]),
       this.db.query<Row>(
-        `select ${COLS} ${FROM}
+        `select ${COLS}, n.note ${FROM} left join trainer_session_notes n on n.booking_id = b.id and n.trainer_id = $1::uuid
           where b.coach_id = $1::uuid and b.status = 'confirmed' and (b.starts_at is null or b.starts_at >= now() - interval '7 days')
           order by b.starts_at nulls first, b.created_at limit 100`, [userId]),
+      this.db.query<Row>(
+        `select ${COLS}, n.note, b.completed_at ${FROM} left join trainer_session_notes n on n.booking_id = b.id and n.trainer_id = $1::uuid
+          where b.coach_id = $1::uuid and b.status = 'completed'
+          order by b.completed_at desc nulls last, b.starts_at desc nulls last limit 30`, [userId]),
+      this.db.query<{ n: string }>(`select count(*)::text as n from bookings where coach_id = $1::uuid and status = 'completed'`, [userId]),
     ]);
     return {
       open: open.rows.map(toOpen),
       mine: mine.rows.map((r) => ({
         ...toOpen(r), customerFirstName: r.full_name?.trim().split(/\s+/)[0] || 'Customer', addressLabel: r.address_label, addressLine: r.address_line, pincode: r.address_pincode,
         canCancel: r.starts_at === null || r.starts_at.getTime() > now.getTime(),
-        canComplete: r.starts_at === null || r.starts_at.getTime() <= now.getTime(),
+        canComplete: r.starts_at === null || r.starts_at.getTime() <= now.getTime(), note: r.note ?? '',
       })),
+      done: done.rows.map((r) => ({ ...toOpen(r), customerFirstName: r.full_name?.trim().split(/\s+/)[0] || 'Customer', completedAt: r.completed_at ? r.completed_at.toISOString() : null, note: r.note ?? '' })),
+      doneCount: Number(doneCount.rows[0]?.n ?? 0),
     };
   }
 
@@ -111,6 +120,16 @@ export class TrainerJobsService {
   async complete(userId: string, id: string): Promise<JobBoard> {
     await this.assertActiveTrainer(userId);
     await this.sessions.complete(userId, 'trainer', id, userId);
+    return this.board(userId);
+  }
+
+  // A private note on a session this trainer holds or finished. An empty note removes it.
+  async saveNote(userId: string, id: string, note: string): Promise<JobBoard> {
+    await this.assertActiveTrainer(userId);
+    const own = await this.db.query(`select 1 from bookings where id = $1 and coach_id = $2 and status in ('confirmed', 'completed')`, [id, userId]);
+    if (!own.rows[0]) throw new DomainError('NOT_FOUND', 'We could not find that session.');
+    if (note === '') await this.db.query(`delete from trainer_session_notes where booking_id = $1 and trainer_id = $2`, [id, userId]);
+    else await this.db.query(`insert into trainer_session_notes (booking_id, trainer_id, note) values ($1, $2, $3) on conflict (booking_id, trainer_id) do update set note = excluded.note, updated_at = now()`, [id, userId, note]);
     return this.board(userId);
   }
 }

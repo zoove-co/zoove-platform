@@ -73,7 +73,7 @@ suite('trainer jobs: who is free, assigning, open jobs, accepting and cancelling
   };
   const assign = (id: string, trainerId: string) => http().post(`/v1/admin/sessions/${id}/assign`).set(as(owner)).send({ trainerId });
   const available = async (id: string) => (await http().get(`/v1/admin/sessions/${id}/available-trainers`).set(as(owner)).expect(200)).body as { id: string; name: string; sameDay: number }[];
-  const board = async (t: string) => (await dispatch(), await http().get('/v1/trainer/jobs').set(as(t)).expect(200)).body as { open: { id: string }[]; mine: { id: string; addressLine: string; customerFirstName: string; canCancel: boolean }[] };
+  const board = async (t: string) => (await dispatch(), await http().get('/v1/trainer/jobs').set(as(t)).expect(200)).body as { open: { id: string }[]; mine: { id: string; addressLine: string; customerFirstName: string; canCancel: boolean; note: string }[]; done: { id: string; note: string }[]; doneCount: number };
 
   beforeAll(async () => {
     ({ app, pool } = await startApp(url as string, (builder) => builder.overrideProvider(EmailProvider).useValue(mail)));
@@ -244,6 +244,23 @@ suite('trainer jobs: who is free, assigning, open jobs, accepting and cancelling
       await pool.query(`update bookings set starts_at = now() - interval '5 minutes' where id = $1`, [id]);
       await http().post(`/v1/trainer/jobs/${id}/cancel`).set(as(t1)).send({ reason: 'Too late now' }).expect(409);
       expect((await pool.query(`select status from bookings where id = $1`, [id])).rows[0].status).toBe('confirmed');
+    });
+
+    it('keeps a private note per session and lists finished sessions with their note', async () => {
+      const id = await bookingId(me, await addressFor(me), slot(30));
+      await assign(id, t1Id).expect(200);
+      const noted = (await http().put(`/v1/trainer/jobs/${id}/note`).set(as(t1)).send({ note: '  Bring a mat next time  ' }).expect(200)).body as Awaited<ReturnType<typeof board>>;
+      expect(noted.mine.find((j) => j.id === id)?.note).toBe('Bring a mat next time');
+      await http().put(`/v1/trainer/jobs/${id}/note`).set(as(t2)).send({ note: 'Not mine' }).expect(404); // only the trainer who holds it
+      await pool.query(`update bookings set starts_at = now() - interval '2 hours' where id = $1`, [id]);
+      const before = (await board(t1)).doneCount;
+      const done = (await http().post(`/v1/trainer/jobs/${id}/complete`).set(as(t1)).expect(200)).body as Awaited<ReturnType<typeof board>>;
+      expect(done.mine.find((j) => j.id === id)).toBeUndefined();
+      expect(done.done[0]).toMatchObject({ id, note: 'Bring a mat next time' });
+      expect(done.doneCount).toBe(before + 1);
+      expect((await board(t2)).done.some((j) => j.id === id)).toBe(false);
+      const cleared = (await http().put(`/v1/trainer/jobs/${id}/note`).set(as(t1)).send({ note: '' }).expect(200)).body as Awaited<ReturnType<typeof board>>;
+      expect(cleared.done[0]?.note).toBe('');
     });
   });
 });

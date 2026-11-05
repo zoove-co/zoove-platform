@@ -211,8 +211,9 @@ export async function listServices(): Promise<Service[]> {
 
 // ---- Jobs: open sessions nobody has taken (first to accept gets it) and the trainer's own sessions ----
 export type OpenJob = { id: string; sessionCode: string; serviceName: string; formatName: string; startsAt: string | null; whenLabel: string; participant: string; groupSize: number | null; area: string | null };
-export type MyJob = OpenJob & { customerFirstName: string; addressLabel: string; addressLine: string; pincode: string | null; canCancel: boolean; canComplete: boolean };
-export type JobBoard = { open: OpenJob[]; mine: MyJob[] };
+export type MyJob = OpenJob & { customerFirstName: string; addressLabel: string; addressLine: string; pincode: string | null; canCancel: boolean; canComplete: boolean; note: string };
+export type DoneJob = OpenJob & { customerFirstName: string; completedAt: string | null; note: string };
+export type JobBoard = { open: OpenJob[]; mine: MyJob[]; done: DoneJob[]; doneCount: number };
 export const getJobs = () => call<JobBoard>('/v1/trainer/jobs');
 export const acceptJob = (id: string) => call<JobBoard>(`/v1/trainer/jobs/${id}/accept`, { method: 'POST', json: {} });
 export const completeJob = (id: string) => call<JobBoard>(`/v1/trainer/jobs/${id}/complete`, { method: 'POST', json: {} });
@@ -223,3 +224,4 @@ export const registerDevice = (token: string, platform: 'ios' | 'android') => ca
 export const removeDevice = (token: string) => call<void>('/v1/me/devices', { method: 'DELETE', json: { token } });
 
 export const errorMessage = (err: unknown): string => (err instanceof ApiError ? err.message : GENERIC_MESSAGE);
+export const saveNote = (id: string, note: string) => call<JobBoard>(`/v1/trainer/jobs/${id}/note`, { method: 'PUT', json: { note } });

@@ -241,3 +241,9 @@ Missing endpoints (the app's mock has them, the API does not):
 - Signed out: email code sign-in. Not approved: 6-step application wizard with document upload (camera, gallery or PDF), saved step by step, then the pending / changes requested / rejected / on-hold screen. Approved and active: Open jobs, My sessions (address after accepting, Session done, I cannot make it), Profile.
 - The server decides which screen shows (`destinationFor`), the app keeps no status of its own.
 - Not done: push to trainers from the API (email only today), EAS project id and push credentials, Sentry, `?ref=` tracking, trainer account deletion.
+
+## Trainer app: Today, history, notes, phone alerts
+- Trainer app now has Today, Open jobs, My sessions (Upcoming / Completed), Profile.
+- API: job board also returns the trainer's last 30 completed sessions and a total count; private per-session trainer notes (`PUT /v1/trainer/jobs/:id/note`, migration 0023 `trainer_session_notes`).
+- Trainer job emails are now followed by a best-effort phone push (new job, assigned, moved, cancelled) through the same Expo push channel as customers.
+- Ideas taken from Pratik's SwiftUI prototype (Today, Completed, notes). Not built, needs a decision: earnings and payout (trainer pay model), client list and goals (what a trainer may see), chat, trainer-set availability and hours (no availability rules exist yet, only a no-clash check).

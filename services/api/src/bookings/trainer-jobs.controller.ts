@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Put, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 
@@ -7,6 +7,7 @@ import { AuthGuard, CurrentUser, type AuthUser } from '../identity/auth.guard';
 import { TrainerJobsService } from './trainer-jobs.service';
 
 const idSchema = z.uuid();
+const noteSchema = z.object({ note: z.string().trim().max(2000) });
 const cancelSchema = z.object({ reason: z.string().trim().min(3).max(300) });
 
 // For signed-in trainers only (the service refuses anyone who is not an active trainer).
@@ -37,4 +38,8 @@ export class TrainerJobsController {
   @HttpCode(200)
   @ApiOperation({ summary: 'The session happened: mark it done' })
   complete(@CurrentUser() user: AuthUser, @Param('id', new ZodValidationPipe(idSchema)) id: string) { return this.jobs.complete(user.id, id); }
+
+  @Put(':id/note')
+  @ApiOperation({ summary: 'My private note on a session I hold or finished (empty text removes it)' })
+  note(@CurrentUser() user: AuthUser, @Param('id', new ZodValidationPipe(idSchema)) id: string, @Body(new ZodValidationPipe(noteSchema)) body: z.infer<typeof noteSchema>) { return this.jobs.saveNote(user.id, id, body.note); }
 }
