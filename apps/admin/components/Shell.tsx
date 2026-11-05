@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
+import { sessionSummary } from '@/lib/api';
+
 import { can, useMe } from './me';
 import { Icons, Wordmark, avatarTone, initials } from './ui';
 
@@ -13,8 +15,6 @@ const THEME_KEY = 'zoove.admin.theme';
 // Planned sections. They are shown so the team can see where the panel is going; none of them open yet.
 const SOON: [string, ReactNode][] = [
   ['Customers', Icons.customers],
-  ['Sessions', Icons.sessions],
-  ['Offerings', Icons.card],
   ['Complaints', Icons.complaints],
 ];
 
@@ -103,6 +103,21 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
   const onDiscounts = path.startsWith('/discounts');
   const onParties = path.startsWith('/parties');
   const onPackages = path.startsWith('/packages');
+  const onSessions = path.startsWith('/sessions');
+  const onOfferings = path.startsWith('/offerings');
+  const onRewards = path.startsWith('/rewards');
+  const other = onTeam || onCalc || onDiscounts || onParties || onPackages || onSessions || onOfferings || onRewards;
+  // Sessions waiting for a trainer, so a cancellation is noticed without opening the page.
+  const [waiting, setWaiting] = useState(0);
+  const canSessions = can(me, 'sessions.manage');
+  useEffect(() => {
+    if (!canSessions || me === null) return;
+    let live = true;
+    const tick = () => sessionSummary().then((s) => { if (live) setWaiting(s.needsTrainer); }).catch(() => undefined);
+    void tick();
+    const timer = setInterval(() => void tick(), 60_000);
+    return () => { live = false; clearInterval(timer); };
+  }, [canSessions, me]);
   return (
     <div className="app">
       <aside className="side">
@@ -112,7 +127,7 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
         </Link>
         <nav className="nav" aria-label="Main">
           {can(me, 'trainers.view') ? (
-            <Link href="/" aria-current={onTeam || onCalc || onDiscounts || onParties || onPackages ? undefined : 'page'}>
+            <Link href="/" aria-current={other ? undefined : 'page'}>
               {Icons.users}
               Trainers
               {pending ? <span className="badge">{pending}</span> : null}
@@ -125,6 +140,19 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
               <span className="soontag">Soon</span>
             </span>
           ))}
+          {canSessions ? (
+            <Link href="/sessions" aria-current={onSessions ? 'page' : undefined}>
+              {Icons.sessions}
+              Sessions
+              {waiting ? <span className="badge">{waiting}</span> : null}
+            </Link>
+          ) : null}
+          {can(me, 'catalog.manage') ? (
+            <Link href="/offerings" aria-current={onOfferings ? 'page' : undefined}>
+              {Icons.card}
+              Offerings
+            </Link>
+          ) : null}
           {can(me, 'parties.manage') ? (
             <Link href="/parties" aria-current={onParties ? 'page' : undefined}>
               {Icons.sessions}
@@ -135,6 +163,12 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
             <Link href="/packages" aria-current={onPackages ? 'page' : undefined}>
               {Icons.card}
               Packages
+            </Link>
+          ) : null}
+          {can(me, 'rewards.manage') ? (
+            <Link href="/rewards" aria-current={onRewards ? 'page' : undefined}>
+              {Icons.gift}
+              Rewards
             </Link>
           ) : null}
           {can(me, 'discounts.manage') ? (

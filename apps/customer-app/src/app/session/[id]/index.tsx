@@ -112,6 +112,7 @@ export default function SessionDetailScreen() {
             <DetailRow icon="calendar-outline" text={booking.whenLabel} />
             {booking.groupSize ? <DetailRow icon="people-outline" text={t('booking.groupSizeValue', { count: booking.groupSize })} /> : null}
             {booking.recipient ? <DetailRow icon="person-add-outline" text={`${booking.recipient.name} · ${booking.recipient.phone}`} /> : null}
+            <DetailRow icon="pricetag-outline" text={t('session.code', { code: booking.sessionCode })} />
           </View>
         </View>
 
@@ -122,6 +123,17 @@ export default function SessionDetailScreen() {
               <AppText variant="bodyStrong">{t('session.rematchTitle')}</AppText>
               <AppText variant="caption" color={colors.muted}>
                 {t('session.rematchBody')}
+              </AppText>
+              <AppText variant="caption" color={colors.muted}>
+                {t('session.rematchWait')}
+              </AppText>
+              {canReschedule ? (
+                <AppText variant="caption" color={colors.muted}>
+                  {t('session.rematchMove')}
+                </AppText>
+              ) : null}
+              <AppText variant="caption" color={colors.muted}>
+                {t('session.rematchCancel')}
               </AppText>
             </View>
           </View>

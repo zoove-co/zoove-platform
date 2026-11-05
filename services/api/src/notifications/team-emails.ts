@@ -29,3 +29,17 @@ export function partyRequestedEmail(to: string, ctx: { name: string; occasion: s
   );
   return { to, subject: `New party request: ${ctx.occasion}, ${ctx.guests} guests`, html, text };
 }
+
+export function trainerCancelledEmail(to: string, ctx: { sessionCode: string; serviceName: string; when: string; reason: string }, adminUrl: string): EmailMessage {
+  const { html, text } = layout(
+    `A trainer cancelled session ${ctx.sessionCode}`,
+    [
+      `The trainer cancelled the ${ctx.serviceName} session ${ctx.sessionCode} planned for ${ctx.when}.`,
+      `Reason given: ${ctx.reason}`,
+      'The customer has been told we are finding another trainer. Open the session, check the details and assign a new trainer.',
+    ],
+    { label: 'Open the session', url: adminUrl },
+    'You received this because you are on the Zoove ops notification list.',
+  );
+  return { to, subject: `Trainer cancelled: session ${ctx.sessionCode} needs a new trainer`, html, text };
+}

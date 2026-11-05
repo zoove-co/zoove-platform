@@ -193,6 +193,10 @@ export interface Booking {
   discountPaise: Paise;
   discountCode: string | null;
   paidWithCredit: boolean;
+  // Short code the customer and the Zoove team both use for this session, for example ZV-3F9A21BC.
+  sessionCode: string;
+  // The coach cancelled and we are finding another one (status rematching). The customer can wait, reschedule or cancel.
+  trainerCancelled: boolean;
   // Decided by the server (rule lives in the API, never in the app).
   canChange: boolean;
   inProgress: boolean; // a confirmed session whose time is running now

@@ -7,17 +7,18 @@ import { v7 as uuidv7 } from 'uuid';
 import { DomainError } from '../common/domain-error';
 import { notifyCustomer } from '../customer/notify';
 import { DatabaseService } from '../database/database.service';
+import { RewardsService } from './rewards.service';
 
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const makeCode = () => Array.from({ length: 8 }, () => ALPHABET[randomInt(0, ALPHABET.length)]).join('');
 
 export type ReferralSummary = { code: string; signedUp: number; booked: number; referredBy: boolean };
 
-// Only the link between two customers is tracked. What a referral earns is undecided (open question 10), so
-// nothing here pays out. When Pratik decides, an admin can issue a discount code with reason 'referral' (or this can do it).
+// The link between two customers is tracked here. What a referral earns is set in the admin Rewards tab
+// (switched off until the business decides, open question 10); RewardsService gives it out on the first booking.
 @Injectable()
 export class ReferralService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly db: DatabaseService, private readonly rewards: RewardsService) {}
 
   async summary(userId: string): Promise<ReferralSummary> {
     return this.db.tx(async (client) => {
@@ -54,6 +55,9 @@ export class ReferralService {
 
   // Called from the booking transaction: the referred customer's first booking marks the referral as booked.
   async markBooked(client: PoolClient, userId: string): Promise<void> {
-    await client.query(`update referrals set status = 'booked', booked_at = now() where referred_id = $1 and status = 'signed_up'`, [userId]);
+    const done = await client.query<{ id: string; referrer_id: string }>(
+      `update referrals set status = 'booked', booked_at = now() where referred_id = $1 and status = 'signed_up' returning id, referrer_id`, [userId]);
+    // Rewards switched on in the admin panel are given once, at this moment. Switched off by default.
+    if (done.rows[0]) await this.rewards.grant(client, done.rows[0].id, done.rows[0].referrer_id, userId);
   }
 }

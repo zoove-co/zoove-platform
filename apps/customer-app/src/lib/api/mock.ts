@@ -271,7 +271,7 @@ function pickCoach(preferredId: string | undefined, startsAt: string | null, bus
   return COACHES.find((item) => coachAvailable(item.id, startsAt, busy)) ?? null;
 }
 
-type BookingRecord = Omit<Booking, 'canChange' | 'inProgress'> & {
+type BookingRecord = Omit<Booking, 'canChange' | 'inProgress' | 'sessionCode' | 'trainerCancelled'> & {
   addressId: string | null;
   preferredCoachId?: string;
   // Coaches who cancelled this booking, so a replacement is never the same person.
@@ -430,7 +430,8 @@ const toBooking = (record: BookingRecord): Booking => {
   void _c;
   const start = record.startsAt ? new Date(record.startsAt).getTime() : null;
   const inProgress = record.status === 'confirmed' && start !== null && start <= Date.now() && Date.now() < start + 60 * 60_000;
-  return { ...rest, canChange: isChangeable(record), inProgress };
+  const sessionCode = `ZV-${record.id.replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase()}`;
+  return { ...rest, sessionCode, trainerCancelled: record.status === 'rematching' && record.cancelledCoachIds.length > 0, canChange: isChangeable(record), inProgress };
 };
 
 // ---------------------------------------------------------------------------

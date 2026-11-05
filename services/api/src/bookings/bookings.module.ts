@@ -8,10 +8,12 @@ import { ReferralModule } from '../referral/referral.module';
 import { IdentityModule } from '../identity/identity.module';
 import { BookingsController } from './bookings.controller';
 import { BookingsService } from './bookings.service';
+import { SessionsAdminController } from './sessions-admin.controller';
+import { SessionsAdminService } from './sessions-admin.service';
 
 @Module({
   imports: [IdentityModule, CatalogModule, AddressesModule, DiscountsModule, PackagesModule, ReferralModule],
-  controllers: [BookingsController],
-  providers: [BookingsService],
+  controllers: [BookingsController, SessionsAdminController],
+  providers: [BookingsService, SessionsAdminService],
 })
 export class BookingsModule {}

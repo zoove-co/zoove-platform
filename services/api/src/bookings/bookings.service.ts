@@ -31,6 +31,10 @@ export type Booking = {
   status: BookingStatus;
   startsAt: string | null;
   coach: { id: string; name: string } | null;
+  // Short code the customer and the ops team both use to talk about this session, for example ZV-3F9A21BC.
+  sessionCode: string;
+  // The trainer cancelled and we are finding another one. The customer can wait, reschedule or cancel.
+  trainerCancelled: boolean;
   whenLabel: string;
   addressLabel: string;
   areaLabel: string;
@@ -80,13 +84,21 @@ export type Row = {
   format_name: string;
   duration_max_minutes: number;
   request_fingerprint: string;
+  trainer_cancelled_at: Date | null;
+  coach_id: string | null;
+  coach_name: string | null;
 };
 
+// ZV- plus the last 8 characters of the booking id. The ops list searches by the same rule.
+export const sessionCodeOf = (id: string): string => `ZV-${id.replace(/-/g, '').slice(-8).toUpperCase()}`;
+
 export const BOOKING_SELECT = `select b.id, b.mode, b.participant, b.group_size, b.recipient_name, b.recipient_phone, b.status, b.starts_at, b.address_label, b.address_area, b.total_paise, b.discount_paise, b.discount_code, b.package_purchase_id,
-                       b.request_fingerprint, s.slug as service_slug, s.name as service_name, f.name as format_name, s.duration_max_minutes
+                       b.request_fingerprint, b.trainer_cancelled_at, b.coach_id, coalesce(c.full_name, (select ta.first_name from trainers t join trainer_applications ta on ta.id = t.application_id where t.user_id = b.coach_id)) as coach_name,
+                       s.slug as service_slug, s.name as service_name, f.name as format_name, s.duration_max_minutes
                   from bookings b
                   join services s on s.id = b.service_id
-                  join service_formats f on f.id = b.format_id`;
+                  join service_formats f on f.id = b.format_id
+                  left join users c on c.id = b.coach_id`;
 
 const ACTIVE = `('matching', 'confirmed', 'rematching')`;
 
@@ -116,8 +128,10 @@ export function bookingFromRow(row: Row, now = new Date()): Booking {
     recipient: row.recipient_name && row.recipient_phone ? { name: row.recipient_name, phone: row.recipient_phone } : null,
     status: row.status,
     startsAt: row.starts_at ? row.starts_at.toISOString() : null,
-    // Coaches arrive with the trainer and matching modules.
-    coach: null,
+    // Only the first name is shown to the customer.
+    coach: row.coach_id && row.status === 'confirmed' ? { id: row.coach_id, name: (row.coach_name ?? 'Your trainer').split(' ')[0] ?? 'Your trainer' } : null,
+    sessionCode: sessionCodeOf(row.id),
+    trainerCancelled: row.status === 'rematching' && row.trainer_cancelled_at !== null,
     whenLabel: row.starts_at ? formatWhen(row.starts_at) : row.mode === 'instant' ? 'Finding your coach' : 'To be scheduled',
     addressLabel: row.address_label,
     areaLabel: row.address_area ?? '',

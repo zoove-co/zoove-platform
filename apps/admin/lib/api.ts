@@ -296,3 +296,50 @@ export const markOrderPaid = (id: string, method: string, reference: string) => 
 export const cancelOrder = (id: string) => api<PackageOrder>(`/v1/admin/package-orders/${id}/cancel`, { method: 'POST', json: {} });
 export const listAdminPackages = () => api<AdminPackage[]>('/v1/admin/packages');
 export const savePackage = (id: string | null, input: PackageInput) => api<AdminPackage>(id ? `/v1/admin/packages/${id}` : '/v1/admin/packages', { method: 'POST', json: input });
+
+// ---- Offerings (services, styles, prices), rewards and sessions (mirror the API) ----
+
+export type BookingModeKey = 'instant' | 'scheduled' | 'demo';
+export type PriceCell = { pricePaise: number } | null;
+export type AdminFormat = { id: string; slug: string; name: string; description: string | null; sortOrder: number; isActive: boolean };
+export type AdminService = {
+  id: string; slug: string; name: string; tagline: string | null; durationMinMinutes: number; durationMaxMinutes: number; intensity: string | null;
+  sortOrder: number; isActive: boolean; formats: AdminFormat[]; ownPrices: Record<BookingModeKey, PriceCell>;
+};
+export type ParticipantRule = { participant: 'duo' | 'loved_one' | 'group'; percent: number; perHead: boolean; isPlaceholder: boolean };
+export type Offerings = { services: AdminService[]; defaultPrices: Record<BookingModeKey, PriceCell>; participants: ParticipantRule[] };
+export type ServiceInput = { name: string; tagline: string | null; durationMinMinutes: number; durationMaxMinutes: number; intensity: string | null; sortOrder: number; isActive: boolean };
+export type FormatInput = { name: string; description: string | null; sortOrder: number; isActive: boolean };
+export const getOfferings = () => api<Offerings>('/v1/admin/offerings');
+export const createService = (slug: string, input: ServiceInput) => api<{ id: string }>('/v1/admin/offerings/services', { method: 'POST', json: { slug, ...input } });
+export const updateService = (id: string, input: ServiceInput) => api<{ id: string }>(`/v1/admin/offerings/services/${id}`, { method: 'POST', json: input });
+export const createFormat = (serviceId: string, slug: string, input: FormatInput) => api<{ id: string }>(`/v1/admin/offerings/services/${serviceId}/formats`, { method: 'POST', json: { slug, ...input } });
+export const updateFormat = (serviceId: string, formatId: string, input: FormatInput) => api<{ id: string }>(`/v1/admin/offerings/services/${serviceId}/formats/${formatId}`, { method: 'POST', json: input });
+export const setPrice = (serviceId: string | null, mode: BookingModeKey, pricePaise: number | null) => api<Offerings>('/v1/admin/offerings/prices', { method: 'PUT', json: { serviceId, mode, pricePaise } });
+export const setParticipantRule = (participant: string, percent: number, perHead: boolean) => api<Offerings>(`/v1/admin/offerings/participants/${participant}`, { method: 'PUT', json: { percent, perHead } });
+
+export type RewardSide = 'referrer' | 'friend';
+export type RewardRule = { side: RewardSide; enabled: boolean; kind: 'flat' | 'percent' | null; flatOffPaise: number | null; percentOff: number | null; maxDiscountPaise: number | null; validDays: number };
+export type IssuedReward = { id: string; side: RewardSide; customer: string; code: string; state: 'unused' | 'used' | 'expired' | 'switched_off'; createdAt: string; expiresAt: string | null };
+export type RewardsOverview = { rules: RewardRule[]; issued: IssuedReward[]; stats: { signedUp: number; booked: number; rewardsGiven: number } };
+export const getRewards = () => api<RewardsOverview>('/v1/admin/rewards');
+export const saveReward = (side: RewardSide, rule: Omit<RewardRule, 'side'>) => api<RewardsOverview>(`/v1/admin/rewards/${side}`, { method: 'PUT', json: rule });
+export const switchOffReward = (id: string) => api<RewardsOverview>(`/v1/admin/rewards/issued/${id}/switch-off`, { method: 'POST', json: {} });
+
+export type SessionStatus = 'matching' | 'confirmed' | 'rematching' | 'completed' | 'cancelled';
+export type AdminSession = {
+  id: string; sessionCode: string; status: SessionStatus; mode: string; participant: string; groupSize: number | null; serviceName: string; formatName: string;
+  startsAt: string | null; whenLabel: string; startPassed: boolean; area: string | null; customerName: string; customerContact: string;
+  trainerId: string | null; trainerName: string | null; trainerCancelCount: number; trainerCancelledAt: string | null; totalPaise: number; paidWithCredit: boolean; discountCode: string | null; createdAt: string;
+};
+export type SessionDetail = AdminSession & {
+  addressLabel: string; addressLine: string; pincode: string | null; recipient: { name: string; phone: string } | null;
+  events: { type: string; actor: string; payload: Record<string, unknown>; createdAt: string }[];
+};
+export type SessionFilter = 'needs_trainer' | 'upcoming' | 'all';
+export const sessionSummary = () => api<{ needsTrainer: number; trainerCancelled: number }>('/v1/admin/sessions/summary');
+export const listSessions = (filter: SessionFilter, q: string) => api<AdminSession[]>(`/v1/admin/sessions?filter=${filter}${q.trim() ? `&q=${encodeURIComponent(q.trim())}` : ''}`);
+export const getSession = (id: string) => api<SessionDetail>(`/v1/admin/sessions/${id}`);
+export const listAssignableTrainers = () => api<{ id: string; name: string }[]>('/v1/admin/sessions/trainers');
+export const recordTrainerCancel = (id: string, reason: string) => api<SessionDetail>(`/v1/admin/sessions/${id}/trainer-cancel`, { method: 'POST', json: { reason } });
+export const assignTrainer = (id: string, trainerId: string) => api<SessionDetail>(`/v1/admin/sessions/${id}/assign`, { method: 'POST', json: { trainerId } });

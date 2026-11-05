@@ -153,6 +153,12 @@ export const en = {
     rematchTitle: 'Your coach had to cancel',
     rematchBody:
       'We are finding another coach nearby for the same time and will notify you as soon as one accepts. You can still reschedule or cancel this session.',
+    rematchOptionsTitle: 'What would you like to do?',
+    rematchWait: 'Wait: nothing to do. We will tell you as soon as a new coach is assigned.',
+    rematchMove: 'Reschedule: pick another time and we will find a coach for it.',
+    rematchCancel: 'Cancel: nothing is charged, and any package credit or code comes back.',
+    code: 'Session {{code}}',
+    codeHint: 'Quote this code if you contact us about this session.',
     statusCancelled: 'Cancelled',
     statusCompleted: 'Completed',
     reschedule: 'Reschedule',
