@@ -7,6 +7,7 @@ import { AuthGuard, CurrentUser, type AuthUser } from '../identity/auth.guard';
 import { TrainerJobsService } from './trainer-jobs.service';
 
 const idSchema = z.uuid();
+const availabilitySchema = z.object({ acceptingJobs: z.boolean() });
 const noteSchema = z.object({ note: z.string().trim().max(2000) });
 const cancelSchema = z.object({ reason: z.string().trim().min(3).max(300) });
 
@@ -21,6 +22,10 @@ export class TrainerJobsController {
   @Get()
   @ApiOperation({ summary: 'Open jobs nobody has taken, and my own upcoming sessions' })
   board(@CurrentUser() user: AuthUser) { return this.jobs.board(user.id); }
+
+  @Put('availability')
+  @ApiOperation({ summary: 'Switch on or off: off means no new sessions are offered to me' })
+  availability(@CurrentUser() user: AuthUser, @Body(new ZodValidationPipe(availabilitySchema)) body: z.infer<typeof availabilitySchema>) { return this.jobs.setAccepting(user.id, body.acceptingJobs); }
 
   @Post(':id/accept')
   @HttpCode(200)

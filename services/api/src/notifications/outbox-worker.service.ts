@@ -135,6 +135,9 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
       if (event.event_type === 'trainer.job_available') {
         const open = p.bookingId ? await this.db.query(`select 1 from bookings where id = $1 and status in ('matching', 'rematching')`, [p.bookingId]) : { rows: [] };
         if (!open.rows[0]) return;
+        // A trainer who switched themselves off since the alert was queued is not told about the job.
+        const on = await this.db.query(`select 1 from trainers where user_id = $1 and accepting_jobs`, [p.trainerId]);
+        if (!on.rows[0]) return;
       }
       const who = await this.db.query<{ email: string | null; first_name: string | null }>(
         `select coalesce(u.verified_email, u.email, ta.email) as email, ta.first_name

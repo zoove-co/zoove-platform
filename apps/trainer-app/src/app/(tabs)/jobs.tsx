@@ -43,7 +43,8 @@ export default function Jobs() {
       {error ? <Banner tone="bad">{error}</Banner> : null}
       {note && !error ? <Banner tone="good">{note}</Banner> : null}
       {jobs.isError && !jobs.data ? <Banner tone="bad">{errorMessage(jobs.error)}</Banner> : null}
-      {jobs.data && open.length === 0 ? (
+      {jobs.data && !jobs.data.acceptingJobs ? <Banner tone="warn">You are switched off, so no new jobs are offered. Switch on from the Today tab.</Banner> : null}
+      {jobs.data && jobs.data.acceptingJobs && open.length === 0 ? (
         <Card soft>
           <AppText variant="body" color={colors.muted}>No open jobs right now. This list checks again every few seconds, and we also email you when a new job is offered to you.</AppText>
         </Card>

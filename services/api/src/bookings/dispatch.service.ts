@@ -120,7 +120,7 @@ export class DispatchService implements OnModuleInit, OnModuleDestroy {
     const candidates = await client.query<{ user_id: string }>(
       `select t.user_id
          from trainers t join trainer_applications ta on ta.id = t.application_id
-        where t.status = 'active' and t.user_id <> $2
+        where t.status = 'active' and t.accepting_jobs and t.user_id <> $2
           and (cardinality(ta.specialties) = 0 or $3 = any(ta.specialties))
           and not exists (select 1 from job_alerts a where a.booking_id = $1 and a.trainer_id = t.user_id)
           and not exists (select 1 from booking_events e where e.booking_id = $1 and e.type in ('trainer_cancelled', 'trainer_no_show') and e.payload->>'trainerId' = t.user_id::text)

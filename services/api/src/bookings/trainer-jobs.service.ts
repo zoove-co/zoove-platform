@@ -16,7 +16,7 @@ export type OpenJob = {
 export type MyJob = OpenJob & { customerFirstName: string; addressLabel: string; addressLine: string; pincode: string | null; canCancel: boolean; canComplete: boolean; note: string };
 // A session this trainer finished, newest first (the last 30).
 export type DoneJob = OpenJob & { customerFirstName: string; completedAt: string | null; note: string };
-export type JobBoard = { open: OpenJob[]; mine: MyJob[]; done: DoneJob[]; doneCount: number };
+export type JobBoard = { acceptingJobs: boolean; open: OpenJob[]; mine: MyJob[]; done: DoneJob[]; doneCount: number };
 
 type Row = {
   id: string; mode: string; participant: string; group_size: number | null; starts_at: Date | null; address_area: string | null; address_pincode: string | null;
@@ -44,6 +44,7 @@ export class TrainerJobsService {
   async board(userId: string): Promise<JobBoard> {
     await this.assertActiveTrainer(userId);
     const now = new Date();
+    const accepting = (await this.db.query<{ accepting_jobs: boolean }>(`select accepting_jobs from trainers where user_id = $1`, [userId])).rows[0]?.accepting_jobs ?? true;
     const [open, mine, done, doneCount] = await Promise.all([
       // Open = no trainer yet, not started, this trainer has not dropped it, and this trainer is not busy at that time.
       this.db.query<Row>(
@@ -64,7 +65,9 @@ export class TrainerJobsService {
       this.db.query<{ n: string }>(`select count(*)::text as n from bookings where coach_id = $1::uuid and status = 'completed'`, [userId]),
     ]);
     return {
-      open: open.rows.map(toOpen),
+      acceptingJobs: accepting,
+      open: accepting ? open.rows.map(toOpen) : [], // switched off: no open jobs are shown
+
       mine: mine.rows.map((r) => ({
         ...toOpen(r), customerFirstName: r.full_name?.trim().split(/\s+/)[0] || 'Customer', addressLabel: r.address_label, addressLine: r.address_line, pincode: r.address_pincode,
         canCancel: r.starts_at === null || r.starts_at.getTime() > now.getTime(),
@@ -79,6 +82,9 @@ export class TrainerJobsService {
   // so they cannot accept two jobs at the same time at once.
   async accept(userId: string, id: string): Promise<JobBoard> {
     await this.assertActiveTrainer(userId);
+    if (!(await this.db.query(`select 1 from trainers where user_id = $1 and accepting_jobs`, [userId])).rows[0]) {
+      throw new DomainError('INVALID_STATE', 'You are switched off for new jobs. Switch on to take this job.');
+    }
     await this.db.tx(async (client) => {
       const row = (await client.query<{ id: string; user_id: string; status: string; starts_at: Date | null; service_name: string }>(
         `select b.id, b.user_id, b.status, b.starts_at, s.name as service_name from bookings b join services s on s.id = b.service_id where b.id = $1 for update of b`, [id])).rows[0];
@@ -130,6 +136,13 @@ export class TrainerJobsService {
     if (!own.rows[0]) throw new DomainError('NOT_FOUND', 'We could not find that session.');
     if (note === '') await this.db.query(`delete from trainer_session_notes where booking_id = $1 and trainer_id = $2`, [id, userId]);
     else await this.db.query(`insert into trainer_session_notes (booking_id, trainer_id, note) values ($1, $2, $3) on conflict (booking_id, trainer_id) do update set note = excluded.note, updated_at = now()`, [id, userId, note]);
+    return this.board(userId);
+  }
+
+  // The trainer's on/off switch. Off: no new sessions are offered to them. Sessions they already hold stay theirs.
+  async setAccepting(userId: string, on: boolean): Promise<JobBoard> {
+    await this.assertActiveTrainer(userId);
+    await this.db.query(`update trainers set accepting_jobs = $2 where user_id = $1`, [userId, on]);
     return this.board(userId);
   }
 }

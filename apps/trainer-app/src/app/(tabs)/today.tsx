@@ -1,14 +1,15 @@
 import { router } from 'expo-router';
-import { View } from 'react-native';
+import { useState } from 'react';
+import { Switch, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { Banner } from '@/components/ui/Banner';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Screen } from '@/components/ui/Screen';
-import { errorMessage } from '@/lib/api';
+import { errorMessage, setAcceptingJobs } from '@/lib/api';
 import { useApplication } from '@/lib/useApplication';
-import { useJobs, whoFor } from '@/lib/useJobs';
+import { useJobs, useSetBoard, whoFor } from '@/lib/useJobs';
 import { colors } from '@/theme';
 
 const WEEK_MS = 7 * 86_400_000;
@@ -16,6 +17,9 @@ const WEEK_MS = 7 * 86_400_000;
 // The first screen of an approved trainer: what is next, what is open, and how many sessions they have done.
 export default function Today() {
   const jobs = useJobs();
+  const setBoard = useSetBoard();
+  const [switching, setSwitching] = useState(false);
+  const [switchError, setSwitchError] = useState<string | null>(null);
   const application = useApplication();
   const first = application.data?.form.firstName?.trim();
   const mine = jobs.data?.mine ?? [];
@@ -23,11 +27,36 @@ export default function Today() {
   const openCount = jobs.data?.open.length ?? 0;
   const thisWeek = (jobs.data?.done ?? []).filter((job) => job.completedAt && jobs.dataUpdatedAt - new Date(job.completedAt).getTime() < WEEK_MS).length;
 
+  const accepting = jobs.data?.acceptingJobs ?? true;
+
+  async function toggle(on: boolean) {
+    setSwitching(true);
+    setSwitchError(null);
+    try {
+      setBoard(await setAcceptingJobs(on));
+    } catch (err) {
+      setSwitchError(errorMessage(err));
+    } finally {
+      setSwitching(false);
+    }
+  }
+
   return (
     <Screen refreshing={jobs.isRefetching} onRefresh={() => void jobs.refetch()}>
       <AppText variant="screenTitle">{first ? `Hello, ${first}` : 'Hello'}</AppText>
       <AppText variant="body" color={colors.muted}>Here is your day on Zoove.</AppText>
       {jobs.isError && !jobs.data ? <Banner tone="bad">{errorMessage(jobs.error)}</Banner> : null}
+
+      <Card>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ flex: 1 }}>
+            <AppText variant="heading">{accepting ? 'You are on' : 'You are off'}</AppText>
+            <AppText variant="caption" color={colors.muted}>{accepting ? 'New sessions near you are offered to you.' : 'No new sessions are offered to you. Sessions you already hold stay yours.'}</AppText>
+          </View>
+          <Switch value={accepting} disabled={switching || !jobs.data} onValueChange={(on) => void toggle(on)} trackColor={{ false: colors.lavender, true: '#22A559' }} thumbColor="#FFFFFF" accessibilityLabel="Accept new jobs" />
+        </View>
+        {switchError ? <Banner tone="bad">{switchError}</Banner> : null}
+      </Card>
 
       <Card>
         <AppText variant="caption" color={colors.muted}>UP NEXT</AppText>

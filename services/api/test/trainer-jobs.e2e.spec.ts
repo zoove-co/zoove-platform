@@ -262,5 +262,21 @@ suite('trainer jobs: who is free, assigning, open jobs, accepting and cancelling
       const cleared = (await http().put(`/v1/trainer/jobs/${id}/note`).set(as(t1)).send({ note: '' }).expect(200)).body as Awaited<ReturnType<typeof board>>;
       expect(cleared.done[0]?.note).toBe('');
     });
+
+    it('a trainer who switches off is not offered new sessions and cannot take one; switching on brings them back', async () => {
+      const id = await bookingId(me, await addressFor(me), slot(31));
+      await dispatch();
+      expect((await board(t2)).open.map((j) => j.id)).toContain(id);
+      const off = (await http().put('/v1/trainer/jobs/availability').set(as(t2)).send({ acceptingJobs: false }).expect(200)).body as { acceptingJobs: boolean; open: unknown[] };
+      expect(off).toMatchObject({ acceptingJobs: false, open: [] });
+      await http().post(`/v1/trainer/jobs/${id}/accept`).set(as(t2)).expect(409);
+      // A session opened while switched off is not offered to them at all.
+      const later = await bookingId(me, await addressFor(me), slot(32));
+      await dispatch();
+      expect((await pool.query(`select 1 from job_alerts where booking_id = $1 and trainer_id = $2`, [later, t2Id])).rows).toHaveLength(0);
+      const on = (await http().put('/v1/trainer/jobs/availability').set(as(t2)).send({ acceptingJobs: true }).expect(200)).body as { acceptingJobs: boolean };
+      expect(on.acceptingJobs).toBe(true);
+      await http().post(`/v1/trainer/jobs/${id}/accept`).set(as(t2)).expect(200);
+    });
   });
 });
