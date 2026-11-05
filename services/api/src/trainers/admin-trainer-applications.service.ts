@@ -18,6 +18,8 @@ export type AdminListItem = {
   source: string | null;
   submittedAt: string | null;
   trainerStatus: TrainerStatus | null;
+  /** The trainer's own on/off switch. Null until they are an approved trainer. */
+  acceptingJobs: boolean | null;
 };
 
 export type AdminList = { items: AdminListItem[]; counts: Record<string, number> };
@@ -34,6 +36,7 @@ type ListRow = {
   source: string | null;
   submitted_at: Date | null;
   trainer_status: TrainerStatus | null;
+  accepting_jobs: boolean | null;
 };
 
 const REVIEWABLE: ApplicationStatus[] = ['submitted', 'in_review'];
@@ -59,7 +62,7 @@ export class AdminTrainerApplicationsService {
     }
     params.push(filter.limit);
     const items = await this.db.query<ListRow>(
-      `select a.id, a.first_name, a.last_name, coalesce(a.phone_e164, u.phone_e164) as phone_e164, a.email, a.status, a.specialties, a.experience_years, a.source, a.submitted_at, t.status as trainer_status
+      `select a.id, a.first_name, a.last_name, coalesce(a.phone_e164, u.phone_e164) as phone_e164, a.email, a.status, a.specialties, a.experience_years, a.source, a.submitted_at, t.status as trainer_status, t.accepting_jobs
          from trainer_applications a join users u on u.id = a.user_id left join trainers t on t.application_id = a.id
         where ${where.join(' and ')}
         order by a.submitted_at asc nulls last, a.created_at asc
@@ -79,6 +82,7 @@ export class AdminTrainerApplicationsService {
         source: row.source,
         submittedAt: row.submitted_at ? row.submitted_at.toISOString() : null,
         trainerStatus: row.trainer_status,
+        acceptingJobs: row.trainer_status ? row.accepting_jobs : null,
       })),
       counts: Object.fromEntries(counts.rows.map((row) => [row.status, Number(row.n)])),
     };
@@ -97,8 +101,10 @@ export class AdminTrainerApplicationsService {
       [applicationId],
     );
     const source = await this.db.query<{ source: string | null }>(`select source from trainer_applications where id = $1`, [applicationId]);
+    const sw = await this.db.query<{ accepting_jobs: boolean }>(`select accepting_jobs from trainers where application_id = $1`, [applicationId]);
     return {
       ...view,
+      acceptingJobs: sw.rows[0] ? sw.rows[0].accepting_jobs : null,
       phone: owner.phone_e164,
       source: source.rows[0]?.source ?? null,
       events: events.rows.map((event) => ({ type: event.type, actor: event.actor, payload: event.payload, at: event.created_at.toISOString() })),

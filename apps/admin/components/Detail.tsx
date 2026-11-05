@@ -199,6 +199,7 @@ export function Detail({ signOut, expired }: { signOut: () => void; expired: () 
               <h2>Trainer account</h2>
               <div className="statusrow">
                 <span className={`pill ${data.trainerStatus}`}>{STATUS_LABEL[data.trainerStatus] ?? data.trainerStatus}</span>
+                {data.trainerStatus === 'active' ? <span className={`pill ${data.acceptingJobs === false ? 'paused' : 'approved'}`} title="The trainer's own switch in the app">{data.acceptingJobs === false ? 'Switched off by the trainer' : 'Taking new jobs'}</span> : null}
                 {canStatus ? (
                   <div className="btns">
                     {data.trainerStatus === 'active' ? <button className="btn small ghost" type="button" onClick={() => openStatus('paused')}>Pause</button> : null}

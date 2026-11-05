@@ -200,13 +200,14 @@ export type Status = 'submitted' | 'in_review' | 'changes_requested' | 'approved
 export type Filter = 'pending' | 'changes_requested' | 'approved' | 'rejected' | 'all';
 
 export type TrainerStatus = 'active' | 'paused' | 'suspended' | 'revoked';
-export type ListItem = { trainerStatus: TrainerStatus | null; id: string; name: string; phone: string | null; email: string | null; status: Status; specialties: string[]; experienceYears: number | null; source: string | null; submittedAt: string | null };
+export type ListItem = { trainerStatus: TrainerStatus | null; acceptingJobs: boolean | null; id: string; name: string; phone: string | null; email: string | null; status: Status; specialties: string[]; experienceYears: number | null; source: string | null; submittedAt: string | null };
 export type ListResult = { items: ListItem[]; counts: Record<string, number> };
 
 export type DocKind = 'aadhaar_front' | 'aadhaar_back' | 'pan_card' | 'selfie' | 'certificate' | 'other';
 
 export type Detail = {
   trainerStatus: TrainerStatus | null;
+  acceptingJobs: boolean | null;
   id: string;
   status: Status | 'draft';
   phone: string | null;
@@ -346,7 +347,7 @@ export const sessionSummary = () => api<{ needsTrainer: number; trainerCancelled
 export const listSessions = (filter: SessionFilter, q: string) => api<AdminSession[]>(`/v1/admin/sessions?filter=${filter}${q.trim() ? `&q=${encodeURIComponent(q.trim())}` : ''}`);
 export const getSession = (id: string) => api<SessionDetail>(`/v1/admin/sessions/${id}`);
 // Trainers who are free for this session (not busy at its time, did not drop it). sameDay = sessions they already have that day.
-export type AvailableTrainer = { id: string; name: string; sameDay: number };
+export type AvailableTrainer = { id: string; name: string; sameDay: number; acceptingJobs: boolean };
 export const listAvailableTrainers = (id: string) => api<AvailableTrainer[]>(`/v1/admin/sessions/${id}/available-trainers`);
 export const recordTrainerCancel = (id: string, reason: string) => api<SessionDetail>(`/v1/admin/sessions/${id}/trainer-cancel`, { method: 'POST', json: { reason } });
 export const assignTrainer = (id: string, trainerId: string) => api<SessionDetail>(`/v1/admin/sessions/${id}/assign`, { method: 'POST', json: { trainerId } });

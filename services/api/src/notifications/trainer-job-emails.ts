@@ -67,3 +67,18 @@ export function jobCancelledEmail(to: string, ctx: JobMailContext & { reason?: s
   );
   return { to, subject: moved ? `Removed from your list: session ${ctx.sessionCode}` : `Cancelled: ${ctx.serviceName}, ${ctx.when}`, html, text };
 }
+
+// Sent 30 minutes before a session the trainer holds. The address is in the app, not in the email.
+export function sessionReminderEmail(to: string, ctx: JobMailContext & { minutes: number }, jobsUrl: string): EmailMessage {
+  const { html, text } = layout(
+    `Your session starts in about ${ctx.minutes} minutes`,
+    [
+      `Hi ${ctx.firstName},`,
+      `Your ${ctx.serviceName} session ${ctx.sessionCode} starts at ${ctx.when}${ctx.area ? ` in ${ctx.area}` : ''}.`,
+      'Open the app to see the address and the customer. If something has come up, cancel the session there right away so we can look for someone else.',
+    ],
+    { label: 'Open my sessions', url: jobsUrl },
+    FOOTER,
+  );
+  return { to, subject: `Starts in about ${ctx.minutes} minutes: ${ctx.serviceName}, ${ctx.when}`, html, text };
+}

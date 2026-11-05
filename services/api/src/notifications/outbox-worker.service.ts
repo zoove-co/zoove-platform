@@ -8,7 +8,7 @@ import { ERROR_REPORTER, type ErrorReporter } from '../monitoring/error-reporter
 import { referralRewardEmail } from './customer-emails';
 import { ExpoPushChannel } from './channels/expo-push.channel';
 import { CustomerMessageService } from './customer-message.service';
-import { jobAssignedEmail, jobAvailableEmail, jobCancelledEmail, jobMovedEmail } from './trainer-job-emails';
+import { jobAssignedEmail, jobAvailableEmail, sessionReminderEmail, jobCancelledEmail, jobMovedEmail } from './trainer-job-emails';
 import { packageExpiredOpsEmail, partyRequestedEmail, sessionNotClosedEmail, sessionOverdueEmail, sessionUnfilledEmail, teamInviteEmail, trainerCancelledEmail } from './team-emails';
 import { approvedEmail, changesEmail, opsNewApplicationEmail, receivedEmail, rejectedEmail } from './trainer-emails';
 
@@ -16,7 +16,7 @@ type OutboxRow = { id: string; aggregate_id: string; event_type: string; payload
 
 type ApplicationInfo = { first_name: string | null; last_name: string | null; email: string | null; phone_e164: string | null; review_note: string | null };
 
-const HANDLED = ['trainer.application_submitted', 'trainer.application_approved', 'trainer.application_rejected', 'trainer.application_changes_requested', 'team.member_invited', 'party.requested', 'booking.trainer_cancelled', 'booking.overdue', 'referral.reward_granted', 'trainer.job_assigned', 'trainer.job_moved', 'trainer.job_cancelled', 'trainer.job_available', 'booking.unfilled', 'booking.completion_open', 'package.expired', 'customer.notify'];
+const HANDLED = ['trainer.application_submitted', 'trainer.application_approved', 'trainer.application_rejected', 'trainer.application_changes_requested', 'team.member_invited', 'party.requested', 'booking.trainer_cancelled', 'booking.overdue', 'referral.reward_granted', 'trainer.job_assigned', 'trainer.job_moved', 'trainer.job_cancelled', 'trainer.job_available', 'trainer.session_reminder', 'booking.unfilled', 'booking.completion_open', 'package.expired', 'customer.notify'];
 const MAX_ATTEMPTS = 10;
 const BATCH = 10;
 
@@ -128,8 +128,8 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
       for (const ops of this.opsEmails()) await this.email.send(packageExpiredOpsEmail(ops, { packageName: p.packageName ?? 'A', unused: p.unused ?? 0, customer: p.customer ?? 'A customer' }, `${this.config.ADMIN_URL}/packages`));
       return;
     }
-    if (['trainer.job_assigned', 'trainer.job_moved', 'trainer.job_cancelled', 'trainer.job_available'].includes(event.event_type)) {
-      const p = event.payload as { trainerId?: string; bookingId?: string; sessionCode?: string; serviceName?: string; when?: string; area?: string; reason?: string };
+    if (['trainer.job_assigned', 'trainer.job_moved', 'trainer.job_cancelled', 'trainer.job_available', 'trainer.session_reminder'].includes(event.event_type)) {
+      const p = event.payload as { trainerId?: string; bookingId?: string; sessionCode?: string; serviceName?: string; when?: string; area?: string; reason?: string; minutes?: number };
       if (!p.trainerId) return;
       // An alert about a job that has since been taken or cancelled would only confuse the trainer.
       if (event.event_type === 'trainer.job_available') {
@@ -139,17 +139,22 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
         const on = await this.db.query(`select 1 from trainers where user_id = $1 and accepting_jobs`, [p.trainerId]);
         if (!on.rows[0]) return;
       }
+      // A reminder for a session that was cancelled, moved to someone else or already closed would only confuse the trainer.
+      if (event.event_type === 'trainer.session_reminder') {
+        const mine = p.bookingId ? await this.db.query(`select 1 from bookings where id = $1 and coach_id = $2 and status = 'confirmed'`, [p.bookingId, p.trainerId]) : { rows: [] };
+        if (!mine.rows[0]) return;
+      }
       const who = await this.db.query<{ email: string | null; first_name: string | null }>(
         `select coalesce(u.verified_email, u.email, ta.email) as email, ta.first_name
            from trainers t join users u on u.id = t.user_id join trainer_applications ta on ta.id = t.application_id where t.user_id = $1 and t.status = 'active'`, [p.trainerId]);
       const trainer = who.rows[0];
       if (!trainer) return; // no longer an active trainer: nothing to send
       const ctx = { firstName: trainer.first_name ?? 'there', sessionCode: p.sessionCode ?? '', serviceName: p.serviceName ?? 'a', when: p.when ?? '', area: p.area ?? '' };
-      const build = { 'trainer.job_assigned': jobAssignedEmail, 'trainer.job_moved': jobMovedEmail, 'trainer.job_available': jobAvailableEmail }[event.event_type];
+      const build = { 'trainer.job_assigned': jobAssignedEmail, 'trainer.job_moved': jobMovedEmail, 'trainer.job_available': jobAvailableEmail, 'trainer.session_reminder': (to: string, c: typeof ctx, url: string) => sessionReminderEmail(to, { ...c, minutes: p.minutes ?? 30 }, url) }[event.event_type];
       if (trainer.email) await this.email.send(build ? build(trainer.email, ctx, this.config.TRAINER_SITE_URL) : jobCancelledEmail(trainer.email, { ...ctx, ...(p.reason ? { reason: p.reason } : {}) }, this.config.TRAINER_SITE_URL));
       // The phone alert goes after the email, so a retry of a failed email never buzzes the phone twice. It is best effort.
       const detail = [ctx.serviceName, ctx.when, ctx.area].filter(Boolean).join(' · ');
-      const title = { 'trainer.job_available': 'New job near you', 'trainer.job_assigned': 'A session was assigned to you', 'trainer.job_moved': 'Session time changed', 'trainer.job_cancelled': 'A session was cancelled' }[event.event_type] ?? 'Zoove';
+      const title = { 'trainer.job_available': 'New job near you', 'trainer.job_assigned': 'A session was assigned to you', 'trainer.job_moved': 'Session time changed', 'trainer.job_cancelled': 'A session was cancelled', 'trainer.session_reminder': `Session starts in about ${p.minutes ?? 30} minutes` }[event.event_type] ?? 'Zoove';
       try { await this.push.deliver({ userId: p.trainerId, title, body: detail || 'Open the Zoove Trainer app', bookingId: p.bookingId ?? null }); } catch (error) { this.logger.warn(`Trainer push failed: ${error instanceof Error ? error.message : String(error)}`); }
       return;
     }

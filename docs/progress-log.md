@@ -248,3 +248,9 @@ Missing endpoints (the app's mock has them, the API does not):
 - Trainer job emails are now followed by a best-effort phone push (new job, assigned, moved, cancelled) through the same Expo push channel as customers.
 - Ideas taken from Pratik's SwiftUI prototype (Today, Completed, notes). Not built, needs a decision: earnings and payout (trainer pay model), client list and goals (what a trainer may see), chat, trainer-set availability and hours (no availability rules exist yet, only a no-clash check).
 - Trainer on/off switch (Today tab, green): off means no new sessions are offered (dispatcher skips them, open list is empty, accepting is refused, queued job emails are dropped). Sessions already held stay theirs; ops can still assign directly. Migration 0024 `trainers.accepting_jobs` (default on).
+
+## Trainer reminder and admin visibility
+- Admin now shows a "Switched off" pill on the trainer list and detail, and marks switched-off trainers in the assign-session dropdown.
+- Trainers get an email and a phone push about 30 minutes before a confirmed session. Sent once per trainer per start time, sent again if the session is moved, skipped if it was cancelled or reassigned before sending.
+- New table trainer_session_reminders (migration 0025). Needs EMAIL_WORKER_ENABLED not set to false.
+- Open question: block switching off when a session is upcoming? Currently the switch only affects new offers.

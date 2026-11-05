@@ -4,6 +4,7 @@ import request from 'supertest';
 
 import { EmailProvider, type EmailMessage } from '../src/email/email.provider';
 import { DispatchService } from '../src/bookings/dispatch.service';
+import { TrainerReminderService } from '../src/bookings/trainer-reminder.service';
 import { OutboxWorkerService } from '../src/notifications/outbox-worker.service';
 import { CODE, signIn, startApp } from './helpers';
 
@@ -277,6 +278,43 @@ suite('trainer jobs: who is free, assigning, open jobs, accepting and cancelling
       const on = (await http().put('/v1/trainer/jobs/availability').set(as(t2)).send({ acceptingJobs: true }).expect(200)).body as { acceptingJobs: boolean };
       expect(on.acceptingJobs).toBe(true);
       await http().post(`/v1/trainer/jobs/${id}/accept`).set(as(t2)).expect(200);
+    });
+
+    it('reminds the trainer about 30 minutes before a session, once, and again if it is moved', async () => {
+      const id = await bookingId(me, await addressFor(me), slot(34));
+      await assign(id, t1Id).expect(200);
+      const remind = () => app.get(TrainerReminderService).runOnce();
+      expect(await remind()).toBe(0); // far away: nothing yet
+      await pool.query(`update bookings set starts_at = now() + interval '20 minutes' where id = $1`, [id]);
+      expect(await remind()).toBe(1);
+      expect(await remind()).toBe(0); // not twice
+      await worker().runOnce();
+      const mails = mail.sent.filter((m) => m.to === 'asha@trainer.test' && m.subject.startsWith('Starts in about'));
+      expect(mails).toHaveLength(1);
+      expect(mails[0]!.subject).toMatch(/Starts in about 2\d minutes/);
+      await pool.query(`update bookings set starts_at = now() + interval '25 minutes' where id = $1`, [id]);
+      expect(await remind()).toBe(1); // moved: a fresh reminder
+    });
+
+    it('does not send a reminder for a session that was cancelled before the email went out', async () => {
+      const id = await bookingId(me, await addressFor(me), slot(35));
+      await assign(id, t1Id).expect(200);
+      await pool.query(`update bookings set starts_at = now() + interval '20 minutes' where id = $1`, [id]);
+      expect(await app.get(TrainerReminderService).runOnce()).toBe(1);
+      await pool.query(`update bookings set status = 'rematching', coach_id = null where id = $1`, [id]);
+      mail.sent.length = 0;
+      await worker().runOnce();
+      expect(mail.sent.some((m) => m.subject.startsWith('Starts in about'))).toBe(false);
+    });
+
+    it('lets ops see which trainers switched themselves off', async () => {
+      await http().put('/v1/trainer/jobs/availability').set(as(t2)).send({ acceptingJobs: false }).expect(200);
+      const list = (await http().get('/v1/admin/trainer-applications').set(as(owner)).expect(200)).body.items as { name: string; trainerStatus: string | null; acceptingJobs: boolean | null }[];
+      expect(list.find((i) => i.name.startsWith('Bala'))).toMatchObject({ trainerStatus: 'active', acceptingJobs: false });
+      expect(list.find((i) => i.name.startsWith('Asha'))).toMatchObject({ acceptingJobs: true });
+      const id = await bookingId(me, await addressFor(me), slot(36));
+      const options = (await http().get(`/v1/admin/sessions/${id}/available-trainers`).set(as(owner)).expect(200)).body as { name: string; acceptingJobs: boolean }[];
+      expect(options.find((o) => o.name.startsWith('Bala'))?.acceptingJobs).toBe(false); // still listed: ops can assign directly
     });
   });
 });

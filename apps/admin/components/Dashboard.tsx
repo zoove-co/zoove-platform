@@ -175,7 +175,10 @@ export function Dashboard({ signOut, expired }: { signOut: () => void; expired: 
                     </td>
                     <td className="hide-sm muted">{item.source ?? '—'}</td>
                     <td title={absolute(item.submittedAt)}>{ago(item.submittedAt)}</td>
-                    <td>{(() => { const shown = item.status === 'approved' && item.trainerStatus && item.trainerStatus !== 'active' ? item.trainerStatus : item.status; return <span className={`pill ${shown}`}>{STATUS_LABEL[shown] ?? shown}</span>; })()}</td>
+                    <td>
+                      {(() => { const shown = item.status === 'approved' && item.trainerStatus && item.trainerStatus !== 'active' ? item.trainerStatus : item.status; return <span className={`pill ${shown}`}>{STATUS_LABEL[shown] ?? shown}</span>; })()}
+                      {item.status === 'approved' && item.trainerStatus === 'active' && item.acceptingJobs === false ? <span className="pill paused" style={{ marginLeft: 6 }} title="The trainer switched themselves off, so no new sessions are offered to them">Switched off</span> : null}
+                    </td>
                   </tr>
                 );
               })}

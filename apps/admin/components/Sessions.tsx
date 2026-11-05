@@ -191,7 +191,7 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
                   <span>Assign a trainer</span>
                   <select value={pick} onChange={(e) => setPick(e.target.value)}>
                     <option value="">Choose a trainer</option>
-                    {trainers.map((t) => <option key={t.id} value={t.id}>{t.name}{t.sameDay ? ` · ${t.sameDay} session${t.sameDay > 1 ? 's' : ''} that day` : ''}</option>)}
+                    {trainers.map((t) => <option key={t.id} value={t.id}>{t.name}{t.sameDay ? ` · ${t.sameDay} session${t.sameDay > 1 ? 's' : ''} that day` : ''}{t.acceptingJobs ? '' : ' · switched off'}</option>)}
                   </select>
                   {trainers.length === 0
                     ? <div className="hint">No trainer is free at this time. Move the session to another time, or leave it open: trainers can pick it up themselves from their jobs page.</div>

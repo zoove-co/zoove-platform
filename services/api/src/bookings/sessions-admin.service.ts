@@ -21,7 +21,7 @@ export type SessionEvent = { type: string; actor: string; payload: Record<string
 export type AdminSessionDetail = AdminSession & { addressLabel: string; addressLine: string; pincode: string | null; recipient: { name: string; phone: string } | null; events: SessionEvent[] };
 export type TrainerOption = { id: string; name: string };
 // A trainer who can take this session: not busy at its time and has not dropped it. sameDay = confirmed sessions already that day.
-export type AvailableTrainer = { id: string; name: string; sameDay: number };
+export type AvailableTrainer = { id: string; name: string; sameDay: number; acceptingJobs: boolean };
 
 type ListRow = {
   id: string; status: BookingStatus; mode: string; participant: string; group_size: number | null; service_name: string; format_name: string; starts_at: Date | null;
@@ -118,10 +118,10 @@ export class SessionsAdminService {
     if (!b) throw new DomainError('NOT_FOUND', 'We could not find that session.');
     if (b.status !== 'matching' && b.status !== 'rematching') return [];
     if (b.starts_at && b.starts_at.getTime() <= Date.now()) return [];
-    const r = await this.db.query<{ user_id: string; name: string; same_day: string }>(
+    const r = await this.db.query<{ user_id: string; name: string; same_day: string; accepting_jobs: boolean }>(
       `select t.user_id, coalesce(nullif(trim(concat_ws(' ', ta.first_name, ta.last_name)), ''), u.full_name, u.email, 'Trainer') as name,
               (select count(*) from bookings x where x.coach_id = t.user_id and x.status = 'confirmed' and $2::timestamptz is not null
-                  and (x.starts_at at time zone 'Asia/Kolkata')::date = ($2::timestamptz at time zone 'Asia/Kolkata')::date) as same_day
+                  and (x.starts_at at time zone 'Asia/Kolkata')::date = ($2::timestamptz at time zone 'Asia/Kolkata')::date) as same_day, t.accepting_jobs
          from trainers t join trainer_applications ta on ta.id = t.application_id join users u on u.id = t.user_id
         where t.status = 'active'
           and not exists (select 1 from booking_events e where e.booking_id = $1 and e.type in ('trainer_cancelled', 'trainer_no_show') and e.payload->>'trainerId' = t.user_id::text)
@@ -129,7 +129,7 @@ export class SessionsAdminService {
         order by name`,
       [id, b.starts_at],
     );
-    return r.rows.map((row) => ({ id: row.user_id, name: row.name, sameDay: Number(row.same_day) }));
+    return r.rows.map((row) => ({ id: row.user_id, name: row.name, sameDay: Number(row.same_day), acceptingJobs: row.accepting_jobs }));
   }
 
   private async lock(client: PoolClient, id: string) {
