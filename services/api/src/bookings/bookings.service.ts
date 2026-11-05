@@ -15,6 +15,7 @@ import { queueTrainerAlert } from '../notifications/trainer-alerts';
 import { DatabaseService } from '../database/database.service';
 import { DiscountsService, normaliseCode } from '../discounts/discounts.service';
 import { CHANGE_WINDOW_MS, dayRange, formatClock, formatWhen, isSlotStart, slotStarts, withinHorizon } from './rules';
+import { trainerBusySql } from './trainer-clash';
 
 export type Participant = 'personal' | 'duo' | 'loved_one' | 'group';
 
@@ -299,7 +300,7 @@ export class BookingsService {
         if (row.package_purchase_id) await this.packages.assertCovers(client, row.package_purchase_id, startsAt);
         // A trainer already on this session may be busy at the new time: then the session goes back to "finding a coach".
         const clash = row.status === 'confirmed' && row.coach_id
-          ? (await client.query(`select 1 from bookings where coach_id = $1 and status = 'confirmed' and starts_at = $2 and id <> $3 limit 1`, [row.coach_id, startsAt, id])).rows[0]
+          ? (await client.query<{ busy: boolean }>(`select ${trainerBusySql('$1::uuid', '$2', '$4', '$3::uuid')} as busy`, [row.coach_id, startsAt, id, row.duration_max_minutes])).rows[0]?.busy
           : null;
         if (toScheduled) {
           // A fresh start for dispatch: trainers are offered the session again, for its new time, nearest first.

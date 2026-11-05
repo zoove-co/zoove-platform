@@ -83,6 +83,13 @@ export class TrainerApplicationsController {
     return this.applications.removeDocument(user.id, id);
   }
 
+  @Delete('account')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Delete my trainer account: personal details and documents are removed and sign-in ends on every device. Refused while a session is still ahead.' })
+  async deleteAccount(@CurrentUser() user: AuthUser): Promise<void> {
+    await this.applications.deleteAccount(user.id);
+  }
+
   @Post('submit')
   @HttpCode(200)
   @ApiOperation({ summary: 'Submit for review. Needs every required detail and document, and agreement to the terms.' })

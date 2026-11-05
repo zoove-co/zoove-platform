@@ -14,11 +14,13 @@ import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { useAuth } from '@/lib/auth';
+import { initMonitoring, withMonitoring } from '@/lib/monitoring';
 import { colors } from '@/theme';
 
+initMonitoring();
 void SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
+function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, ...Ionicons.font });
   const authStatus = useAuth((state) => state.status);
   const hydrate = useAuth((state) => state.hydrate);
@@ -59,3 +61,5 @@ export default function RootLayout() {
     </QueryClientProvider>
   );
 }
+
+export default withMonitoring(RootLayout);

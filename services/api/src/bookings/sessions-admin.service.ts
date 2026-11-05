@@ -10,6 +10,7 @@ import { PackagesService } from '../packages/packages.service';
 import { ALERT_ALL_KEY, alertAllSwitch } from './dispatch.service';
 import { assertBookableSlot, sessionCodeOf, type BookingStatus } from './bookings.service';
 import { formatWhen } from './rules';
+import { trainerBusySql } from './trainer-clash';
 
 export type SessionFilter = 'needs_trainer' | 'upcoming' | 'all';
 export type AdminSession = {
@@ -114,7 +115,7 @@ export class SessionsAdminService {
   // Trainers who are free for this session: active, not already confirmed on another session at the same start time, and not
   // one who already dropped this session. Instant sessions have no start time, so only the "dropped" rule applies.
   async availableTrainers(id: string): Promise<AvailableTrainer[]> {
-    const b = (await this.db.query<{ status: BookingStatus; starts_at: Date | null }>(`select status, starts_at from bookings where id = $1`, [id])).rows[0];
+    const b = (await this.db.query<{ status: BookingStatus; starts_at: Date | null; minutes: number }>(`select b.status, b.starts_at, s.duration_max_minutes as minutes from bookings b join services s on s.id = b.service_id where b.id = $1`, [id])).rows[0];
     if (!b) throw new DomainError('NOT_FOUND', 'We could not find that session.');
     if (b.status !== 'matching' && b.status !== 'rematching') return [];
     if (b.starts_at && b.starts_at.getTime() <= Date.now()) return [];
@@ -125,16 +126,16 @@ export class SessionsAdminService {
          from trainers t join trainer_applications ta on ta.id = t.application_id join users u on u.id = t.user_id
         where t.status = 'active'
           and not exists (select 1 from booking_events e where e.booking_id = $1 and e.type in ('trainer_cancelled', 'trainer_no_show') and e.payload->>'trainerId' = t.user_id::text)
-          and ($2::timestamptz is null or not exists (select 1 from bookings x where x.coach_id = t.user_id and x.status = 'confirmed' and x.starts_at = $2 and x.id <> $1))
+          and ($2::timestamptz is null or not ${trainerBusySql('t.user_id', '$2', '$3', '$1')})
         order by name`,
-      [id, b.starts_at],
+      [id, b.starts_at, b.minutes],
     );
     return r.rows.map((row) => ({ id: row.user_id, name: row.name, sameDay: Number(row.same_day), acceptingJobs: row.accepting_jobs }));
   }
 
   private async lock(client: PoolClient, id: string) {
-    const r = await client.query<{ id: string; user_id: string; status: BookingStatus; mode: string; starts_at: Date | null; coach_id: string | null; service_name: string; package_purchase_id: string | null; address_area: string | null }>(
-      `select b.id, b.user_id, b.status, b.mode, b.starts_at, b.coach_id, b.package_purchase_id, b.address_area, s.name as service_name from bookings b join services s on s.id = b.service_id where b.id = $1 for update of b`, [id]);
+    const r = await client.query<{ id: string; user_id: string; status: BookingStatus; mode: string; starts_at: Date | null; coach_id: string | null; service_name: string; package_purchase_id: string | null; address_area: string | null; minutes: number }>(
+      `select b.id, b.user_id, b.status, b.mode, b.starts_at, b.coach_id, b.package_purchase_id, b.address_area, s.name as service_name, s.duration_max_minutes as minutes from bookings b join services s on s.id = b.service_id where b.id = $1 for update of b`, [id]);
     const row = r.rows[0];
     if (!row) throw new DomainError('NOT_FOUND', 'We could not find that session.');
     return row;
@@ -200,7 +201,7 @@ export class SessionsAdminService {
         const startsAt = assertBookableSlot(startsAtInput);
         if (row.package_purchase_id) await this.packages.assertCovers(client, row.package_purchase_id, startsAt);
         const clash = row.status === 'confirmed' && row.coach_id
-          ? (await client.query(`select 1 from bookings where coach_id = $1 and status = 'confirmed' and starts_at = $2 and id <> $3 limit 1`, [row.coach_id, startsAt, id])).rows[0]
+          ? (await client.query<{ busy: boolean }>(`select ${trainerBusySql('$1::uuid', '$2', '$4', '$3::uuid')} as busy`, [row.coach_id, startsAt, id, row.minutes])).rows[0]?.busy
           : null;
         if (clash) await client.query(`update bookings set starts_at = $2, status = 'rematching', coach_id = null, overdue_notified_at = null where id = $1`, [id, startsAt]);
         else await client.query(`update bookings set starts_at = $2, overdue_notified_at = null where id = $1`, [id, startsAt]);
@@ -270,8 +271,8 @@ export class SessionsAdminService {
       const cancelledBefore = await client.query(`select 1 from booking_events where booking_id = $1 and type in ('trainer_cancelled', 'trainer_no_show') and payload->>'trainerId' = $2 limit 1`, [id, trainerId]);
       if (cancelledBefore.rows[0]) throw new DomainError('INVALID_REQUEST', 'This trainer already dropped this session. Choose another trainer.');
       if (row.starts_at) {
-        const clash = await client.query(`select 1 from bookings where coach_id = $1 and status = 'confirmed' and starts_at = $2 and id <> $3 limit 1`, [trainerId, row.starts_at, id]);
-        if (clash.rows[0]) throw new DomainError('SLOT_CONFLICT', 'That trainer already has a session at this time.');
+        const clash = await client.query<{ busy: boolean }>(`select ${trainerBusySql('$1::uuid', '$2', '$4', '$3::uuid')} as busy`, [trainerId, row.starts_at, id, row.minutes]);
+        if (clash.rows[0]?.busy) throw new DomainError('SLOT_CONFLICT', 'That trainer already has a session that overlaps this time.');
       }
       await client.query(`update bookings set status = 'confirmed', coach_id = $2 where id = $1`, [id, trainerId]);
       await client.query(`insert into booking_events (id, booking_id, type, actor, payload) values ($1, $2, 'trainer_assigned', 'admin', $3)`, [uuidv7(), id, JSON.stringify({ trainerId, byUserId: adminId })]);

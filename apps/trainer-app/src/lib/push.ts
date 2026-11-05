@@ -5,6 +5,7 @@ import { AndroidImportance } from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { registerDevice, removeDevice } from '@/lib/api';
+import { reportError } from '@/lib/monitoring';
 
 // Push messages. Everything here is best effort: a trainer who says no, a simulator, or a build without push credentials
 // simply gets the same messages by email and sees the jobs when they open the app.
@@ -29,8 +30,8 @@ export async function registerForPush(): Promise<void> {
   try {
     const token = await currentToken(true);
     if (token) await registerDevice(token, Platform.OS === 'ios' ? 'ios' : 'android');
-  } catch {
-    // best effort
+  } catch (error) {
+    reportError(error, 'push-register');
   }
 }
 

@@ -193,6 +193,8 @@ export class AdminTrainerApplicationsService {
       const row = found.rows[0];
       if (!row) throw new DomainError('NOT_FOUND', 'Application not found.');
       if (row.status !== 'approved' || !row.trainer_status) throw new DomainError('INVALID_STATE', 'Only an approved trainer can be paused, suspended, revoked or resumed.');
+      const gone = await client.query(`select 1 from trainer_applications a join users u on u.id = a.user_id where a.id = $1 and u.status = 'deleted'`, [applicationId]);
+      if (gone.rows.length > 0) throw new DomainError('INVALID_STATE', 'This trainer deleted their account, so it cannot be changed.');
       if (row.trainer_status === target) throw new DomainError('INVALID_STATE', `This trainer is already ${target === 'active' ? 'active' : target}.`);
       await client.query(`update trainers set status = $2 where application_id = $1`, [applicationId, target]);
       const type = target === 'active' ? 'trainer_resumed' : `trainer_${target}`;

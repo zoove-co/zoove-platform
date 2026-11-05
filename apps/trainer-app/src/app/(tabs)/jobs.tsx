@@ -11,6 +11,9 @@ import { useJobs, useSetBoard, whoFor } from '@/lib/useJobs';
 import { colors } from '@/theme';
 
 // Sessions near the trainer that nobody has taken yet. The first trainer to accept gets it.
+// Where the job is compared with the trainer's own pincode. The exact address stays hidden until the job is accepted.
+const NEAR_LABEL = { same_pincode: 'In your pincode', near_you: 'Near you', elsewhere: 'Elsewhere in Mumbai' } as const;
+
 export default function Jobs() {
   const jobs = useJobs();
   const setBoard = useSetBoard();
@@ -53,7 +56,8 @@ export default function Jobs() {
         <Card key={job.id}>
           <AppText variant="heading">{job.whenLabel}</AppText>
           <AppText variant="body">{`${job.serviceName} · ${job.formatName} · ${whoFor(job)}`}</AppText>
-          <AppText variant="caption" color={colors.muted}>{`${job.area ?? 'Mumbai'} · Session ${job.sessionCode}`}</AppText>
+          <AppText variant="body" style={{ fontWeight: '600' }}>{[job.area ?? 'Mumbai', NEAR_LABEL[job.nearness ?? 'elsewhere']].join(' · ')}</AppText>
+          <AppText variant="caption" color={colors.muted}>{`Session ${job.sessionCode}`}</AppText>
           <View style={{ marginTop: 10 }}>
             <Button label="Accept this job" small loading={busy === job.id} disabled={busy !== null && busy !== job.id} onPress={() => void accept(job.id)} />
           </View>

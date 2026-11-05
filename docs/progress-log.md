@@ -254,3 +254,9 @@ Missing endpoints (the app's mock has them, the API does not):
 - Trainers get an email and a phone push about 30 minutes before a confirmed session. Sent once per trainer per start time, sent again if the session is moved, skipped if it was cancelled or reassigned before sending.
 - New table trainer_session_reminders (migration 0025). Needs EMAIL_WORKER_ENABLED not set to false.
 - Open question: block switching off when a session is upcoming? Currently the switch only affects new offers.
+
+## Trainer app: crash reports, account deletion, overlap rule, area on open jobs
+- Trainer app reports crashes and server errors to Sentry (off until EXPO_PUBLIC_SENTRY_DSN is set); personal data is scrubbed first.
+- Trainers can delete their account from Profile (DELETE /v1/trainer-application/account): details, ID documents (files too), private notes and phone registrations are removed, sign-in ends everywhere. Refused while a session is still ahead. The trainer row becomes "revoked" and ops cannot resume it. Queued outbox events are kept.
+- A trainer is never put on a session that overlaps another one (accept, assign, move, dispatch, board). Today's hourly slots and 60-minute sessions mean it only matters at the same start time; it is ready for longer sessions. No travel buffer is assumed (open business question).
+- Open jobs show the area (the customer's typed area, or the pincode's area name when they typed only "Mumbai") and "In your pincode / Near you / Elsewhere in Mumbai" compared with the trainer's own pincode. A distance in km is not possible yet: bookings carry no map pin and there is no pincode coordinate list.

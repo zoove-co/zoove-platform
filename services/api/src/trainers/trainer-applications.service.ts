@@ -304,6 +304,60 @@ export class TrainerApplicationsService {
     return this.get(userId);
   }
 
+  // Delete my trainer account. The rows stay where past sessions and payouts point at them, but every personal detail, the
+  // ID documents (files too), private notes and phone registrations are removed, and sign-in ends on every device. Refused
+  // while the trainer still holds a session that has not finished, so no customer is left waiting for a trainer who is gone.
+  // Queued outbox events are kept; a message with no email address left is simply not sent.
+  async deleteAccount(userId: string): Promise<void> {
+    const keys = await this.db.tx(async (client) => {
+      const found = await client.query<{ status: string }>(`select status from users where id = $1 for update`, [userId]);
+      if (found.rows[0]?.status !== 'active') throw new DomainError('NOT_FOUND', 'Account not found.');
+      const staff = await client.query(`select 1 from user_roles where user_id = $1 and role = 'admin'`, [userId]);
+      if (staff.rows.length > 0) throw new DomainError('FORBIDDEN', 'This account cannot be deleted here. Please contact support.');
+      const asCustomer = await client.query(`select 1 from bookings where user_id = $1 limit 1`, [userId]);
+      if (asCustomer.rows.length > 0) throw new DomainError('FORBIDDEN', 'This email also has customer bookings. Delete it from the Zoove customer app instead.');
+      const live = await client.query<{ count: string }>(
+        `select count(*) from bookings b join services s on s.id = b.service_id
+          where b.coach_id = $1 and b.status = 'confirmed' and (b.starts_at is null or b.starts_at + make_interval(mins => s.duration_max_minutes) > now())`,
+        [userId],
+      );
+      const liveCount = Number(live.rows[0]?.count ?? 0);
+      if (liveCount > 0) throw new DomainError('HAS_ACTIVE_BOOKINGS', 'Finish or cancel your upcoming sessions before deleting your account.', { count: liveCount });
+
+      const app = (await client.query<{ id: string; status: ApplicationStatus }>(`select id, status from trainer_applications where user_id = $1 for update`, [userId])).rows[0];
+      let storageKeys: string[] = [];
+      if (app) {
+        storageKeys = (await client.query<{ storage_key: string }>(`delete from trainer_documents where application_id = $1 returning storage_key`, [app.id])).rows.map((r) => r.storage_key);
+        await client.query(
+          `update trainer_applications set first_name = null, last_name = null, date_of_birth = null, gender = null, email = null, phone_e164 = null,
+                  address_line = null, address_area = null, address_pincode = null, specialties = '{}', experience_years = null, languages = '{}',
+                  bio = null, pan_encrypted = null, pan_last4 = null, pan_hash = null, aadhaar_last4 = null
+            where id = $1`,
+          [app.id],
+        );
+        // A person who deletes their account while waiting for a review leaves the queue; an approved trainer stays "approved" in history.
+        if (app.status !== 'approved' && app.status !== 'rejected') {
+          await client.query(`update trainer_applications set status = 'rejected', reviewed_at = now(), review_note = 'The applicant deleted their account.' where id = $1`, [app.id]);
+        }
+        await this.event(client, app.id, 'account_deleted', 'trainer', userId, {});
+      }
+      await client.query(`update trainers set status = 'revoked', accepting_jobs = false where user_id = $1`, [userId]);
+      await client.query(
+        `update users set status = 'deleted', phone_e164 = null, email = null, verified_email = null, first_name = null, last_name = null, full_name = null where id = $1`,
+        [userId],
+      );
+      await client.query(`delete from refresh_tokens where user_id = $1`, [userId]);
+      await client.query(`update consents set ip = null where user_id = $1`, [userId]);
+      await client.query(`delete from notification_devices where user_id = $1`, [userId]);
+      await client.query(`delete from trainer_session_notes where trainer_id = $1`, [userId]);
+      await client.query(`delete from trainer_session_reminders where trainer_id = $1`, [userId]);
+      await client.query(`delete from job_alerts where trainer_id = $1`, [userId]);
+      await client.query(`insert into audit_log (actor_user_id, action, entity_type, entity_id) values ($1, 'trainer.account_deleted', 'user', $1)`, [userId]);
+      return storageKeys;
+    });
+    for (const key of keys) await this.storage.remove(key).catch((error: unknown) => this.logger.warn(`Could not remove a deleted trainer's file: ${String(error)}`));
+  }
+
   async submit(userId: string, ip: string | null): Promise<ApplicationView> {
     await this.db.tx(async (client) => {
       const found = await client.query<AppRow>(`select ${APP_COLUMNS} from trainer_applications where user_id = $1 for update`, [userId]);

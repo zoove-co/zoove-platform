@@ -7,6 +7,7 @@ import { DatabaseService } from '../database/database.service';
 import { sessionCodeOf } from './bookings.service';
 import { DISPATCH_WAVES, INSTANT_GIVE_UP_MINUTES, type WaveScope } from './dispatch.rules';
 import { formatWhen } from './rules';
+import { trainerBusySql } from './trainer-clash';
 
 const BATCH = 50;
 const TOP_UP_BATCH = 200; // newest first, so a long tail of old unfilled sessions can never starve a new one
@@ -20,7 +21,7 @@ export async function alertAllSwitch(client: { query: (text: string, params?: un
 
 type OpenSession = {
   id: string; user_id: string; mode: string; starts_at: Date | null; address_pincode: string | null; address_area: string | null;
-  dispatch_started_at: Date; dispatch_wave: number; unfilled_notified_at: Date | null; service_slug: string; service_name: string;
+  dispatch_started_at: Date; dispatch_wave: number; unfilled_notified_at: Date | null; service_slug: string; service_name: string; minutes: number;
 };
 
 // Offers every open session to trainers in widening waves (same pincode, then same cluster, then everyone who teaches the
@@ -52,7 +53,7 @@ export class DispatchService implements OnModuleInit, OnModuleDestroy {
       return await this.db.tx(async (client) => {
         const everyone = await alertAllSwitch(client);
         const open = await client.query<OpenSession>(
-          `select b.id, b.user_id, b.mode, b.starts_at, b.address_pincode, b.address_area, b.dispatch_started_at, b.dispatch_wave, b.unfilled_notified_at, s.slug as service_slug, s.name as service_name
+          `select b.id, b.user_id, b.mode, b.starts_at, b.address_pincode, b.address_area, b.dispatch_started_at, b.dispatch_wave, b.unfilled_notified_at, s.slug as service_slug, s.name as service_name, s.duration_max_minutes as minutes
              from bookings b join services s on s.id = b.service_id
             where b.status in ('matching', 'rematching') and b.dispatch_started_at is not null and (b.starts_at is null or b.starts_at > $2)
               and (b.dispatch_wave < $1 or (b.mode = 'instant' and b.unfilled_notified_at is null))
@@ -73,7 +74,7 @@ export class DispatchService implements OnModuleInit, OnModuleDestroy {
   // session was booked, or free at that time since). Trainers already alerted are skipped, so nobody hears twice.
   private async topUp(client: import('pg').PoolClient, now: Date, skip: string[]): Promise<number> {
     const rows = await client.query<OpenSession>(
-      `select b.id, b.user_id, b.mode, b.starts_at, b.address_pincode, b.address_area, b.dispatch_started_at, b.dispatch_wave, b.unfilled_notified_at, s.slug as service_slug, s.name as service_name
+      `select b.id, b.user_id, b.mode, b.starts_at, b.address_pincode, b.address_area, b.dispatch_started_at, b.dispatch_wave, b.unfilled_notified_at, s.slug as service_slug, s.name as service_name, s.duration_max_minutes as minutes
          from bookings b join services s on s.id = b.service_id
         where b.status in ('matching', 'rematching') and b.dispatch_started_at is not null and (b.starts_at is null or b.starts_at > $2)
           and b.dispatch_wave >= $1 and not (b.id = any($3::uuid[]))
@@ -124,9 +125,9 @@ export class DispatchService implements OnModuleInit, OnModuleDestroy {
           and (cardinality(ta.specialties) = 0 or $3 = any(ta.specialties))
           and not exists (select 1 from job_alerts a where a.booking_id = $1 and a.trainer_id = t.user_id)
           and not exists (select 1 from booking_events e where e.booking_id = $1 and e.type in ('trainer_cancelled', 'trainer_no_show') and e.payload->>'trainerId' = t.user_id::text)
-          and ($4::timestamptz is null or not exists (select 1 from bookings x where x.coach_id = t.user_id and x.status = 'confirmed' and x.starts_at = $4))
+          and ($4::timestamptz is null or not ${trainerBusySql('t.user_id', '$4', '$6')})
           ${scopeSql} ${noop}`,
-      [s.id, s.user_id, s.service_slug, s.starts_at, s.address_pincode],
+      [s.id, s.user_id, s.service_slug, s.starts_at, s.address_pincode, s.minutes],
     );
     const code = sessionCodeOf(s.id);
     for (const c of candidates.rows) {

@@ -7,10 +7,13 @@ import { DatabaseService } from '../database/database.service';
 import { sessionCodeOf } from './bookings.service';
 import { formatWhen } from './rules';
 import { SessionsAdminService } from './sessions-admin.service';
+import { trainerBusySql } from './trainer-clash';
 
 export type OpenJob = {
   id: string; sessionCode: string; serviceName: string; formatName: string; startsAt: string | null; whenLabel: string;
   participant: string; groupSize: number | null; area: string | null;
+  // How close the job is to this trainer's own pincode: same pincode, same area group, or elsewhere in the city. Null where it does not apply.
+  nearness: 'same_pincode' | 'near_you' | 'elsewhere' | null;
 };
 // A job the trainer already holds. The full address and the customer's first name are shown only here, never on an open job.
 export type MyJob = OpenJob & { customerFirstName: string; addressLabel: string; addressLine: string; pincode: string | null; canCancel: boolean; canComplete: boolean; note: string };
@@ -20,14 +23,18 @@ export type JobBoard = { acceptingJobs: boolean; open: OpenJob[]; mine: MyJob[];
 
 type Row = {
   id: string; mode: string; participant: string; group_size: number | null; starts_at: Date | null; address_area: string | null; address_pincode: string | null;
-  address_label: string; address_line: string; service_name: string; format_name: string; full_name: string | null; note?: string | null; completed_at?: Date | null;
+  address_label: string; address_line: string; service_name: string; format_name: string; full_name: string | null; note?: string | null; completed_at?: Date | null; cluster_name: string | null; near?: 'same_pincode' | 'near_you' | 'elsewhere' | null;
 };
-const COLS = `b.id, b.mode, b.participant, b.group_size, b.starts_at, b.address_area, b.address_pincode, b.address_label, b.address_line, s.name as service_name, f.name as format_name, u.full_name`;
+const COLS = `b.id, b.mode, b.participant, b.group_size, b.starts_at, b.address_area, b.address_pincode, b.address_label, b.address_line, s.name as service_name, f.name as format_name, u.full_name,
+  (select c.name from cluster_pincodes cp join clusters c on c.id = cp.cluster_id where cp.pincode = b.address_pincode limit 1) as cluster_name`;
 const FROM = `from bookings b join services s on s.id = b.service_id join service_formats f on f.id = b.format_id join users u on u.id = b.user_id`;
+
+// The area the customer typed, unless it is only the city name (then the real area name of their pincode is more useful).
+const areaLabel = (r: Row): string | null => (r.address_area && r.address_area.trim().toLowerCase() !== 'mumbai' ? r.address_area : (r.cluster_name ?? r.address_area));
 
 const toOpen = (r: Row): OpenJob => ({
   id: r.id, sessionCode: sessionCodeOf(r.id), serviceName: r.service_name, formatName: r.format_name, startsAt: r.starts_at ? r.starts_at.toISOString() : null,
-  whenLabel: r.starts_at ? formatWhen(r.starts_at) : 'As soon as possible', participant: r.participant, groupSize: r.group_size, area: r.address_area,
+  whenLabel: r.starts_at ? formatWhen(r.starts_at) : 'As soon as possible', participant: r.participant, groupSize: r.group_size, area: areaLabel(r), nearness: r.near ?? null,
 });
 
 // What a trainer sees and does: the open jobs nobody has taken (first to accept gets it), their own sessions, and cancelling one of theirs.
@@ -48,11 +55,16 @@ export class TrainerJobsService {
     const [open, mine, done, doneCount] = await Promise.all([
       // Open = no trainer yet, not started, this trainer has not dropped it, and this trainer is not busy at that time.
       this.db.query<Row>(
-        `select ${COLS} ${FROM}
+        `select ${COLS},
+                case when b.address_pincode is not null and b.address_pincode = me.pin then 'same_pincode'
+                     when exists (select 1 from cluster_pincodes a join cluster_pincodes c on c.cluster_id = a.cluster_id where a.pincode = b.address_pincode and c.pincode = me.pin) then 'near_you'
+                     else 'elsewhere' end as near
+           ${FROM}
+           cross join (select (select ta.address_pincode from trainers t join trainer_applications ta on ta.id = t.application_id where t.user_id = $1::uuid) as pin) me
           where b.status in ('matching', 'rematching') and (b.starts_at is null or b.starts_at > now())
             and exists (select 1 from job_alerts a where a.booking_id = b.id and a.trainer_id = $1::uuid)
             and not exists (select 1 from booking_events e where e.booking_id = b.id and e.type in ('trainer_cancelled', 'trainer_no_show') and e.payload->>'trainerId' = ($1::uuid)::text)
-            and (b.starts_at is null or not exists (select 1 from bookings x where x.coach_id = $1::uuid and x.status = 'confirmed' and x.starts_at = b.starts_at))
+            and (b.starts_at is null or not ${trainerBusySql('$1::uuid', 'b.starts_at', 's.duration_max_minutes')})
           order by b.starts_at nulls first, b.created_at limit 100`, [userId]),
       this.db.query<Row>(
         `select ${COLS}, n.note ${FROM} left join trainer_session_notes n on n.booking_id = b.id and n.trainer_id = $1::uuid
@@ -86,8 +98,8 @@ export class TrainerJobsService {
       throw new DomainError('INVALID_STATE', 'You are switched off for new jobs. Switch on to take this job.');
     }
     await this.db.tx(async (client) => {
-      const row = (await client.query<{ id: string; user_id: string; status: string; starts_at: Date | null; service_name: string }>(
-        `select b.id, b.user_id, b.status, b.starts_at, s.name as service_name from bookings b join services s on s.id = b.service_id where b.id = $1 for update of b`, [id])).rows[0];
+      const row = (await client.query<{ id: string; user_id: string; status: string; starts_at: Date | null; service_name: string; minutes: number }>(
+        `select b.id, b.user_id, b.status, b.starts_at, s.name as service_name, s.duration_max_minutes as minutes from bookings b join services s on s.id = b.service_id where b.id = $1 for update of b`, [id])).rows[0];
       if (!row) throw new DomainError('NOT_FOUND', 'We could not find that job.');
       if (row.status !== 'matching' && row.status !== 'rematching') throw new DomainError('INVALID_STATE', 'Someone else just took this job.');
       if (row.starts_at && row.starts_at.getTime() <= Date.now()) throw new DomainError('INVALID_STATE', 'This job\'s start time has passed.');
@@ -102,8 +114,8 @@ export class TrainerJobsService {
       if ((await client.query(`select 1 from booking_events where booking_id = $1 and type in ('trainer_cancelled', 'trainer_no_show') and payload->>'trainerId' = $2 limit 1`, [id, userId])).rows[0]) {
         throw new DomainError('INVALID_STATE', 'You already dropped this session.');
       }
-      if (row.starts_at && (await client.query(`select 1 from bookings where coach_id = $1 and status = 'confirmed' and starts_at = $2 and id <> $3 limit 1`, [userId, row.starts_at, id])).rows[0]) {
-        throw new DomainError('SLOT_CONFLICT', 'You already have a session at this time.');
+      if (row.starts_at && (await client.query(`select ${trainerBusySql('$1::uuid', '$2', '$4', '$3::uuid')} as busy`, [userId, row.starts_at, id, row.minutes])).rows[0]?.busy) {
+        throw new DomainError('SLOT_CONFLICT', 'You already have a session that overlaps this time.');
       }
       await client.query(`update bookings set status = 'confirmed', coach_id = $2 where id = $1`, [id, userId]);
       await client.query(`insert into booking_events (id, booking_id, type, actor, payload) values ($1, $2, 'trainer_assigned', 'trainer', $3)`, [uuidv7(), id, JSON.stringify({ trainerId: userId, byUserId: userId, pickedByTrainer: true })]);

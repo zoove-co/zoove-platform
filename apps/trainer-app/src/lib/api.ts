@@ -1,4 +1,5 @@
 import { API_URL } from '@/lib/config';
+import { reportError } from '@/lib/monitoring';
 
 // One client for the Zoove API. It is the same API the Join Zoove web page uses, so an application started on the web
 // is the same application here (same account, same saved answers, same documents, same status).
@@ -65,7 +66,10 @@ async function send<T>(method: string, path: string, body: BodyInit | undefined,
     if (response.ok) return { status: response.status, data: json as T, error: null };
     const failure = (json as { error?: { code?: string; message?: string; details?: unknown } } | null)?.error;
     const code: ApiErrorCode = failure?.code ?? (response.status === 401 ? 'UNAUTHORIZED' : 'INTERNAL');
-    return { status: response.status, data: null, error: new ApiError(code, failure?.message ?? GENERIC_MESSAGE, response.status, failure?.details) };
+    const failed = new ApiError(code, failure?.message ?? GENERIC_MESSAGE, response.status, failure?.details);
+    // Only a server fault is worth a report; a refused code or a validation message is normal.
+    if (response.status >= 500) reportError(failed, 'api');
+    return { status: response.status, data: null, error: failed };
   } catch {
     // No connection, DNS failure, or no answer within the time limit.
     return { status: 0, data: null, error: new ApiError('NETWORK', NETWORK_MESSAGE, 0) };
@@ -126,6 +130,8 @@ export async function verifyCode(email: string, code: string): Promise<Session> 
   const reply = await call<TokenReply>('/v1/auth/email-otp/verify', { json: { email, code, audience: 'trainer' }, authed: false });
   return { accessToken: reply.token, refreshToken: reply.refreshToken };
 }
+// Deletes the trainer's account (details, documents, notes). The server refuses while a session is still ahead and says why.
+export const deleteAccount = () => call<null>('/v1/trainer-application/account', { method: 'DELETE' });
 export async function logout(): Promise<void> {
   const current = session;
   if (!current) return;
@@ -210,7 +216,7 @@ export async function listServices(): Promise<Service[]> {
 }
 
 // ---- Jobs: open sessions nobody has taken (first to accept gets it) and the trainer's own sessions ----
-export type OpenJob = { id: string; sessionCode: string; serviceName: string; formatName: string; startsAt: string | null; whenLabel: string; participant: string; groupSize: number | null; area: string | null };
+export type OpenJob = { id: string; sessionCode: string; serviceName: string; formatName: string; startsAt: string | null; whenLabel: string; participant: string; groupSize: number | null; area: string | null; nearness: 'same_pincode' | 'near_you' | 'elsewhere' | null };
 export type MyJob = OpenJob & { customerFirstName: string; addressLabel: string; addressLine: string; pincode: string | null; canCancel: boolean; canComplete: boolean; note: string };
 export type DoneJob = OpenJob & { customerFirstName: string; completedAt: string | null; note: string };
 export type JobBoard = { acceptingJobs: boolean; open: OpenJob[]; mine: MyJob[]; done: DoneJob[]; doneCount: number };

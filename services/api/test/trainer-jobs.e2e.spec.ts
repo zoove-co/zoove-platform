@@ -317,4 +317,75 @@ suite('trainer jobs: who is free, assigning, open jobs, accepting and cancelling
       expect(options.find((o) => o.name.startsWith('Bala'))?.acceptingJobs).toBe(false); // still listed: ops can assign directly
     });
   });
+
+  describe('sessions that overlap in time', () => {
+    // Today every slot is on the hour and no session is longer than 60 minutes, so two sessions only clash at the same start.
+    // This makes the rule ready for longer sessions: a 90 minute session from 17:00 runs until 18:30.
+    it('does not put a trainer on a session that starts before another one ends, but allows back to back', async () => {
+      await pool.query(`update services set duration_max_minutes = 90 where slug = 'yoga'`);
+      try {
+        const a = await bookingId(me, await addressFor(me), slot(3, 17));
+        const b = await bookingId(friend, await addressFor(friend), slot(3, 18)); // starts inside the first session
+        const c = await bookingId(me, await addressFor(me), slot(3, 19)); // starts after it ended
+        await assign(a, t1Id).expect(200);
+        expect((await available(b)).map((t) => t.name)).toEqual(['Bala Rao']);
+        await assign(b, t1Id).expect(409);
+        await http().post(`/v1/trainer/jobs/${b}/accept`).set(as(t1)).expect(409);
+        expect((await board(t1)).open.map((j) => j.id)).not.toContain(b);
+        expect((await board(t1)).open.map((j) => j.id)).toContain(c);
+        await http().post(`/v1/trainer/jobs/${c}/accept`).set(as(t1)).expect(200);
+      } finally {
+        await pool.query(`update services set duration_max_minutes = 60 where slug = 'yoga'`);
+      }
+    });
+  });
+
+  describe('where an open job is', () => {
+    it('shows the area name of the pincode when the customer only typed the city, and how near the job is to the trainer', async () => {
+      const near = (await pool.query<{ pincode: string }>(`select cp.pincode from cluster_pincodes cp join clusters c on c.id = cp.cluster_id where c.slug = 'bandra-khar' and cp.pincode <> '400050' limit 1`)).rows[0]!.pincode;
+      await pool.query(`update trainer_applications set address_pincode = '400050' where user_id = $1`, [t1Id]);
+      await pool.query(`update trainer_applications set address_pincode = $2 where user_id = $1`, [t2Id, near]);
+      const id = await bookingId(me, await addressFor(me), slot(3));
+      await pool.query(`update bookings set address_area = 'Mumbai' where id = $1`, [id]);
+      await pool.query(`insert into job_alerts (booking_id, trainer_id, wave) values ($1, $2, 1), ($1, $3, 2) on conflict do nothing`, [id, t1Id, t2Id]);
+      expect((await board(t1)).open[0]).toMatchObject({ area: 'Bandra-Khar', nearness: 'same_pincode' });
+      expect((await board(t2)).open[0]).toMatchObject({ area: 'Bandra-Khar', nearness: 'near_you' });
+      await pool.query(`update trainer_applications set address_pincode = '400076' where user_id = $1`, [t2Id]);
+      expect((await board(t2)).open[0]).toMatchObject({ nearness: 'elsewhere' });
+    });
+  });
+
+  describe('trainer account deletion', () => {
+    const remove = (t: string) => http().delete('/v1/trainer-application/account').set(as(t));
+    it('is refused while a session is still ahead, then wipes the account and ends sign-in', async () => {
+      const id = await bookingId(me, await addressFor(me), slot(3));
+      await http().post(`/v1/trainer/jobs/${id}/accept`).set(as(t1)).expect(200);
+      const refused = await remove(t1).expect(409);
+      expect(refused.body.error.code).toBe('HAS_ACTIVE_BOOKINGS');
+      await http().post(`/v1/trainer/jobs/${id}/cancel`).set(as(t1)).send({ reason: 'Leaving Zoove' }).expect(200);
+      const appRow = (await pool.query<{ id: string }>(`select id from trainer_applications where user_id = $1`, [t1Id])).rows[0]!.id;
+      await pool.query(`update trainer_applications set email = 'asha@trainer.test', pan_last4 = 'ABCD', bio = 'Hello' where id = $1`, [appRow]);
+      await pool.query(`insert into trainer_documents (id, application_id, kind, storage_key, mime_type, size_bytes) values (gen_random_uuid(), $1, 'selfie', 'test/selfie-1', 'image/jpeg', 1000)`, [appRow]);
+      await pool.query(`insert into trainer_session_notes (booking_id, trainer_id, note) values ($1, $2, 'private')`, [id, t1Id]);
+      await remove(t1).expect(204);
+      const user = (await pool.query(`select status, email, verified_email, phone_e164, full_name from users where id = $1`, [t1Id])).rows[0];
+      expect(user).toMatchObject({ status: 'deleted', email: null, verified_email: null, phone_e164: null, full_name: null });
+      expect((await pool.query(`select first_name, email, pan_last4, bio from trainer_applications where id = $1`, [appRow])).rows[0]).toEqual({ first_name: null, email: null, pan_last4: null, bio: null });
+      expect((await pool.query(`select count(*)::int as c from trainer_documents where application_id = $1`, [appRow])).rows[0].c).toBe(0);
+      expect((await pool.query(`select status, accepting_jobs from trainers where user_id = $1`, [t1Id])).rows[0]).toEqual({ status: 'revoked', accepting_jobs: false });
+      expect((await pool.query(`select count(*)::int as c from refresh_tokens where user_id = $1`, [t1Id])).rows[0].c).toBe(0);
+      expect((await pool.query(`select count(*)::int as c from trainer_session_notes where trainer_id = $1`, [t1Id])).rows[0].c).toBe(0);
+      expect((await http().get('/v1/trainer/jobs').set(as(t1))).status).not.toBe(200);
+      // The other trainer is unaffected, the session is open again for others, and ops cannot bring the deleted trainer back.
+      expect((await board(t2)).open.map((j) => j.id)).toContain(id);
+      const adminApp = (await http().get('/v1/admin/trainer-applications').set(as(owner)).expect(200)).body.items as { id: string; trainerStatus: string | null }[];
+      const gone = adminApp.find((i) => i.trainerStatus === 'revoked');
+      await http().post(`/v1/admin/trainer-applications/${gone!.id}/trainer-status`).set(as(owner)).send({ status: 'active' }).expect(409);
+    });
+
+    it('is not for customers who have bookings', async () => {
+      await bookingId(me, await addressFor(me), slot(3));
+      await remove(me).expect(403);
+    });
+  });
 });
