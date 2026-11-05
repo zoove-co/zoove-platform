@@ -13,7 +13,7 @@ export type OpenJob = {
   participant: string; groupSize: number | null; area: string | null;
 };
 // A job the trainer already holds. The full address and the customer's first name are shown only here, never on an open job.
-export type MyJob = OpenJob & { customerFirstName: string; addressLabel: string; addressLine: string; pincode: string | null; canCancel: boolean };
+export type MyJob = OpenJob & { customerFirstName: string; addressLabel: string; addressLine: string; pincode: string | null; canCancel: boolean; canComplete: boolean };
 export type JobBoard = { open: OpenJob[]; mine: MyJob[] };
 
 type Row = {
@@ -47,12 +47,13 @@ export class TrainerJobsService {
       this.db.query<Row>(
         `select ${COLS} ${FROM}
           where b.status in ('matching', 'rematching') and (b.starts_at is null or b.starts_at > now())
+            and exists (select 1 from job_alerts a where a.booking_id = b.id and a.trainer_id = $1::uuid)
             and not exists (select 1 from booking_events e where e.booking_id = b.id and e.type in ('trainer_cancelled', 'trainer_no_show') and e.payload->>'trainerId' = ($1::uuid)::text)
             and (b.starts_at is null or not exists (select 1 from bookings x where x.coach_id = $1::uuid and x.status = 'confirmed' and x.starts_at = b.starts_at))
           order by b.starts_at nulls first, b.created_at limit 100`, [userId]),
       this.db.query<Row>(
         `select ${COLS} ${FROM}
-          where b.coach_id = $1::uuid and b.status = 'confirmed' and (b.starts_at is null or b.starts_at >= now() - interval '1 day')
+          where b.coach_id = $1::uuid and b.status = 'confirmed' and (b.starts_at is null or b.starts_at >= now() - interval '7 days')
           order by b.starts_at nulls first, b.created_at limit 100`, [userId]),
     ]);
     return {
@@ -60,6 +61,7 @@ export class TrainerJobsService {
       mine: mine.rows.map((r) => ({
         ...toOpen(r), customerFirstName: r.full_name?.trim().split(/\s+/)[0] || 'Customer', addressLabel: r.address_label, addressLine: r.address_line, pincode: r.address_pincode,
         canCancel: r.starts_at === null || r.starts_at.getTime() > now.getTime(),
+        canComplete: r.starts_at === null || r.starts_at.getTime() <= now.getTime(),
       })),
     };
   }
@@ -74,6 +76,10 @@ export class TrainerJobsService {
       if (!row) throw new DomainError('NOT_FOUND', 'We could not find that job.');
       if (row.status !== 'matching' && row.status !== 'rematching') throw new DomainError('INVALID_STATE', 'Someone else just took this job.');
       if (row.starts_at && row.starts_at.getTime() <= Date.now()) throw new DomainError('INVALID_STATE', 'This job\'s start time has passed.');
+      // Only a job that was offered to this trainer can be taken (it is offered nearest first, then wider).
+      if (!(await client.query(`select 1 from job_alerts where booking_id = $1 and trainer_id = $2`, [id, userId])).rows[0]) {
+        throw new DomainError('INVALID_STATE', 'This job is not available to you.');
+      }
       const me = (await client.query<{ name: string }>(
         `select coalesce(nullif(trim(concat_ws(' ', ta.first_name, ta.last_name)), ''), u.full_name, 'Your coach') as name
            from trainers t join trainer_applications ta on ta.id = t.application_id join users u on u.id = t.user_id where t.user_id = $1 and t.status = 'active' for update of t`, [userId])).rows[0];
@@ -98,6 +104,13 @@ export class TrainerJobsService {
   async cancel(userId: string, id: string, reason: string): Promise<JobBoard> {
     await this.assertActiveTrainer(userId);
     await this.sessions.trainerCancel(userId, 'trainer', id, reason, userId);
+    return this.board(userId);
+  }
+
+  // The trainer marks their own session done once it has started.
+  async complete(userId: string, id: string): Promise<JobBoard> {
+    await this.assertActiveTrainer(userId);
+    await this.sessions.complete(userId, 'trainer', id, userId);
     return this.board(userId);
   }
 }

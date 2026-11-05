@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { acceptJob, ApiError, cancelJob, getJobs, type JobBoard, type MyJob, type OpenJob } from '@/lib/api';
+import { acceptJob, ApiError, cancelJob, completeJob, getJobs, type JobBoard, type MyJob, type OpenJob } from '@/lib/api';
 import { Spinner } from './ui';
 
 const PEOPLE: Record<string, string> = { personal: 'Personal', duo: 'Duo', loved_one: 'Loved one', group: 'Group' };
@@ -55,6 +55,9 @@ export function Jobs({ onExpired }: { onExpired: () => void }) {
           <div>{j.serviceName} · {j.formatName} · {who(j)}</div>
           <div className="muted small" style={{ marginTop: 6 }}>{j.customerFirstName} · {j.addressLabel}: {j.addressLine}{j.pincode ? `, ${j.pincode}` : ''}</div>
           <div className="muted small">Session {j.sessionCode}</div>
+          {j.canComplete ? (
+            <button className="btn small" type="button" style={{ marginTop: 10, marginRight: 8 }} disabled={busy === j.id} onClick={() => void run(j.id, () => completeJob(j.id), 'Thank you. The session is marked done.')}>{busy === j.id ? <Spinner /> : null} Session done</button>
+          ) : null}
           {j.canCancel ? (
             cancelling === j.id ? (
               <div style={{ marginTop: 10 }}>
@@ -73,7 +76,7 @@ export function Jobs({ onExpired }: { onExpired: () => void }) {
       ))}
 
       <h2 style={{ margin: '22px 0 8px' }}>Open jobs</h2>
-      <p className="muted small" style={{ margin: '0 0 10px' }}>Sessions nobody has taken yet. The first trainer to accept gets it. You only see jobs at times you are free. The full address shows after you accept.</p>
+      <p className="muted small" style={{ margin: '0 0 10px' }}>Sessions near you that nobody has taken yet. Jobs closest to you appear first, and more appear as we widen the search. The first trainer to accept gets it. You only see jobs at times you are free. The full address shows after you accept.</p>
       {board.open.length === 0 ? <div className="card soft"><span className="muted small">No open jobs right now. This page checks again every few seconds.</span></div> : null}
       {board.open.map((j) => (
         <div className="card" key={j.id} style={{ marginBottom: 10 }}>

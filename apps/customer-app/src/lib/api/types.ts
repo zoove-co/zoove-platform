@@ -411,6 +411,9 @@ export interface Api {
   deleteAddress(id: string): Promise<Address[]>;
   listNotifications(): Promise<AppNotification[]>;
   markNotificationsRead(): Promise<void>;
+  /** Tell the server this phone can receive push messages (or no longer should). */
+  registerDevice(token: string, platform: 'ios' | 'android'): Promise<void>;
+  removeDevice(token: string): Promise<void>;
   getSlots(serviceSlug: string, isoDate: string): Promise<TimeSlot[]>;
   // Checks a discount code for a session and returns the new total. Nothing is used up until the booking is made.
   previewDiscount(input: { code: string; serviceSlug: string; mode: BookingMode }): Promise<DiscountQuote>;

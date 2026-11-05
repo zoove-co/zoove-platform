@@ -206,6 +206,8 @@ export class PackagesService {
         [id, input.extraSessions, input.extendDays],
       );
       const after = upd.rows[0]!;
+      // A new end date means the customer should be warned again before it.
+      if (input.extendDays > 0) await client.query(`delete from package_reminders where purchase_id = $1`, [id]);
       await client.query(
         `insert into audit_log (actor_user_id, action, entity_type, entity_id, before, after) values ($1, 'package.exception_granted', 'package_purchase', $2, $3, $4)`,
         [adminId, id, JSON.stringify({ creditsTotal: cur.credits_total, creditsUsed: cur.credits_used, expiresAt: cur.expires_at.toISOString() }),

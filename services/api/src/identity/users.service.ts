@@ -60,6 +60,9 @@ export class UsersService {
       // The consent record stays as proof; the network address recorded with it goes.
       await client.query(`update consents set ip = null where user_id = $1`, [userId]);
       await client.query(`delete from customer_notifications where user_id = $1`, [userId]);
+      await client.query(`delete from notification_devices where user_id = $1`, [userId]);
+      // Copies of their messages waiting to be sent (they hold booking details) go with the account.
+      await client.query(`delete from outbox_events where event_type = 'customer.notify' and aggregate_id = $1`, [userId]);
       await client.query(`delete from customer_profiles where user_id = $1`, [userId]);
       await client.query(`delete from referral_codes where user_id = $1`, [userId]);
       await client.query(

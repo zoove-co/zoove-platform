@@ -57,6 +57,12 @@ export class SessionsAdminController {
     return this.sessions.reschedule(user.id, id, body.startsAt, body.reason);
   }
 
+  @Post(':id/complete')
+  @HttpCode(200)
+  complete(@CurrentUser() user: AuthUser, @Param('id', new ZodValidationPipe(idSchema)) id: string) {
+    return this.sessions.complete(user.id, 'admin', id);
+  }
+
   @Post(':id/assign')
   @HttpCode(200)
   assign(@CurrentUser() user: AuthUser, @Param('id', new ZodValidationPipe(idSchema)) id: string, @Body(new ZodValidationPipe(assignSchema)) body: z.infer<typeof assignSchema>) {

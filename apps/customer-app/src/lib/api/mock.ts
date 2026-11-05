@@ -726,6 +726,14 @@ export const mockApi: Api = {
     for (const item of notifications) item.read = true;
   },
 
+  async registerDevice() {
+    await wait(50);
+  },
+
+  async removeDevice() {
+    await wait(50);
+  },
+
   async getSlots(serviceSlug, isoDate) {
     await wait(200);
     return slotsFor(isoDate);

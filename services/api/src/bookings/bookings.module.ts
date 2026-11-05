@@ -8,6 +8,8 @@ import { ReferralModule } from '../referral/referral.module';
 import { IdentityModule } from '../identity/identity.module';
 import { BookingsController } from './bookings.controller';
 import { BookingsService } from './bookings.service';
+import { CompletionSweepService } from './completion-sweep.service';
+import { DispatchService } from './dispatch.service';
 import { OverdueSweepService } from './overdue-sweep.service';
 import { SessionsAdminController } from './sessions-admin.controller';
 import { SessionsAdminService } from './sessions-admin.service';
@@ -17,7 +19,7 @@ import { TrainerJobsService } from './trainer-jobs.service';
 @Module({
   imports: [IdentityModule, CatalogModule, AddressesModule, DiscountsModule, PackagesModule, ReferralModule],
   controllers: [BookingsController, SessionsAdminController, TrainerJobsController],
-  providers: [BookingsService, SessionsAdminService, OverdueSweepService, TrainerJobsService],
-  exports: [OverdueSweepService],
+  providers: [BookingsService, SessionsAdminService, OverdueSweepService, TrainerJobsService, DispatchService, CompletionSweepService],
+  exports: [OverdueSweepService, DispatchService, CompletionSweepService],
 })
 export class BookingsModule {}

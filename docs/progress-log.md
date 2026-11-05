@@ -4,6 +4,15 @@ Newest entry first. Add a new dated section at the top whenever something meanin
 
 ---
 
+## 5 November 2026 (evening): finding a coach, closing sessions, notifications
+- Migration `0021_dispatch_completion_channels.sql`: dispatch state on bookings (restart trigger), `job_alerts`, `notification_devices`, `package_reminders`, completion columns.
+- Trainers are alerted in waves, nearest first; the job board shows only what they were alerted about. Trainer is emailed when a customer cancels or moves their session.
+- Instant sessions have a give-up point: the customer is offered a date or a cancel. App shows it and lets them pick a date.
+- Session completion by trainer (jobs page) or ops (admin); ops flagged after 3 hours; streak now counts real sessions.
+- All customer notifications also go out by email and push (WhatsApp seam off). Package expiry reminders. Retention covers old push tokens and job alerts.
+- Found and fixed before release: a lock that would have frozen the notification worker (customer channel records are written on the worker's own transaction).
+- Not built: rating screen, trainer payout, WhatsApp, SMS to trainers (needs DLT), real distance ordering (needs trainer locations).
+
 ## 5 November 2026: trainer jobs
 - Admin Assign shows only trainers free at that session's time (and not one who dropped it), with how many sessions they already have that day. The server re-checks, and a per-trainer lock stops double booking.
 - The trainer is emailed when ops assign them or move their session (outbox events `trainer.job_assigned`, `trainer.job_moved`).

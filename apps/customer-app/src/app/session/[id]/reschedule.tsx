@@ -50,7 +50,7 @@ export default function RescheduleScreen() {
   }
 
   // Deep link or stale screen: only a changeable, scheduled session can be rescheduled.
-  if (!updatedLabel && (!booking.canChange || booking.mode === 'instant' || !isActiveStatus(booking.status))) {
+  if (!updatedLabel && (!booking.canChange || (booking.mode === 'instant' && !booking.overdue) || !isActiveStatus(booking.status))) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
         <ScreenHeader title={t('session.rescheduleTitle')} />

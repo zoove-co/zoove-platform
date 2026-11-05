@@ -4,6 +4,7 @@ import { v7 as uuidv7 } from 'uuid';
 
 import { DomainError } from '../common/domain-error';
 import { notifyCustomer } from '../customer/notify';
+import { queueTrainerAlert } from '../notifications/trainer-alerts';
 import { DatabaseService } from '../database/database.service';
 import { PackagesService } from '../packages/packages.service';
 import { assertBookableSlot, sessionCodeOf, type BookingStatus } from './bookings.service';
@@ -197,6 +198,10 @@ export class SessionsAdminService {
             uuidv7(), id, JSON.stringify({ trainerId: row.coach_id, sessionCode: sessionCodeOf(id), serviceName: row.service_name, when: formatWhen(startsAt), area: row.address_area ?? '' }),
           ]);
         }
+        // A trainer who is busy at the new time is taken off the session and told.
+        if (row.status === 'confirmed' && row.coach_id && clash) {
+          await queueTrainerAlert(client, 'trainer.job_cancelled', id, row.coach_id, { sessionCode: sessionCodeOf(id), serviceName: row.service_name, when: formatWhen(startsAt), area: row.address_area ?? '', reason: 'moved' });
+        }
         await notifyCustomer(
           client, row.user_id, 'Your session was moved',
           `Our team moved your ${row.service_name} session (session ${sessionCodeOf(id)}) to ${formatWhen(startsAt)}.${clash ? ' Your coach is not free then, so we are finding another coach and will tell you as soon as one is assigned.' : ''} You can still move it again or cancel it from the app.`,
@@ -209,6 +214,28 @@ export class SessionsAdminService {
       }
       throw error;
     }
+    return this.detail(id);
+  }
+
+  // The session happened. The trainer closes it from their jobs page, or ops close it from here. Closing is what makes the
+  // customer's streak, ratings and the trainer's payout possible, and it tells CleverTap the session was completed.
+  // An instant session has no start time until now, so it gets one: the moment it was closed.
+  // `onlyCoachId` is set when a trainer closes their own session: it must still be theirs when the row is locked.
+  async complete(actorUserId: string, actor: 'admin' | 'trainer', id: string, onlyCoachId?: string): Promise<AdminSessionDetail> {
+    await this.db.tx(async (client) => {
+      const row = await this.lock(client, id);
+      if (row.status === 'completed') return; // closing twice changes nothing
+      if (row.status !== 'confirmed' || !row.coach_id) throw new DomainError('INVALID_STATE', 'Only a session that has a trainer on it can be marked as done.');
+      if (onlyCoachId && row.coach_id !== onlyCoachId) throw new DomainError('INVALID_STATE', 'This session is not yours.');
+      if (row.starts_at && row.starts_at.getTime() > Date.now()) throw new DomainError('INVALID_STATE', 'This session has not started yet.');
+      await client.query(`update bookings set status = 'completed', completed_at = now(), completed_by = $2, starts_at = coalesce(starts_at, now()) where id = $1`, [id, actorUserId]);
+      await client.query(`insert into booking_events (id, booking_id, type, actor, payload) values ($1, $2, 'completed', $3, $4)`, [uuidv7(), id, actor, JSON.stringify({ trainerId: row.coach_id, byUserId: actorUserId })]);
+      await client.query(`insert into outbox_events (id, aggregate_type, aggregate_id, event_type, payload) values ($1, 'booking', $2, 'booking.completed', $3)`, [
+        uuidv7(), id, JSON.stringify({ bookingId: id, userId: row.user_id, trainerId: row.coach_id, by: actor }),
+      ]);
+      await client.query(`insert into audit_log (actor_user_id, action, entity_type, entity_id, after) values ($1, 'session.completed', 'booking', $2, $3)`, [actorUserId, id, JSON.stringify({ by: actor, trainerId: row.coach_id })]);
+      await notifyCustomer(client, row.user_id, 'Session complete', `Your ${row.service_name} session (session ${sessionCodeOf(id)}) is complete. Well done! It counts towards your streak.`, id);
+    });
     return this.detail(id);
   }
 

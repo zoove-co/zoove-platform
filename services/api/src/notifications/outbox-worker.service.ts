@@ -1,19 +1,21 @@
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import type { PoolClient } from 'pg';
 
 import { APP_CONFIG, type Env } from '../config/env';
 import { DatabaseService } from '../database/database.service';
 import { EmailProvider, type EmailMessage } from '../email/email.provider';
 import { ERROR_REPORTER, type ErrorReporter } from '../monitoring/error-reporter';
 import { referralRewardEmail } from './customer-emails';
-import { jobAssignedEmail, jobMovedEmail } from './trainer-job-emails';
-import { partyRequestedEmail, teamInviteEmail, sessionOverdueEmail, trainerCancelledEmail } from './team-emails';
+import { CustomerMessageService } from './customer-message.service';
+import { jobAssignedEmail, jobAvailableEmail, jobCancelledEmail, jobMovedEmail } from './trainer-job-emails';
+import { packageExpiredOpsEmail, partyRequestedEmail, sessionNotClosedEmail, sessionOverdueEmail, sessionUnfilledEmail, teamInviteEmail, trainerCancelledEmail } from './team-emails';
 import { approvedEmail, changesEmail, opsNewApplicationEmail, receivedEmail, rejectedEmail } from './trainer-emails';
 
 type OutboxRow = { id: string; aggregate_id: string; event_type: string; payload: Record<string, unknown>; attempts: number };
 
 type ApplicationInfo = { first_name: string | null; last_name: string | null; email: string | null; phone_e164: string | null; review_note: string | null };
 
-const HANDLED = ['trainer.application_submitted', 'trainer.application_approved', 'trainer.application_rejected', 'trainer.application_changes_requested', 'team.member_invited', 'party.requested', 'booking.trainer_cancelled', 'booking.overdue', 'referral.reward_granted', 'trainer.job_assigned', 'trainer.job_moved'];
+const HANDLED = ['trainer.application_submitted', 'trainer.application_approved', 'trainer.application_rejected', 'trainer.application_changes_requested', 'team.member_invited', 'party.requested', 'booking.trainer_cancelled', 'booking.overdue', 'referral.reward_granted', 'trainer.job_assigned', 'trainer.job_moved', 'trainer.job_cancelled', 'trainer.job_available', 'booking.unfilled', 'booking.completion_open', 'package.expired', 'customer.notify'];
 const MAX_ATTEMPTS = 10;
 const BATCH = 10;
 
@@ -28,6 +30,7 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly db: DatabaseService,
     private readonly email: EmailProvider,
+    private readonly customerMessages: CustomerMessageService,
     @Inject(APP_CONFIG) private readonly config: Env,
     @Inject(ERROR_REPORTER) private readonly reporter: ErrorReporter,
   ) {}
@@ -56,7 +59,7 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
         );
         for (const event of claimed.rows) {
           try {
-            await this.handle(event);
+            await this.handle(event, client);
             await client.query(`update outbox_events set published_at = now(), last_error = null where id = $1`, [event.id]);
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
@@ -77,7 +80,11 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async handle(event: OutboxRow): Promise<void> {
+  private opsEmails(): string[] {
+    return this.config.OPS_NOTIFY_EMAILS.split(',').map((value) => value.trim()).filter(Boolean);
+  }
+
+  private async handle(event: OutboxRow, client: PoolClient): Promise<void> {
     if (event.event_type === 'team.member_invited') {
       const invite = event.payload as { email?: string; name?: string; jobTitle?: string; invitedBy?: string };
       if (!invite.email) return;
@@ -98,16 +105,43 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
       }
       return;
     }
-    if (event.event_type === 'trainer.job_assigned' || event.event_type === 'trainer.job_moved') {
-      const p = event.payload as { trainerId?: string; sessionCode?: string; serviceName?: string; when?: string; area?: string };
+    if (event.event_type === 'customer.notify') {
+      const p = event.payload as { userId?: string; title?: string; body?: string; bookingId?: string | null };
+      if (!p.userId || !p.title || !p.body) return;
+      await this.customerMessages.deliver(client, event.id, { userId: p.userId, title: p.title, body: p.body, bookingId: p.bookingId ?? null });
+      return;
+    }
+    if (event.event_type === 'booking.unfilled') {
+      const p = event.payload as { sessionCode?: string; serviceName?: string };
+      for (const ops of this.opsEmails()) await this.email.send(sessionUnfilledEmail(ops, { sessionCode: p.sessionCode ?? '', serviceName: p.serviceName ?? 'a' }, `${this.config.ADMIN_URL}/sessions?code=${encodeURIComponent(p.sessionCode ?? '')}`));
+      return;
+    }
+    if (event.event_type === 'booking.completion_open') {
+      const p = event.payload as { sessionCode?: string; serviceName?: string; when?: string; trainerName?: string };
+      for (const ops of this.opsEmails()) await this.email.send(sessionNotClosedEmail(ops, { sessionCode: p.sessionCode ?? '', serviceName: p.serviceName ?? 'a', when: p.when ?? '', trainerName: p.trainerName ?? 'the trainer' }, `${this.config.ADMIN_URL}/sessions?code=${encodeURIComponent(p.sessionCode ?? '')}`));
+      return;
+    }
+    if (event.event_type === 'package.expired') {
+      const p = event.payload as { packageName?: string; unused?: number; customer?: string };
+      for (const ops of this.opsEmails()) await this.email.send(packageExpiredOpsEmail(ops, { packageName: p.packageName ?? 'A', unused: p.unused ?? 0, customer: p.customer ?? 'A customer' }, `${this.config.ADMIN_URL}/packages`));
+      return;
+    }
+    if (['trainer.job_assigned', 'trainer.job_moved', 'trainer.job_cancelled', 'trainer.job_available'].includes(event.event_type)) {
+      const p = event.payload as { trainerId?: string; bookingId?: string; sessionCode?: string; serviceName?: string; when?: string; area?: string; reason?: string };
       if (!p.trainerId) return;
+      // An alert about a job that has since been taken or cancelled would only confuse the trainer.
+      if (event.event_type === 'trainer.job_available') {
+        const open = p.bookingId ? await this.db.query(`select 1 from bookings where id = $1 and status in ('matching', 'rematching')`, [p.bookingId]) : { rows: [] };
+        if (!open.rows[0]) return;
+      }
       const who = await this.db.query<{ email: string | null; first_name: string | null }>(
         `select coalesce(u.verified_email, u.email, ta.email) as email, ta.first_name
            from trainers t join users u on u.id = t.user_id join trainer_applications ta on ta.id = t.application_id where t.user_id = $1 and t.status = 'active'`, [p.trainerId]);
       const trainer = who.rows[0];
       if (!trainer?.email) return; // no email on file or no longer active: nothing to send
       const ctx = { firstName: trainer.first_name ?? 'there', sessionCode: p.sessionCode ?? '', serviceName: p.serviceName ?? 'a', when: p.when ?? '', area: p.area ?? '' };
-      await this.email.send((event.event_type === 'trainer.job_assigned' ? jobAssignedEmail : jobMovedEmail)(trainer.email, ctx, this.config.TRAINER_SITE_URL));
+      const build = { 'trainer.job_assigned': jobAssignedEmail, 'trainer.job_moved': jobMovedEmail, 'trainer.job_available': jobAvailableEmail }[event.event_type];
+      await this.email.send(build ? build(trainer.email, ctx, this.config.TRAINER_SITE_URL) : jobCancelledEmail(trainer.email, { ...ctx, ...(p.reason ? { reason: p.reason } : {}) }, this.config.TRAINER_SITE_URL));
       return;
     }
     if (event.event_type === 'referral.reward_granted') {

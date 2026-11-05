@@ -3,6 +3,7 @@ import { Pool } from 'pg';
 import request from 'supertest';
 
 import { EmailProvider, type EmailMessage } from '../src/email/email.provider';
+import { DispatchService } from '../src/bookings/dispatch.service';
 import { OutboxWorkerService } from '../src/notifications/outbox-worker.service';
 import { CODE, signIn, startApp } from './helpers';
 
@@ -43,6 +44,8 @@ suite('trainer jobs: who is free, assigning, open jobs, accepting and cancelling
   const as = (t: string) => ({ Authorization: `Bearer ${t}` });
   const key = () => `job-key-${Date.now()}-${(n += 1)}`;
   const worker = () => app.get(OutboxWorkerService);
+  // Open sessions are offered to trainers by the dispatcher (a timer in production); tests run it by hand.
+  const dispatch = () => app.get(DispatchService).runOnce();
   async function adminToken(email: string) {
     const user = await pool.query<{ id: string }>(`insert into users (id, verified_email) values (gen_random_uuid(), $1) returning id`, [email]);
     await pool.query(`insert into user_roles (user_id, role) values ($1, 'admin')`, [user.rows[0]!.id]);
@@ -63,10 +66,14 @@ suite('trainer jobs: who is free, assigning, open jobs, accepting and cancelling
   }
   const book = (t: string, addressId: string, startsAt: string) =>
     http().post('/v1/bookings').set(as(t)).send({ serviceSlug: 'yoga', formatSlug: 'power-yoga', mode: 'scheduled', addressId, startsAt, idempotencyKey: key() });
-  const bookingId = async (t: string, addressId: string, startsAt: string) => (await book(t, addressId, startsAt).expect(201)).body.id as string;
+  const bookingId = async (t: string, addressId: string, startsAt: string) => {
+    const id = (await book(t, addressId, startsAt).expect(201)).body.id as string;
+    await dispatch();
+    return id;
+  };
   const assign = (id: string, trainerId: string) => http().post(`/v1/admin/sessions/${id}/assign`).set(as(owner)).send({ trainerId });
   const available = async (id: string) => (await http().get(`/v1/admin/sessions/${id}/available-trainers`).set(as(owner)).expect(200)).body as { id: string; name: string; sameDay: number }[];
-  const board = async (t: string) => (await http().get('/v1/trainer/jobs').set(as(t)).expect(200)).body as { open: { id: string }[]; mine: { id: string; addressLine: string; customerFirstName: string; canCancel: boolean }[] };
+  const board = async (t: string) => (await dispatch(), await http().get('/v1/trainer/jobs').set(as(t)).expect(200)).body as { open: { id: string }[]; mine: { id: string; addressLine: string; customerFirstName: string; canCancel: boolean }[] };
 
   beforeAll(async () => {
     ({ app, pool } = await startApp(url as string, (builder) => builder.overrideProvider(EmailProvider).useValue(mail)));

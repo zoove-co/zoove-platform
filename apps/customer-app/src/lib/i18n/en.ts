@@ -156,6 +156,9 @@ export const en = {
     rematchBody:
       'We are finding another coach nearby for the same time and will notify you as soon as one accepts. You can still reschedule or cancel this session.',
     overdueTitle: 'We could not find a coach in time',
+    unfilledTitle: 'We could not find a coach right now',
+    unfilledBody:
+      'No coach nearby could take your session as soon as you asked. We are sorry. You can pick another date and time for it, or cancel. You can also keep waiting and we will keep trying.',
     overdueBody:
       'Your start time has passed and no coach is on this session. We are sorry. You can move it to a new time or cancel it.',
     rematchOptionsTitle: 'What would you like to do?',

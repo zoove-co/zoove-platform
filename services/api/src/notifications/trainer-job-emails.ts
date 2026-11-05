@@ -34,3 +34,36 @@ export function jobMovedEmail(to: string, ctx: JobMailContext, jobsUrl: string):
   );
   return { to, subject: `Session moved: ${ctx.serviceName}, now ${ctx.when}`, html, text };
 }
+
+// Sent to trainers near an open session, nearest first. It is first come, first served on the jobs page.
+export function jobAvailableEmail(to: string, ctx: JobMailContext, jobsUrl: string): EmailMessage {
+  const { html, text } = layout(
+    `New session you can take: ${ctx.sessionCode}`,
+    [
+      `Hi ${ctx.firstName},`,
+      `A customer needs a ${ctx.serviceName} session ${ctx.when === 'as soon as possible' ? 'as soon as possible' : `on ${ctx.when}`}${ctx.area ? ` in ${ctx.area}` : ''}.`,
+      'It goes to the first trainer who accepts it on the jobs page. If someone else gets there first, the job will no longer be listed.',
+    ],
+    { label: 'See the job', url: jobsUrl },
+    FOOTER,
+  );
+  return { to, subject: `New ${ctx.serviceName} session${ctx.area ? ` in ${ctx.area}` : ''}: ${ctx.when}`, html, text };
+}
+
+// Sent to a trainer when a session they hold is no longer theirs: the customer cancelled it, or moved it to a time they are busy.
+export function jobCancelledEmail(to: string, ctx: JobMailContext & { reason?: string }, jobsUrl: string): EmailMessage {
+  const moved = ctx.reason === 'moved';
+  const { html, text } = layout(
+    moved ? `Session ${ctx.sessionCode} is no longer yours` : `Session ${ctx.sessionCode} was cancelled`,
+    [
+      `Hi ${ctx.firstName},`,
+      moved
+        ? `The customer moved the ${ctx.serviceName} session ${ctx.sessionCode} to ${ctx.when}, a time you already have another session. It has been taken off your list and we are finding another trainer.`
+        : `The customer cancelled the ${ctx.serviceName} session ${ctx.sessionCode}${ctx.when ? ` that was planned for ${ctx.when}` : ''}${ctx.area ? ` in ${ctx.area}` : ''}. Please do not travel for it.`,
+      'You do not need to do anything. It has been removed from your jobs page.',
+    ],
+    { label: 'Open my jobs', url: jobsUrl },
+    FOOTER,
+  );
+  return { to, subject: moved ? `Removed from your list: session ${ctx.sessionCode}` : `Cancelled: ${ctx.serviceName}, ${ctx.when}`, html, text };
+}

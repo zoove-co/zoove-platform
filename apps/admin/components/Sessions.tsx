@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import {
-  ApiError, assignTrainer, getSession, listAvailableTrainers, type AvailableTrainer, listSessions, moveSession, recordTrainerCancel, recordTrainerNoShow,
+  ApiError, assignTrainer, completeSession, getSession, listAvailableTrainers, type AvailableTrainer, listSessions, moveSession, recordTrainerCancel, recordTrainerNoShow,
   type AdminSession, type SessionDetail, type SessionFilter, type SessionStatus,
 } from '@/lib/api';
 import { can, useMe } from './me';
@@ -213,6 +213,9 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
               ) : null}
               {open.status === 'confirmed' && (!open.startsAt || !open.canMarkNoShow) ? (
                 <button className="btn" type="button" disabled={busy || reason.trim().length < 3} onClick={() => void act(() => recordTrainerCancel(open.id, reason.trim()))}>{busy ? <Spinner /> : null} Record trainer cancelled</button>
+              ) : null}
+              {open.status === 'confirmed' && (!open.startsAt || open.canMarkNoShow) ? (
+                <button className="btn" type="button" disabled={busy} onClick={() => void act(() => completeSession(open.id))}>{busy ? <Spinner /> : null} Mark as done</button>
               ) : null}
               {open.status === 'confirmed' && open.canMarkNoShow ? (
                 <button className="btn" type="button" style={{ background: 'var(--red)' }} disabled={busy || reason.trim().length < 3} onClick={() => void act(() => recordTrainerNoShow(open.id, reason.trim()))}>{busy ? <Spinner /> : null} Trainer did not arrive</button>

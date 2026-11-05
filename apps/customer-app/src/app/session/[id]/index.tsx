@@ -80,7 +80,8 @@ export default function SessionDetailScreen() {
           ? t('session.coachName', { name: booking.coach.name })
           : t('booking.coachValue');
   const canSimulate = __DEV__ && Boolean(api.dev) && booking.status === 'confirmed' && booking.coach !== null;
-  const canReschedule = active && booking.mode !== 'instant' && booking.startsAt !== null;
+  // An instant session has no time to move, unless we could not find a coach: then the customer can pick a date for it.
+  const canReschedule = active && (booking.mode !== 'instant' ? booking.startsAt !== null : booking.overdue);
 
   const onCancel = () => {
     cancel.mutate(undefined, {
@@ -121,9 +122,9 @@ export default function SessionDetailScreen() {
           <View style={styles.banner}>
             <Icon name="alert-circle-outline" size={18} color={colors.purple} />
             <View style={styles.bannerText}>
-              <AppText variant="bodyStrong">{t('session.overdueTitle')}</AppText>
+              <AppText variant="bodyStrong">{booking.mode === 'instant' ? t('session.unfilledTitle') : t('session.overdueTitle')}</AppText>
               <AppText variant="caption" color={colors.muted}>
-                {t('session.overdueBody')}
+                {booking.mode === 'instant' ? t('session.unfilledBody') : t('session.overdueBody')}
               </AppText>
               {canReschedule ? (
                 <AppText variant="caption" color={colors.muted}>

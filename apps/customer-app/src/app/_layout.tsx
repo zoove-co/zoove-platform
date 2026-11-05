@@ -10,7 +10,7 @@ import {
 import { Kalam_700Bold } from '@expo-google-fonts/kalam';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
@@ -19,6 +19,7 @@ import { AppState } from 'react-native';
 import { track } from '@/lib/analytics/track';
 import { useAuth } from '@/lib/auth/useAuth';
 import { initMonitoring, withMonitoring } from '@/lib/monitoring';
+import { bookingIdFrom, onNotificationTapped, registerForPush } from '@/lib/push';
 import { colors } from '@/theme';
 
 initMonitoring();
@@ -64,6 +65,18 @@ function RootLayout() {
 
   useEffect(() => {
     track('app_opened');
+  }, []);
+
+  // A signed-in customer's phone is registered for push messages; tapping one opens the session it is about.
+  useEffect(() => {
+    if (authStatus === 'signedIn') void registerForPush();
+  }, [authStatus]);
+  useEffect(() => {
+    const subscription = onNotificationTapped((response) => {
+      const id = bookingIdFrom(response);
+      if (id) router.push({ pathname: '/session/[id]', params: { id } });
+    });
+    return () => subscription.remove();
   }, []);
 
   if (!ready) {

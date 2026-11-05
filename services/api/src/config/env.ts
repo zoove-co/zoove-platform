@@ -62,6 +62,8 @@ const schema = z
 
     // Encrypts PAN numbers in the database. At least 32 characters, different from the other secrets.
     PII_SECRET: z.string().min(32).optional(),
+    // Push messages go through Expo's push service. The access token is optional (only needed if enhanced push security is on).
+    EXPO_ACCESS_TOKEN: z.string().optional().or(z.literal('').transform(() => undefined)),
     // Error monitoring (Sentry). Leave SENTRY_DSN empty to switch it off.
     SENTRY_DSN: z.string().url().optional().or(z.literal('').transform(() => undefined)),
     // CleverTap (marketing journeys). All three together switch it on; leave them empty to keep it off.

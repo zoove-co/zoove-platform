@@ -67,7 +67,7 @@ export class RewardsService {
       await client.query(`insert into referral_rewards (id, referral_id, side, user_id, discount_code_id) values ($1, $2, $3, $4, $5)`, [uuidv7(), referralId, rule.side, userId, codeId]);
       const worth = worthOf(rule);
       const until = dayOf(expiresAt);
-      await notifyCustomer(client, userId, TITLES[rule.side], `Use code ${code} for ${worth} on a session. It works once and is valid until ${until}.`, null);
+      await notifyCustomer(client, userId, TITLES[rule.side], `Use code ${code} for ${worth} on a session. It works once and is valid until ${until}.`, null, { external: false });
       // The email is sent by the outbox worker (retried if it fails); it is skipped for customers who signed up with a phone only.
       await client.query(`insert into outbox_events (id, aggregate_type, aggregate_id, event_type, payload) values ($1, 'user', $2, 'referral.reward_granted', $3)`, [
         uuidv7(), userId, JSON.stringify({ userId, side: rule.side, code, worth, until }),

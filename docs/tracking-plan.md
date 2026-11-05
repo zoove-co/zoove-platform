@@ -50,3 +50,22 @@ Retention triggers planned in CleverTap: started but not confirmed within 30 min
 | `help_viewed` | Help & support opened | none |
 | `referral_viewed` | Refer a friend opened | none |
 | `referral_shared` | Customer taps Share on the referral screen | none |
+
+## Server events sent to CleverTap (from the outbox, no app change needed)
+These are sent by the API itself when the thing happens, with our user id as identity and no phone, email or address.
+They only leave once the CleverTap keys are set in Render. Catalog: `services/api/src/analytics/event-catalog.ts`.
+
+| Event | When | Properties |
+|---|---|---|
+| booking_confirmed | Booking made | booking_id, service_slug, format_slug, mode, booking_for, amount_paise, area, starts_at |
+| booking_rescheduled | Customer or ops moved a session | same as above |
+| booking_cancelled | Customer cancelled | same, plus cancelled_by |
+| coach_assigned | A trainer took or was given the session | same as booking_confirmed |
+| coach_cancelled | The trainer cancelled | same as booking_confirmed |
+| session_overdue | Start time passed with no trainer | same as booking_confirmed |
+| session_unfilled | Instant session nobody took within the limit (customer offered a date or cancel) | same as booking_confirmed |
+| session_completed | Trainer or ops closed the session. Use this for "10 days after the last session" and streak journeys | same as booking_confirmed |
+| package_ordered, package_paid | Package ordered / marked paid | purchase_id, package_id, sessions_count, amount_paise |
+| reward_granted | Referral reward made | reward_side |
+| party_requested | Party request sent | request_id, occasion, guests, service_slug |
+

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import { api } from '@/lib/api';
+import { unregisterFromPush } from '@/lib/push';
 import type { Session } from '@/lib/api/types';
 
 import { clearSession, readSession, writeSession } from './storage';
@@ -28,6 +29,7 @@ export const useAuth = create<AuthState>((set) => ({
   },
   signOut: async () => {
     // Tell the server first (best effort), then forget everything on this device.
+    await unregisterFromPush();
     try {
       await api.logout();
     } catch {

@@ -32,4 +32,9 @@ export class TrainerJobsController {
   cancel(@CurrentUser() user: AuthUser, @Param('id', new ZodValidationPipe(idSchema)) id: string, @Body(new ZodValidationPipe(cancelSchema)) body: z.infer<typeof cancelSchema>) {
     return this.jobs.cancel(user.id, id, body.reason);
   }
+
+  @Post(':id/complete')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'The session happened: mark it done' })
+  complete(@CurrentUser() user: AuthUser, @Param('id', new ZodValidationPipe(idSchema)) id: string) { return this.jobs.complete(user.id, id); }
 }

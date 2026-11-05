@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Post, Put, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { z } from 'zod';
@@ -16,6 +16,8 @@ const progressSchema = z.object({
   weightKg: z.number().min(20).max(400).nullable().optional(),
   healthConsent: z.boolean(),
 });
+
+const deviceSchema = z.object({ token: z.string().trim().min(10).max(300), platform: z.enum(['ios', 'android']) });
 
 @ApiTags('customer')
 @ApiBearerAuth()
@@ -63,6 +65,20 @@ export class CustomerController {
   @ApiOperation({ summary: 'Mark all my notifications as read' })
   async markRead(@CurrentUser() user: AuthUser): Promise<void> {
     await this.notifications.markAllRead(user.id);
+  }
+
+  @Post('me/devices')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Register this phone for push messages' })
+  async registerDevice(@CurrentUser() user: AuthUser, @Body(new ZodValidationPipe(deviceSchema)) body: z.infer<typeof deviceSchema>): Promise<void> {
+    await this.notifications.registerDevice(user.id, body.token, body.platform);
+  }
+
+  @Delete('me/devices')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Stop push messages to this phone (sign out)' })
+  async removeDevice(@CurrentUser() user: AuthUser, @Body(new ZodValidationPipe(z.object({ token: z.string().trim().min(10).max(300) }))) body: { token: string }): Promise<void> {
+    await this.notifications.removeDevice(user.id, body.token);
   }
 
   @Get('coaches/past')

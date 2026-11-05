@@ -106,4 +106,15 @@ suite('events sent to outside tools', () => {
     expect(fake.received.length).toBe(before);
     expect(lonely).toBeTruthy();
   });
+
+  it('sends a closed session as session_completed and an unfilled instant session as session_unfilled', async () => {
+    const id = await newBooking(8);
+    await dispatcher().runOnce();
+    for (const type of ['booking.completed', 'booking.unfilled']) {
+      await pool.query(`insert into outbox_events (id, aggregate_type, aggregate_id, event_type, payload) values (gen_random_uuid(), 'booking', $1, $2, '{}')`, [id, type]);
+    }
+    await dispatcher().runOnce();
+    const names = fake.received.filter((x) => x.properties.booking_id === id).map((x) => x.name);
+    expect(names).toEqual(expect.arrayContaining(['session_completed', 'session_unfilled']));
+  });
 });

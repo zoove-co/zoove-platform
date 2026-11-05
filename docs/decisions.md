@@ -125,3 +125,12 @@ Trainers apply through a web page now and through the trainer app later. Both us
 - Required today: name, date of birth, gender, email, address, specialties, experience, PAN, Aadhaar last 4, Aadhaar front and back, PAN card photo, live selfie. Certificates optional. See open questions 53-56.
 
 ## Not decided (waiting on Pratik): see open-questions.md
+
+- Open sessions are offered to trainers in widening waves (same pincode, same cluster, then everyone who teaches the service). The trainer's job board shows only sessions they were alerted about, and only those trainers can accept. A database trigger restarts this whenever a session goes back to "finding a coach", so no call site can forget.
+- An instant session nobody takes is never cancelled for the customer. After the last wave and 60 minutes they are told once and may pick a date (it becomes a scheduled session at the price they agreed) or cancel.
+- A trainer is told by email when the customer cancels, moves their session, or moves it to a time they are busy (they are taken off it). Jobs that were taken or cancelled are not alerted.
+- A session is closed by the trainer ("Session done") or by ops. Nothing closes it automatically; ops are told once if it is still open 3 hours after it started. Closing emits `booking.completed` (CleverTap: `session_completed`) and counts for the streak.
+- Every customer notification (`notifyCustomer`) now also creates one `customer.notify` event. One worker sends it on each channel (email, push, WhatsApp seam). Each channel's result is stored per event so a retry never repeats a channel that worked. To add a channel: implement `MessageChannel` and add it to `notifications.module.ts`.
+- Packages: reminders 7 days and 1 day before the end, once when it ends with sessions unused (ops emailed). No automatic refund (open question 63).
+
+## Not decided (waiting on Pratik): see open-questions.md

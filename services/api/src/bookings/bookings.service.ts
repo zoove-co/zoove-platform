@@ -11,6 +11,7 @@ import { PricingService, type BookingMode } from '../catalog/pricing.service';
 import { notifyCustomer } from '../customer/notify';
 import { DomainError } from '../common/domain-error';
 import { lockFor } from '../common/locks';
+import { queueTrainerAlert } from '../notifications/trainer-alerts';
 import { DatabaseService } from '../database/database.service';
 import { DiscountsService, normaliseCode } from '../discounts/discounts.service';
 import { CHANGE_WINDOW_MS, dayRange, formatClock, formatWhen, isSlotStart, slotStarts, withinHorizon } from './rules';
@@ -35,7 +36,7 @@ export type Booking = {
   sessionCode: string;
   // The trainer cancelled and we are finding another one. The customer can wait, reschedule or cancel.
   trainerCancelled: boolean;
-  // The start time has passed and no coach is on the session. The customer can move it or cancel it.
+  // The start time has passed and no coach is on the session, or an instant session nobody took in time. The customer can pick a date or cancel.
   overdue: boolean;
   whenLabel: string;
   addressLabel: string;
@@ -87,6 +88,7 @@ export type Row = {
   duration_max_minutes: number;
   request_fingerprint: string;
   trainer_cancelled_at: Date | null;
+  unfilled_notified_at: Date | null;
   coach_id: string | null;
   coach_name: string | null;
 };
@@ -95,7 +97,7 @@ export type Row = {
 export const sessionCodeOf = (id: string): string => `ZV-${id.replace(/-/g, '').slice(-8).toUpperCase()}`;
 
 export const BOOKING_SELECT = `select b.id, b.mode, b.participant, b.group_size, b.recipient_name, b.recipient_phone, b.status, b.starts_at, b.address_label, b.address_area, b.total_paise, b.discount_paise, b.discount_code, b.package_purchase_id,
-                       b.request_fingerprint, b.trainer_cancelled_at, b.coach_id, coalesce(c.full_name, (select ta.first_name from trainers t join trainer_applications ta on ta.id = t.application_id where t.user_id = b.coach_id)) as coach_name,
+                       b.request_fingerprint, b.trainer_cancelled_at, b.unfilled_notified_at, b.coach_id, coalesce(c.full_name, (select ta.first_name from trainers t join trainer_applications ta on ta.id = t.application_id where t.user_id = b.coach_id)) as coach_name,
                        s.slug as service_slug, s.name as service_name, f.name as format_name, s.duration_max_minutes
                   from bookings b
                   join services s on s.id = b.service_id
@@ -134,7 +136,8 @@ export function bookingFromRow(row: Row, now = new Date()): Booking {
     coach: row.coach_id && row.status === 'confirmed' ? { id: row.coach_id, name: (row.coach_name ?? 'Your trainer').split(' ')[0] ?? 'Your trainer' } : null,
     sessionCode: sessionCodeOf(row.id),
     trainerCancelled: row.status === 'rematching' && row.trainer_cancelled_at !== null,
-    overdue: (row.status === 'matching' || row.status === 'rematching') && row.starts_at !== null && row.starts_at.getTime() <= now.getTime(),
+    overdue: (row.status === 'matching' || row.status === 'rematching') &&
+      ((row.starts_at !== null && row.starts_at.getTime() <= now.getTime()) || (row.mode === 'instant' && row.unfilled_notified_at !== null)),
     whenLabel: row.starts_at ? formatWhen(row.starts_at) : row.mode === 'instant' ? 'Finding your coach' : 'To be scheduled',
     addressLabel: row.address_label,
     areaLabel: row.address_area ?? '',
@@ -285,7 +288,10 @@ export class BookingsService {
     try {
       await this.db.tx(async (client) => {
         const row = await this.lock(client, userId, id);
-        if (row.mode === 'instant' || !canChange(row.status, row.starts_at, new Date())) {
+        // An instant session has no time to move, except after we failed to find a coach: then the customer may turn it into a
+        // scheduled session on a date they choose, at the price they already agreed.
+        const toScheduled = row.mode === 'instant' && row.unfilled_notified_at !== null && (row.status === 'matching' || row.status === 'rematching');
+        if ((row.mode === 'instant' && !toScheduled) || !canChange(row.status, row.starts_at, new Date())) {
           throw new DomainError('CHANGE_WINDOW_CLOSED', 'This session can no longer be changed.');
         }
         const startsAt = this.assertBookableSlot(startsAtInput);
@@ -295,10 +301,20 @@ export class BookingsService {
         const clash = row.status === 'confirmed' && row.coach_id
           ? (await client.query(`select 1 from bookings where coach_id = $1 and status = 'confirmed' and starts_at = $2 and id <> $3 limit 1`, [row.coach_id, startsAt, id])).rows[0]
           : null;
-        if (clash) await client.query(`update bookings set starts_at = $2, status = 'rematching', coach_id = null, overdue_notified_at = null where id = $1`, [id, startsAt]);
+        if (toScheduled) {
+          // A fresh start for dispatch: trainers are offered the session again, for its new time, nearest first.
+          await client.query(`delete from job_alerts where booking_id = $1`, [id]);
+          await client.query(`update bookings set mode = 'scheduled', starts_at = $2, overdue_notified_at = null, unfilled_notified_at = null, dispatch_started_at = now(), dispatch_wave = 0 where id = $1`, [id, startsAt]);
+        } else if (clash) await client.query(`update bookings set starts_at = $2, status = 'rematching', coach_id = null, overdue_notified_at = null where id = $1`, [id, startsAt]);
         else await client.query(`update bookings set starts_at = $2, overdue_notified_at = null where id = $1`, [id, startsAt]);
-        await this.record(client, id, 'rescheduled', 'customer', { from: row.starts_at?.toISOString() ?? null, to: startsAt.toISOString(), coachFreed: Boolean(clash) });
+        await this.record(client, id, 'rescheduled', 'customer', { from: row.starts_at?.toISOString() ?? null, to: startsAt.toISOString(), coachFreed: Boolean(clash), fromInstant: toScheduled });
         await this.publish(client, id, 'booking.rescheduled', { bookingId: id, userId, to: startsAt.toISOString() });
+        // The trainer already on this session must know: a new time they can keep, or (if they are busy then) that it is no longer theirs.
+        if (row.status === 'confirmed' && row.coach_id) {
+          await queueTrainerAlert(client, clash ? 'trainer.job_cancelled' : 'trainer.job_moved', id, row.coach_id, {
+            sessionCode: sessionCodeOf(id), serviceName: row.service_name, when: formatWhen(startsAt), area: row.address_area ?? '', reason: clash ? 'moved' : 'customer',
+          });
+        }
         await notifyCustomer(client, userId, 'Session rescheduled', `Your ${row.service_name} session is now ${formatWhen(startsAt)}.${clash ? ' Your coach is not free then, so we are finding another coach and will tell you as soon as one is assigned.' : ''}`, id);
       });
     } catch (error) {
@@ -321,6 +337,12 @@ export class BookingsService {
       if (row.package_purchase_id) await this.packages.giveCreditBack(client, row.package_purchase_id);
       await this.record(client, id, 'cancelled', 'customer', {});
       await this.publish(client, id, 'booking.cancelled', { bookingId: id, userId, by: 'customer' });
+      // A trainer already on the session is told right away, so they do not travel to a cancelled session.
+      if (row.status === 'confirmed' && row.coach_id) {
+        await queueTrainerAlert(client, 'trainer.job_cancelled', id, row.coach_id, {
+          sessionCode: sessionCodeOf(id), serviceName: row.service_name, when: row.starts_at ? formatWhen(row.starts_at) : 'as soon as possible', area: row.address_area ?? '', reason: 'customer',
+        });
+      }
       await notifyCustomer(client, userId, 'Booking cancelled', `Your ${row.service_name} session${row.starts_at ? ` on ${formatWhen(row.starts_at)}` : ''} was cancelled.`, id);
     });
     return this.get(userId, id);

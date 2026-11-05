@@ -28,6 +28,8 @@ export const EVENT_CATALOG: Record<string, Entry> = {
   'booking.trainer_assigned': { name: 'coach_assigned', aggregate: 'booking' },
   'booking.trainer_cancelled': { name: 'coach_cancelled', aggregate: 'booking' },
   'booking.overdue': { name: 'session_overdue', aggregate: 'booking' },
+  'booking.unfilled': { name: 'session_unfilled', aggregate: 'booking' },
+  'booking.completed': { name: 'session_completed', aggregate: 'booking' },
   'package.ordered': { name: 'package_ordered', aggregate: 'package_purchase' },
   'package.marked_paid': { name: 'package_paid', aggregate: 'package_purchase' },
   'referral.reward_granted': { name: 'reward_granted', aggregate: 'user', fromPayload: (p) => ({ reward_side: str(p.side) }) },

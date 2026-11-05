@@ -194,6 +194,13 @@ export const httpApi: Api = {
     await call<void>('POST', '/v1/notifications/read');
   },
 
+  async registerDevice(token, platform) {
+    await call<void>('POST', '/v1/me/devices', { token, platform });
+  },
+  async removeDevice(token) {
+    await call<void>('DELETE', '/v1/me/devices', { token });
+  },
+
   getSlots: (serviceSlug, isoDate) => call<TimeSlot[]>('GET', `/v1/slots?service=${encodeURIComponent(serviceSlug)}&date=${encodeURIComponent(isoDate)}`),
 
   previewDiscount: (input) => call<DiscountQuote>('POST', '/v1/discounts/preview', input),

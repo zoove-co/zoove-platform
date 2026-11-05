@@ -56,3 +56,44 @@ export function sessionOverdueEmail(to: string, ctx: { sessionCode: string; serv
   );
   return { to, subject: `Overdue: session ${ctx.sessionCode} has no trainer`, html, text };
 }
+
+const OPS_FOOTER = 'You received this because you are on the Zoove ops notification list.';
+
+export function sessionUnfilledEmail(to: string, ctx: { sessionCode: string; serviceName: string }, adminUrl: string): EmailMessage {
+  const { html, text } = layout(
+    `No trainer took instant session ${ctx.sessionCode}`,
+    [
+      `The instant ${ctx.serviceName} session ${ctx.sessionCode} went to every trainer nearby and nobody accepted it.`,
+      'The customer has been told, and can pick another date or cancel. You can also assign a trainer yourself or call the customer.',
+    ],
+    { label: 'Open the session', url: adminUrl },
+    OPS_FOOTER,
+  );
+  return { to, subject: `Unfilled: instant session ${ctx.sessionCode}`, html, text };
+}
+
+export function sessionNotClosedEmail(to: string, ctx: { sessionCode: string; serviceName: string; when: string; trainerName: string }, adminUrl: string): EmailMessage {
+  const { html, text } = layout(
+    `Session ${ctx.sessionCode} is still open after it ended`,
+    [
+      `The ${ctx.serviceName} session ${ctx.sessionCode} with ${ctx.trainerName} was planned for ${ctx.when} and nobody has marked it done.`,
+      'Check with the trainer and the customer. Mark it completed, or record a trainer no-show if the trainer did not arrive.',
+    ],
+    { label: 'Open the session', url: adminUrl },
+    OPS_FOOTER,
+  );
+  return { to, subject: `Not closed: session ${ctx.sessionCode}`, html, text };
+}
+
+export function packageExpiredOpsEmail(to: string, ctx: { packageName: string; unused: number; customer: string }, adminUrl: string): EmailMessage {
+  const { html, text } = layout(
+    'A package expired with unused sessions',
+    [
+      `${ctx.customer}'s ${ctx.packageName} package expired with ${ctx.unused} unused session${ctx.unused === 1 ? '' : 's'}.`,
+      'Nothing is refunded automatically. If you want to make it right for the customer, you can extend the package or add sessions from its page.',
+    ],
+    { label: 'Open packages', url: adminUrl },
+    OPS_FOOTER,
+  );
+  return { to, subject: `Package expired with ${ctx.unused} unused session${ctx.unused === 1 ? '' : 's'}`, html, text };
+}
