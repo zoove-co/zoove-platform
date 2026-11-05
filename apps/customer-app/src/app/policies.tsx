@@ -8,9 +8,9 @@ import { AppText } from '@/components/ui/AppText';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { colors, spacing } from '@/theme';
 
-const ITEMS = ['booking', 'cancellation', 'privacy', 'terms'] as const;
+const ITEMS = ['cancellation', 'privacy', 'terms'] as const;
 
-// The policy texts are not written yet (open question 25). Each row opens the placeholder until they are.
+// The texts are in lib/policies/policies.json (drafts, pending legal review: open question 25).
 export default function PoliciesScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -24,7 +24,7 @@ export default function PoliciesScreen() {
             key={key}
             icon="shield-checkmark-outline"
             label={t(`policies.${key}`)}
-            onPress={() => router.push({ pathname: '/soon', params: { title: t(`policies.${key}`) } })}
+            onPress={() => router.push({ pathname: '/policy/[doc]', params: { doc: key } })}
           />
         ))}
       </ScrollView>

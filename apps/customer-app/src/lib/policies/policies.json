@@ -1,0 +1,181 @@
+{
+  "version": "2026-11-05",
+  "updated": "5 November 2026",
+  "contact": "hello@zoove.co",
+  "docs": {
+    "terms": {
+      "title": "Terms of Service",
+      "intro": "These terms apply when you use the Zoove app and website to book home fitness sessions with trainers in Mumbai. By creating an account or booking a session you agree to them.",
+      "sections": [
+        {
+          "heading": "1. Who we are",
+          "body": [
+            "Zoove connects customers with independent, vetted fitness trainers who come to your home. Zoove runs the booking, matching and support. The training itself is delivered by the trainer."
+          ]
+        },
+        {
+          "heading": "2. Your account",
+          "body": [
+            "You sign in with your email or mobile number and a one-time code. Give us correct details and keep your code private. You are responsible for what happens under your account.",
+            "If you book for someone else, you confirm they agree and that the details you give for them are right."
+          ]
+        },
+        {
+          "heading": "3. Booking a session",
+          "body": [
+            "You choose a service, a time slot and your address. A session is confirmed once a trainer is assigned. Until then it shows as finding a trainer.",
+            "Sessions can be booked up to 60 days ahead, in the time slots shown in the app. Prices are shown before you confirm."
+          ]
+        },
+        {
+          "heading": "4. Packages, discounts and rewards",
+          "body": [
+            "A package gives you a set number of session credits, valid for the period shown when you buy it. Unused credits expire after that period unless we extend it.",
+            "Discount and reward codes have their own terms, such as one use per code and an expiry date. A package credit and a discount code cannot be used on the same session. We may withdraw a code that was misused."
+          ]
+        },
+        {
+          "heading": "5. Health and safety",
+          "body": [
+            "Training involves physical effort. Tell your trainer about injuries or conditions before you start, and stop if you feel unwell. Zoove and its trainers do not provide medical advice. Check with a doctor first if you are unsure whether an activity is safe for you.",
+            "Provide a safe, clear space for the session."
+          ]
+        },
+        {
+          "heading": "6. Behaviour",
+          "body": [
+            "Treat trainers with respect. We may suspend accounts that harass or abuse trainers or our team."
+          ]
+        },
+        {
+          "heading": "7. Cancellation and changes",
+          "body": [
+            "Rescheduling and cancelling are covered in the Cancellation Policy, which is part of these terms."
+          ]
+        },
+        {
+          "heading": "8. Our responsibility",
+          "body": [
+            "We work to match you with a suitable trainer on time, but we cannot promise a trainer will always be available. If we cannot find one, we will tell you and you can wait, move the session or cancel.",
+            "To the extent the law allows, Zoove is not liable for injury or loss that arises from your own health condition, from not following a trainer's instructions, or from events outside our control."
+          ]
+        },
+        {
+          "heading": "9. Changes to these terms",
+          "body": [
+            "We may update these terms. When we do, the app will ask you to agree again before you continue."
+          ]
+        },
+        {
+          "heading": "10. Governing law and contact",
+          "body": [
+            "These terms are governed by the laws of India. Questions: hello@zoove.co."
+          ]
+        }
+      ]
+    },
+    "privacy": {
+      "title": "Privacy Policy",
+      "intro": "This explains what Zoove collects, why, and the choices you have.",
+      "sections": [
+        {
+          "heading": "What we collect",
+          "body": [
+            "Account details: your name, email address and mobile number.",
+            "Booking details: the service, time, your address (and the pin location if you share it), who the session is for, and your session history.",
+            "Optional health details: height and weight, only if you choose to share them to track progress. You can untick this at any time and the data is deleted.",
+            "Payments and rewards: package purchases, discount and referral codes. We do not store card details.",
+            "Technical details needed to run the app, such as device type and error reports."
+          ]
+        },
+        {
+          "heading": "Why we use it",
+          "body": [
+            "To create your account, confirm it with a one-time code, book and match sessions, send you booking updates, run packages and rewards, keep the service safe, and improve it."
+          ]
+        },
+        {
+          "heading": "Who sees it",
+          "body": [
+            "Your trainer sees your first name and full address only after the session is assigned to them. Trainers who have not taken the session see only the area and time.",
+            "Our team sees your details to run bookings and support.",
+            "We use service providers to run Zoove, such as cloud hosting and email delivery. They process data for us and may not use it for their own purposes.",
+            "We do not sell your personal data. We share it with authorities only when the law requires."
+          ]
+        },
+        {
+          "heading": "Where it is stored",
+          "body": [
+            "Your data is stored with our cloud database provider. We keep it only as long as needed to run your account and meet legal obligations."
+          ]
+        },
+        {
+          "heading": "Your choices",
+          "body": [
+            "You can edit your details in the app, remove optional health details, and manage your addresses. To ask for a copy of your data or to delete your account, write to hello@zoove.co."
+          ]
+        },
+        {
+          "heading": "Security",
+          "body": [
+            "We use encrypted connections and restrict access to personal data. No system is perfectly secure, so please keep your sign-in code private."
+          ]
+        },
+        {
+          "heading": "Changes and contact",
+          "body": [
+            "If this policy changes, the app will ask you to agree again. Questions or complaints: hello@zoove.co."
+          ]
+        }
+      ]
+    },
+    "cancellation": {
+      "title": "Cancellation Policy",
+      "intro": "How rescheduling and cancelling work.",
+      "sections": [
+        {
+          "heading": "Changing or cancelling a session",
+          "body": [
+            "You can reschedule or cancel a session in the app up to 2 hours before it starts. After that, the session can no longer be changed in the app. Contact us at hello@zoove.co and we will see what we can do."
+          ]
+        },
+        {
+          "heading": "If you paid with a package credit",
+          "body": [
+            "When you cancel in time, the credit goes back to your package, as long as the package has not expired."
+          ]
+        },
+        {
+          "heading": "If you used a discount or reward code",
+          "body": [
+            "When you cancel in time, the code is released so you can use it again, as long as it has not expired."
+          ]
+        },
+        {
+          "heading": "If your trainer cancels or cannot come",
+          "body": [
+            "We will tell you and look for another trainer. You keep your credit or code. You can wait for a new trainer, move the session to another time, or cancel with no loss of credit."
+          ]
+        },
+        {
+          "heading": "If we cannot find a trainer",
+          "body": [
+            "We never cancel a session for you without telling you. If no trainer is found by the start time, we will contact you and you can wait, move or cancel."
+          ]
+        },
+        {
+          "heading": "Missed sessions",
+          "body": [
+            "After the 2-hour window the session can no longer be cancelled in the app. If something went wrong, write to hello@zoove.co and we will look at it."
+          ]
+        },
+        {
+          "heading": "Refunds",
+          "body": [
+            "Online payment is not live yet. Packages are activated by the Zoove team after payment is arranged with you. For any refund question, write to hello@zoove.co."
+          ]
+        }
+      ]
+    }
+  }
+}

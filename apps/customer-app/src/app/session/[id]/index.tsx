@@ -229,7 +229,7 @@ export default function SessionDetailScreen() {
 
         <Pressable
           accessibilityRole="button"
-          onPress={() => router.push({ pathname: '/soon', params: { title: t('session.policy') } })}
+          onPress={() => router.push({ pathname: '/policy/[doc]', params: { doc: 'cancellation' } })}
           style={styles.linkRow}>
           <Icon name="shield-checkmark-outline" size={16} color={colors.purple} />
           <AppText variant="caption" style={styles.detailText}>

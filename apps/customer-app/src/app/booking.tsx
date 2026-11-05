@@ -359,6 +359,23 @@ export default function BookingScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
+        {step === LAST_STEP ? (
+          <AppText variant="caption" color={colors.muted} style={styles.legal}>
+            {t('booking.legalPrefix')}{' '}
+            <AppText variant="caption" color={colors.purple} style={styles.link} onPress={() => router.push({ pathname: '/policy/[doc]', params: { doc: 'terms' } })}>
+              {t('policies.terms')}
+            </AppText>
+            {', '}
+            <AppText variant="caption" color={colors.purple} style={styles.link} onPress={() => router.push({ pathname: '/policy/[doc]', params: { doc: 'cancellation' } })}>
+              {t('policies.cancellation')}
+            </AppText>
+            {' '}{t('auth.and')}{' '}
+            <AppText variant="caption" color={colors.purple} style={styles.link} onPress={() => router.push({ pathname: '/policy/[doc]', params: { doc: 'privacy' } })}>
+              {t('policies.privacy')}
+            </AppText>
+            .
+          </AppText>
+        ) : null}
         <PrimaryButton
           label={step === LAST_STEP ? t('booking.confirmCta', { price: priceLabel }) : t('booking.continueCta')}
           disabled={!canAdvance}
@@ -377,6 +394,8 @@ const styles = StyleSheet.create({
   content: { padding: 17, paddingBottom: spacing.xxl, gap: 22 },
   instantBox: { gap: 10 },
   successWrap: { flex: 1 },
+  legal: { textAlign: 'center' },
+  link: { textDecorationLine: 'underline' },
   flex: { flex: 1 },
   footer: {
     paddingHorizontal: 18,
