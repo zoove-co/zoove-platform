@@ -29,7 +29,7 @@ These block the booking, pricing and matching tables (migration 0002). Everythin
 22. Address delete: allowed while a session at that address is upcoming? The mock blocks it.
 23. Login: mobile number and OTP only, or also Google / Apple sign-in? (The app is OTP only today.) Is guest browsing before login wanted?
 24. Profile: which details are required, and when? The app asks for first name only, later and optionally. Do age, gender, height, weight and medical notes come at signup, before the first booking, or never? (Ties to item 8.)
-25. Terms of Service and Privacy Policy text, plus the cancellation policy text. The app links to placeholder screens.
+25. Terms of Service, Privacy Policy and Cancellation Policy. **Drafts written 5 Nov 2026** (`apps/customer-app/src/lib/policies/policies.json`, shown in the app and on zoove.co). They state only what the system does today. Still needed: a lawyer's review, the legal entity name and registered address, a grievance officer (India), refund and no-show rules, and the real contact email.
 26. SMS: sender name for the OTP message, and who registers it (DLT is needed for India). Which provider does Pratik prefer?
 27. Areas we do not serve yet: collect a number or email to notify the customer when we open there (waitlist)? The app already tells them "we will let you know".
 28. Final logo, brand colours and the splash animation. The app shows a text "zoove." wordmark and the designer's success.svg and Trophy.svg are broken: please ask for Lottie JSON files.

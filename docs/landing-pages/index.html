@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>zoove</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0C0E;
+    --ink:#F4F3F0;
+    --sub:#8A8D92;
+    --line:#232427;
+    --accent:#FF5A36;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"Inter",-apple-system,BlinkMacSystemFont,Arial,sans-serif;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    min-height:100vh;
+    padding:24px;
+    text-align:center;
+  }
+  .logo{
+    font-family:"Space Grotesk",sans-serif;
+    font-weight:700;
+    font-size:22px;
+    letter-spacing:-0.01em;
+    margin-bottom:36px;
+  }
+  .logo .dot{color:var(--accent);}
+
+  h1{
+    font-family:"Space Grotesk",sans-serif;
+    font-weight:500;
+    font-size:15px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--sub);
+    margin:0 0 44px;
+  }
+
+  form{width:100%;max-width:340px;}
+  .form-row{
+    display:flex;
+    border:1px solid var(--line);
+    border-radius:10px;
+    overflow:hidden;
+    background:#111214;
+  }
+  .form-row input[type="email"]{
+    flex:1;
+    background:transparent;
+    border:none;
+    outline:none;
+    padding:13px 16px;
+    color:var(--ink);
+    font-size:14px;
+    font-family:"Inter",sans-serif;
+  }
+  .form-row input[type="email"]::placeholder{color:var(--sub);}
+  .form-row button{
+    border:none;
+    background:var(--accent);
+    color:#fff;
+    font-weight:600;
+    font-size:13.5px;
+    padding:0 20px;
+    cursor:pointer;
+  }
+  .form-row button:hover{background:#E14A29;}
+
+  .success-msg{
+    display:none;
+    font-size:13.5px;
+    color:var(--accent);
+    margin-top:18px;
+  }
+
+  footer{
+    position:fixed;
+    bottom:28px;
+    text-align:center;
+    font-size:12.5px;
+    color:var(--sub);
+  }
+  footer span{color:var(--accent);}
+  footer a{color:var(--sub);text-decoration:none;margin:0 8px;}
+  footer a:hover{color:var(--ink);}
+  footer .links{margin-bottom:8px;}
+</style>
+</head>
+<body>
+
+  <div class="logo">zoove<span class="dot">.</span></div>
+  <h1>Coming soon</h1>
+
+  <form id="waitlist-form">
+    <div class="form-row">
+      <input type="email" id="email-input" placeholder="you@email.com" required>
+      <button type="submit">Notify me</button>
+    </div>
+  </form>
+  <div class="success-msg" id="success-msg">You're on the list.</div>
+
+  <footer>
+    <div class="links"><a href="/terms.html">Terms</a>·<a href="/privacy.html">Privacy</a>·<a href="/cancellation.html">Cancellation</a></div>
+    Made with <span>♥</span> in Mumbai
+  </footer>
+
+<script>
+  const form = document.getElementById('waitlist-form');
+  const successMsg = document.getElementById('success-msg');
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    form.style.display = 'none';
+    successMsg.style.display = 'block';
+    // NOTE: this only confirms in the browser right now.
+    // Wire this to a real signups table (e.g. in Supabase) once the
+    // backend exists, so emails are actually captured and stored.
+  });
+</script>
+
+</body>
+</html>
