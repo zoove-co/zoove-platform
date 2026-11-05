@@ -5,6 +5,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { ConfigModule } from './config/config.module';
 import { APP_CONFIG, type Env } from './config/env';
+import { AnalyticsModule } from './analytics/analytics.module';
 import { AddressesModule } from './addresses/addresses.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { CatalogModule } from './catalog/catalog.module';
@@ -55,6 +56,7 @@ import { TrainersModule } from './trainers/trainers.module';
     TeamModule,
     NotificationsModule,
     MaintenanceModule,
+    AnalyticsModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

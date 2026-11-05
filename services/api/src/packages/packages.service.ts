@@ -138,6 +138,8 @@ export class PackagesService {
         [id, adminId, input.method, input.reference],
       );
       await client.query(`insert into audit_log (actor_user_id, action, entity_type, entity_id, after) values ($1, 'package.marked_paid', 'package_purchase', $2, $3)`, [adminId, id, JSON.stringify(input)]);
+      // Revenue event for analytics and marketing tools (no personal details in the payload).
+      await client.query(`insert into outbox_events (id, aggregate_type, aggregate_id, event_type, payload) values ($1, 'package_purchase', $2, 'package.marked_paid', $3)`, [uuidv7(), id, JSON.stringify({ totalPaise: cur.total_paise })]);
       await notifyCustomer(client, cur.user_id, 'Package ready', `Payment received. You now have ${cur.credits_total} session credits from your ${cur.name} package.`, null);
       return upd.rows[0]!;
     });

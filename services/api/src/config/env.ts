@@ -64,6 +64,11 @@ const schema = z
     PII_SECRET: z.string().min(32).optional(),
     // Error monitoring (Sentry). Leave SENTRY_DSN empty to switch it off.
     SENTRY_DSN: z.string().url().optional().or(z.literal('').transform(() => undefined)),
+    // CleverTap (marketing journeys). All three together switch it on; leave them empty to keep it off.
+    // CLEVERTAP_API_BASE is the server address for your CleverTap region, for example https://in1.api.clevertap.com
+    CLEVERTAP_ACCOUNT_ID: z.string().optional().transform((v) => v || undefined),
+    CLEVERTAP_PASSCODE: z.string().optional().transform((v) => v || undefined),
+    CLEVERTAP_API_BASE: z.string().optional().transform((v) => v || undefined),
     CORS_ORIGINS: z.string().default(''),
     SWAGGER_ENABLED: flag,
     TRUST_PROXY: flag,
@@ -100,6 +105,14 @@ const schema = z
   .refine((env) => env.PII_SECRET === undefined || (env.PII_SECRET !== env.JWT_SECRET && env.PII_SECRET !== env.OTP_SECRET), {
     message: 'PII_SECRET must differ from JWT_SECRET and OTP_SECRET',
     path: ['PII_SECRET'],
+  })
+  .refine((env) => [env.CLEVERTAP_ACCOUNT_ID, env.CLEVERTAP_PASSCODE, env.CLEVERTAP_API_BASE].every(Boolean) || [env.CLEVERTAP_ACCOUNT_ID, env.CLEVERTAP_PASSCODE, env.CLEVERTAP_API_BASE].every((v) => !v), {
+    message: 'CLEVERTAP_ACCOUNT_ID, CLEVERTAP_PASSCODE and CLEVERTAP_API_BASE must be set together',
+    path: ['CLEVERTAP_API_BASE'],
+  })
+  .refine((env) => !env.CLEVERTAP_API_BASE || /^https:\/\//.test(env.CLEVERTAP_API_BASE), {
+    message: 'CLEVERTAP_API_BASE must start with https://',
+    path: ['CLEVERTAP_API_BASE'],
   })
   .refine((env) => env.JWT_SECRET !== env.OTP_SECRET, {
     message: 'JWT_SECRET and OTP_SECRET must be different values',
