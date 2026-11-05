@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto';
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import { v7 as uuidv7 } from 'uuid';
 
@@ -18,6 +18,7 @@ export type ReferralSummary = { code: string; signedUp: number; booked: number; 
 // (switched off until the business decides, open question 10); RewardsService gives it out on the first booking.
 @Injectable()
 export class ReferralService {
+  private readonly logger = new Logger('Referral');
   constructor(private readonly db: DatabaseService, private readonly rewards: RewardsService) {}
 
   async summary(userId: string): Promise<ReferralSummary> {
@@ -58,6 +59,16 @@ export class ReferralService {
     const done = await client.query<{ id: string; referrer_id: string }>(
       `update referrals set status = 'booked', booked_at = now() where referred_id = $1 and status = 'signed_up' returning id, referrer_id`, [userId]);
     // Rewards switched on in the admin panel are given once, at this moment. Switched off by default.
-    if (done.rows[0]) await this.rewards.grant(client, done.rows[0].id, done.rows[0].referrer_id, userId);
+    // A reward problem must never stop the customer's booking: it runs in a savepoint and is only logged if it fails.
+    if (done.rows[0]) {
+      await client.query('savepoint reward_grant');
+      try {
+        await this.rewards.grant(client, done.rows[0].id, done.rows[0].referrer_id, userId);
+        await client.query('release savepoint reward_grant');
+      } catch (error) {
+        await client.query('rollback to savepoint reward_grant');
+        this.logger.error(`Reward for referral ${done.rows[0].id} could not be given: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
   }
 }

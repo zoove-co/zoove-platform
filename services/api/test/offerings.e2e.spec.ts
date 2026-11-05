@@ -188,6 +188,22 @@ suite('offerings, rewards and trainer cancellation', () => {
       expect(after.issued.find((i: { id: string }) => i.id === unused.id).state).toBe('switched_off');
     });
 
+    it('a reward that fails never blocks the friend\'s booking', async () => {
+      await http().put('/v1/admin/rewards/referrer').set(as(owner)).send({ enabled: true, kind: 'flat', flatOffPaise: 20_000, percentOff: null, maxDiscountPaise: null, validDays: 30 }).expect(200);
+      await pool.query(`create or replace function zz_boom() returns trigger language plpgsql as $$ begin raise exception 'reward store is down'; end $$`);
+      await pool.query(`create trigger zz_boom before insert on referral_rewards for each row execute function zz_boom()`);
+      try {
+        await referredFriend();
+        const booked = await book(friend, await addressFor(friend), 3).expect(201);
+        expect(booked.body.status).toBe('matching');
+        expect((await pool.query(`select status from referrals`)).rows[0].status).toBe('booked');
+        expect((await pool.query(`select count(*)::int as c from referral_rewards`)).rows[0].c).toBe(0);
+      } finally {
+        await pool.query(`drop trigger zz_boom on referral_rewards`);
+        await pool.query(`drop function zz_boom()`);
+      }
+    });
+
     it('rejects a half-filled rule when switching on, and keeps a half-filled one off', async () => {
       await http().put('/v1/admin/rewards/referrer').set(as(owner)).send({ enabled: true, kind: 'flat', flatOffPaise: null, percentOff: null, maxDiscountPaise: null, validDays: 30 }).expect(400);
       await http().put('/v1/admin/rewards/referrer').set(as(owner)).send({ enabled: true, kind: null, flatOffPaise: null, percentOff: null, maxDiscountPaise: null, validDays: 30 }).expect(400);
