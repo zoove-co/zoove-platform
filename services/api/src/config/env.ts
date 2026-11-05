@@ -62,6 +62,8 @@ const schema = z
 
     // Encrypts PAN numbers in the database. At least 32 characters, different from the other secrets.
     PII_SECRET: z.string().min(32).optional(),
+    // Error monitoring (Sentry). Leave SENTRY_DSN empty to switch it off.
+    SENTRY_DSN: z.string().url().optional().or(z.literal('').transform(() => undefined)),
     CORS_ORIGINS: z.string().default(''),
     SWAGGER_ENABLED: flag,
     TRUST_PROXY: flag,

@@ -18,11 +18,13 @@ import { AppState } from 'react-native';
 
 import { track } from '@/lib/analytics/track';
 import { useAuth } from '@/lib/auth/useAuth';
+import { initMonitoring, withMonitoring } from '@/lib/monitoring';
 import { colors } from '@/theme';
 
+initMonitoring();
 void SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
+function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -98,3 +100,5 @@ export default function RootLayout() {
     </QueryClientProvider>
   );
 }
+
+export default withMonitoring(RootLayout);

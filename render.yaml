@@ -51,6 +51,9 @@ services:
         sync: false
       - key: RESEND_API_KEY
         sync: false
+      # Error monitoring (Sentry). Leave empty to switch it off.
+      - key: SENTRY_DSN
+        sync: false
       - key: OPS_NOTIFY_EMAILS
         sync: false
       - key: S3_ENDPOINT

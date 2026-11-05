@@ -3,6 +3,7 @@ import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nest
 import { APP_CONFIG, type Env } from '../config/env';
 import { DatabaseService } from '../database/database.service';
 import { EmailProvider, type EmailMessage } from '../email/email.provider';
+import { ERROR_REPORTER, type ErrorReporter } from '../monitoring/error-reporter';
 import { referralRewardEmail } from './customer-emails';
 import { jobAssignedEmail, jobMovedEmail } from './trainer-job-emails';
 import { partyRequestedEmail, teamInviteEmail, sessionOverdueEmail, trainerCancelledEmail } from './team-emails';
@@ -28,6 +29,7 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly db: DatabaseService,
     private readonly email: EmailProvider,
     @Inject(APP_CONFIG) private readonly config: Env,
+    @Inject(ERROR_REPORTER) private readonly reporter: ErrorReporter,
   ) {}
 
   onModuleInit(): void {
@@ -59,6 +61,8 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             this.logger.warn(`Event ${event.event_type} ${event.id} failed (attempt ${event.attempts + 1}): ${message}`);
+            // Report only when the last retry fails: a notification that is lost for good is worth a human's attention.
+            if (event.attempts + 1 >= MAX_ATTEMPTS) this.reporter.capture(error, { path: `outbox:${event.event_type}` });
             await client.query(
               `update outbox_events set attempts = attempts + 1, last_error = $2,
                       next_attempt_at = now() + (least(3600, 30 * power(2, attempts)) || ' seconds')::interval where id = $1`,

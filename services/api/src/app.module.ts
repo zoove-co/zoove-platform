@@ -14,6 +14,7 @@ import { DiscountsModule } from './discounts/discounts.module';
 import { EmailModule } from './email/email.module';
 import { HealthModule } from './health/health.module';
 import { IdentityModule } from './identity/identity.module';
+import { MonitoringModule } from './monitoring/monitoring.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PackagesModule } from './packages/packages.module';
 import { PartyModule } from './party/party.module';
@@ -27,6 +28,7 @@ import { TrainersModule } from './trainers/trainers.module';
 @Module({
   imports: [
     ConfigModule,
+    MonitoringModule,
     DatabaseModule,
     ThrottlerModule.forRootAsync({
       inject: [APP_CONFIG],
