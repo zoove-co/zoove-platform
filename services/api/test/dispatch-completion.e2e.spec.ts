@@ -61,7 +61,7 @@ suite('finding a coach, closing sessions, and telling people', () => {
   const worker = () => app.get(OutboxWorkerService);
 
   async function drain(): Promise<void> {
-    for (let i = 0; i < 30; i += 1) if ((await worker().runOnce()) === 0) return;
+    for (let i = 0; i < 400; i += 1) if ((await worker().runOnce()) === 0) return;
   }
   async function trainer(first: string, pincode: string | null, specialties: string[] = []): Promise<{ token: string; id: string; email: string }> {
     const p = phone();
@@ -103,6 +103,7 @@ suite('finding a coach, closing sessions, and telling people', () => {
   beforeAll(async () => {
     ({ app, pool } = await startApp(url as string, (b) => b.overrideProvider(EmailProvider).useValue(mail).overrideProvider(CUSTOMER_CHANNELS).useValue([okChannel, flakyChannel])));
     await pool.query(`update clusters set status = 'active', activated_at = now() where slug = 'bandra-khar'`);
+    await pool.query(`update bookings set status = 'cancelled', cancelled_at = now() where status in ('matching', 'rematching')`); // leftovers of earlier runs
     await pool.query(`delete from outbox_events`);
     const customerPhone = phone();
     customer = await signIn(app, pool, customerPhone);
@@ -183,6 +184,25 @@ suite('finding a coach, closing sessions, and telling people', () => {
       await dispatch().runOnce();
       expect(await alertedTo(later)).toContain(near.id);
       expect(await alertedTo(later)).not.toContain(far.id);
+    });
+
+    it('offers an open session to a trainer who is approved after the waves already ran', async () => {
+      const early = await trainer('Early', '400050');
+      const id = await scheduled(customer, await addressFor(customer, '400050'), slot(24));
+      await dispatch().runOnce();
+      expect(await alertedTo(id)).toContain(early.id);
+      await dispatch().runOnce(minutesFromNow(26)); // every wave has run
+      const late = await trainer('Late', '411001');
+      expect(await alertedTo(id)).not.toContain(late.id);
+      await dispatch().runOnce();
+      expect(await alertedTo(id)).toContain(late.id);
+      expect((await board(late.token)).open.map((j) => j.id)).toContain(id);
+      const n1 = (await alertedTo(id)).length;
+      await dispatch().runOnce();
+      expect((await alertedTo(id)).length).toBe(n1);
+      await accept(late.token, id).expect(200);
+      await dispatch().runOnce();
+      expect(await statusOf(id)).toBe('confirmed');
     });
 
     it('moves straight on when a wave has nobody', async () => {
@@ -421,7 +441,7 @@ suite('finding a coach, closing sessions, and telling people', () => {
       let sentBody: { to: string }[] = [];
       const good = (async (_url: string, init: RequestInit) => {
         sentBody = JSON.parse(init.body as string) as { to: string }[];
-        return new Response(JSON.stringify({ data: [{ status: 'ok' }, { status: 'error', details: { error: 'DeviceNotRegistered' } }] }));
+        return new Response(JSON.stringify({ data: sentBody.map((m) => (m.to === dead ? { status: 'error', details: { error: 'DeviceNotRegistered' } } : { status: 'ok' })) }));
       }) as unknown as typeof fetch;
       const msg = { userId: customerId, title: 'T', body: 'B', bookingId: 'b1' };
       const rows = (await pool.query<{ token: string }>(`select token from notification_devices where user_id = $1 order by created_at`, [customerId])).rows;

@@ -9,6 +9,7 @@ import { DISPATCH_WAVES, INSTANT_GIVE_UP_MINUTES, type WaveScope } from './dispa
 import { formatWhen } from './rules';
 
 const BATCH = 50;
+const TOP_UP_BATCH = 200; // newest first, so a long tail of old unfilled sessions can never starve a new one
 
 export const ALERT_ALL_KEY = 'dispatch_alert_all';
 // Ops switch: true = alert every eligible trainer in the city at once; false (default) = widening waves.
@@ -60,11 +61,28 @@ export class DispatchService implements OnModuleInit, OnModuleDestroy {
         );
         let alerts = 0;
         for (const session of open.rows) alerts += await this.advance(client, session, now, everyone);
+        alerts += await this.topUp(client, now, open.rows.map((r) => r.id));
         return alerts;
       });
     } finally {
       this.running = false;
     }
+  }
+
+  // Sessions that finished every wave and are still open: offer them to trainers who qualify only now (approved after the
+  // session was booked, or free at that time since). Trainers already alerted are skipped, so nobody hears twice.
+  private async topUp(client: import('pg').PoolClient, now: Date, skip: string[]): Promise<number> {
+    const rows = await client.query<OpenSession>(
+      `select b.id, b.user_id, b.mode, b.starts_at, b.address_pincode, b.address_area, b.dispatch_started_at, b.dispatch_wave, b.unfilled_notified_at, s.slug as service_slug, s.name as service_name
+         from bookings b join services s on s.id = b.service_id
+        where b.status in ('matching', 'rematching') and b.dispatch_started_at is not null and (b.starts_at is null or b.starts_at > $2)
+          and b.dispatch_wave >= $1 and not (b.id = any($3::uuid[]))
+        order by b.dispatch_started_at desc limit ${TOP_UP_BATCH} for update of b skip locked`,
+      [DISPATCH_WAVES.length, now, skip],
+    );
+    let alerts = 0;
+    for (const s of rows.rows) alerts += await this.alertWave(client, s, DISPATCH_WAVES.length, 'city');
+    return alerts;
   }
 
   private async advance(client: import('pg').PoolClient, s: OpenSession, now: Date, everyone: boolean): Promise<number> {

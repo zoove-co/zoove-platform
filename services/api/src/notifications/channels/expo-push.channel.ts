@@ -38,7 +38,8 @@ export class ExpoPushChannel implements MessageChannel {
     const tickets = json.data ?? [];
     const dead: string[] = [];
     tickets.forEach((ticket, index) => {
-      if (ticket.status === 'error' && ticket.details?.error === 'DeviceNotRegistered') dead.push(devices.rows[index]!.token);
+      const device = devices.rows[index];
+      if (device && ticket.status === 'error' && ticket.details?.error === 'DeviceNotRegistered') dead.push(device.token);
     });
     if (dead.length > 0) await this.db.query(`delete from notification_devices where token = any($1)`, [dead]);
     if (tickets.length > 0 && tickets.every((t) => t.status === 'error') && dead.length < tickets.length) this.logger.warn('Push service rejected every message');
