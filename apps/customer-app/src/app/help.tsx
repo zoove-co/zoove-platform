@@ -1,4 +1,3 @@
-import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -9,13 +8,13 @@ import { Icon } from '@/components/ui/Icon';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { track } from '@/lib/analytics/track';
+import { openSupport, SUPPORT_EMAIL } from '@/lib/support';
 import { colors, radius, spacing } from '@/theme';
 
 const FAQ = [1, 2, 3] as const;
 
 export default function HelpScreen() {
   const { t } = useTranslation();
-  const router = useRouter();
   const [open, setOpen] = useState<number | null>(1);
 
   useEffect(() => {
@@ -46,11 +45,11 @@ export default function HelpScreen() {
             </Pressable>
           );
         })}
-        {/* The support channel (chat, call or WhatsApp) is undecided: the button opens the placeholder. */}
-        <PrimaryButton
-          label={t('help.contact')}
-          onPress={() => router.push({ pathname: '/soon', params: { title: t('help.contact') } })}
-        />
+        {/* Support is email for now (admin@zoove.co, reply within 24 hours). A chat or WhatsApp channel can replace it later. */}
+        <AppText variant="caption" color={colors.muted}>
+          {t('help.contactNote', { email: SUPPORT_EMAIL })}
+        </AppText>
+        <PrimaryButton label={t('help.contact')} onPress={() => openSupport(t('help.mailSubject'))} />
       </ScrollView>
     </SafeAreaView>
   );

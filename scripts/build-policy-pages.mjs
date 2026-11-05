@@ -6,7 +6,7 @@ import { join } from 'node:path';
 const out = process.argv[2];
 if (!out) throw new Error('Pass the zoove-landing folder.');
 const data = JSON.parse(readFileSync(new URL('../apps/customer-app/src/lib/policies/policies.json', import.meta.url), 'utf8'));
-const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/hello@zoove\.co/g, '<a href="mailto:hello@zoove.co">hello@zoove.co</a>');
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/admin@zoove\.co/g, '<a href="mailto:admin@zoove.co">admin@zoove.co</a>');
 const slugs = { terms: 'terms', privacy: 'privacy', cancellation: 'cancellation' };
 
 const css = `:root{--bg:#0B0C0E;--ink:#F4F3F0;--sub:#8A8D92;--line:#232427;--accent:#FF5A36}

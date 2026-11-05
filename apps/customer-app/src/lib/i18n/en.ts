@@ -406,7 +406,9 @@ export const en = {
     a2: 'Open your upcoming session and choose Reschedule to pick another available time.',
     q3: 'What if my coach cannot make it?',
     a3: 'We will find another coach nearby and tell you as soon as one accepts.',
-    contact: 'Contact support',
+    contact: 'Email support',
+    contactNote: 'For any help, question or complaint, write to {{email}}. We reply within 24 hours.',
+    mailSubject: 'Help with Zoove',
   },
   policies: {
     title: 'Policies',

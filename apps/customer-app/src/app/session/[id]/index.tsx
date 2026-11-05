@@ -11,6 +11,7 @@ import { AppText } from '@/components/ui/AppText';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { openSupport } from '@/lib/support';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { TabFooter } from '@/components/ui/TabFooter';
 import { useBooking, useCancelBooking, useSimulateTrainerCancel } from '@/features/booking/hooks';
@@ -239,7 +240,7 @@ export default function SessionDetailScreen() {
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          onPress={() => router.push({ pathname: '/soon', params: { title: t('session.support') } })}
+          onPress={() => openSupport(t('help.mailSubject'), booking.sessionCode)}
           style={styles.linkRow}>
           <Icon name="help-circle-outline" size={16} color={colors.purple} />
           <AppText variant="caption" style={styles.detailText}>
