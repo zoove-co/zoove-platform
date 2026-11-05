@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import {
-  ApiError, assignTrainer, completeSession, getSession, listAvailableTrainers, type AvailableTrainer, listSessions, moveSession, recordTrainerCancel, recordTrainerNoShow,
+  ApiError, assignTrainer, completeSession, getDispatchSettings, saveDispatchSettings, getSession, listAvailableTrainers, type AvailableTrainer, listSessions, moveSession, recordTrainerCancel, recordTrainerNoShow,
   type AdminSession, type SessionDetail, type SessionFilter, type SessionStatus,
 } from '@/lib/api';
 import { can, useMe } from './me';
@@ -39,6 +39,8 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
   const [moveDate, setMoveDate] = useState('');
   const [moveTime, setMoveTime] = useState('18:00');
   const [moveReason, setMoveReason] = useState('');
+  const [alertAll, setAlertAll] = useState<boolean | null>(null);
+  const [alertBusy, setAlertBusy] = useState(false);
 
   const handle = useCallback((err: unknown): string => {
     if (err instanceof ApiError && err.code === 'SESSION_EXPIRED') { expired(); return ''; }
@@ -48,6 +50,16 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
   const load = useCallback(async () => {
     try { setRows(await listSessions(filter, query)); setError(null); } catch (err) { setError(handle(err) || null); }
   }, [filter, query, handle]);
+
+  useEffect(() => {
+    if (!can(me, 'sessions.manage')) return;
+    getDispatchSettings().then((s) => setAlertAll(s.alertAll)).catch(() => undefined);
+  }, [me]);
+  async function toggleAlertAll() {
+    if (alertAll === null) return;
+    setAlertBusy(true);
+    try { setAlertAll((await saveDispatchSettings(!alertAll)).alertAll); setError(null); } catch (err) { setError(handle(err) || null); } finally { setAlertBusy(false); }
+  }
 
   // The email link opens this page with ?code=ZV-XXXXXXXX: search for that session across all sessions.
   useEffect(() => {
@@ -101,6 +113,19 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
           <p>Every session has a code the customer also sees. A session goes under Needs a trainer when a trainer cancels or does not arrive. Overdue ones are in red at the top.</p>
         </div>
       </div>
+      {alertAll !== null ? (
+        <div className="panel" style={{ padding: 14, marginBottom: 14, display: 'flex', gap: 14, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 320px' }}>
+            <strong>Alert every trainer at once: {alertAll ? 'ON' : 'OFF'}</strong>
+            <p style={{ margin: '4px 0 0' }}>
+              {alertAll
+                ? 'A new open session is offered to every active trainer in the city who teaches it, straight away.'
+                : 'A new open session goes to trainers in the same pincode first, then the same area after 10 minutes, then the whole city after 25 minutes (a step with nobody in it is skipped).'}
+            </p>
+          </div>
+          <button type="button" className="chipbtn" aria-pressed={alertAll} disabled={alertBusy} onClick={() => void toggleAlertAll()}>{alertAll ? 'Switch off' : 'Switch on'}</button>
+        </div>
+      ) : null}
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
         {FILTERS.map(([key, label]) => <button key={key} type="button" className="chipbtn" aria-pressed={filter === key} onClick={() => setFilter(key)}>{label}</button>)}
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by session code, name or email" aria-label="Search sessions" style={{ flex: '1 1 220px', maxWidth: 360 }} />

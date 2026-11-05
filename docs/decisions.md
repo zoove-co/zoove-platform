@@ -131,6 +131,7 @@ Trainers apply through a web page now and through the trainer app later. Both us
 - A trainer is told by email when the customer cancels, moves their session, or moves it to a time they are busy (they are taken off it). Jobs that were taken or cancelled are not alerted.
 - A session is closed by the trainer ("Session done") or by ops. Nothing closes it automatically; ops are told once if it is still open 3 hours after it started. Closing emits `booking.completed` (CleverTap: `session_completed`) and counts for the streak.
 - Every customer notification (`notifyCustomer`) now also creates one `customer.notify` event. One worker sends it on each channel (email, push, WhatsApp seam). Each channel's result is stored per event so a retry never repeats a channel that worked. To add a channel: implement `MessageChannel` and add it to `notifications.module.ts`.
+- Ops switch (Admin > Sessions, migration 0022 `app_settings.dispatch_alert_all`): OFF (default) = the widening waves above; ON = every eligible trainer in the city is alerted at once. Takes effect within 30 seconds, also for sessions already waiting. Use it while testing with few trainers.
 - Packages: reminders 7 days and 1 day before the end, once when it ends with sessions unused (ops emailed). No automatic refund (open question 63).
 
 ## Not decided (waiting on Pratik): see open-questions.md

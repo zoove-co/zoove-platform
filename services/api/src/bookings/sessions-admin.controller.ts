@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 
@@ -13,6 +13,7 @@ const listSchema = z.object({ filter: z.enum(['needs_trainer', 'upcoming', 'all'
 const cancelSchema = z.object({ reason: z.string().trim().min(3).max(300) });
 const noShowSchema = z.object({ note: z.string().trim().min(3).max(300) });
 const moveSchema = z.object({ startsAt: z.iso.datetime({ offset: true }), reason: z.string().trim().min(3).max(300) });
+const dispatchSchema = z.object({ alertAll: z.boolean() });
 const assignSchema = z.object({ trainerId: z.uuid() });
 
 @ApiTags('admin-sessions')
@@ -26,6 +27,12 @@ export class SessionsAdminController {
 
   @Get('summary')
   summary() { return this.sessions.summary(); }
+
+  @Get('dispatch-settings')
+  dispatchSettings() { return this.sessions.getDispatchSettings(); }
+
+  @Put('dispatch-settings')
+  setDispatchSettings(@CurrentUser() user: AuthUser, @Body(new ZodValidationPipe(dispatchSchema)) body: z.infer<typeof dispatchSchema>) { return this.sessions.setDispatchSettings(user.id, body.alertAll); }
 
   @Get('trainers')
   trainers() { return this.sessions.trainers(); }

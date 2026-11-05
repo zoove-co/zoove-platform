@@ -10,6 +10,13 @@ import { formatWhen } from './rules';
 
 const BATCH = 50;
 
+export const ALERT_ALL_KEY = 'dispatch_alert_all';
+// Ops switch: true = alert every eligible trainer in the city at once; false (default) = widening waves.
+export async function alertAllSwitch(client: { query: (text: string, params?: unknown[]) => Promise<{ rows: Array<{ value?: unknown }> }> }): Promise<boolean> {
+  const r = await client.query(`select value from app_settings where key = $1`, [ALERT_ALL_KEY]);
+  return r.rows[0]?.value === true;
+}
+
 type OpenSession = {
   id: string; user_id: string; mode: string; starts_at: Date | null; address_pincode: string | null; address_area: string | null;
   dispatch_started_at: Date; dispatch_wave: number; unfilled_notified_at: Date | null; service_slug: string; service_name: string;
@@ -42,6 +49,7 @@ export class DispatchService implements OnModuleInit, OnModuleDestroy {
     this.running = true;
     try {
       return await this.db.tx(async (client) => {
+        const everyone = await alertAllSwitch(client);
         const open = await client.query<OpenSession>(
           `select b.id, b.user_id, b.mode, b.starts_at, b.address_pincode, b.address_area, b.dispatch_started_at, b.dispatch_wave, b.unfilled_notified_at, s.slug as service_slug, s.name as service_name
              from bookings b join services s on s.id = b.service_id
@@ -51,7 +59,7 @@ export class DispatchService implements OnModuleInit, OnModuleDestroy {
           [DISPATCH_WAVES.length, now],
         );
         let alerts = 0;
-        for (const session of open.rows) alerts += await this.advance(client, session, now);
+        for (const session of open.rows) alerts += await this.advance(client, session, now, everyone);
         return alerts;
       });
     } finally {
@@ -59,12 +67,17 @@ export class DispatchService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async advance(client: import('pg').PoolClient, s: OpenSession, now: Date): Promise<number> {
+  private async advance(client: import('pg').PoolClient, s: OpenSession, now: Date, everyone: boolean): Promise<number> {
     const elapsedMinutes = (now.getTime() - s.dispatch_started_at.getTime()) / 60_000;
     const target = DISPATCH_WAVES.filter((w) => w.afterMinutes <= elapsedMinutes).length;
     let wave = s.dispatch_wave;
     let alerts = 0;
     let lastWaveEmpty = false;
+    if (everyone && wave < DISPATCH_WAVES.length) {
+      // Ops switched on "alert every trainer at once": skip the waves and offer it to the whole city now.
+      alerts += await this.alertWave(client, s, DISPATCH_WAVES.length, 'city');
+      wave = DISPATCH_WAVES.length;
+    }
     while (wave < DISPATCH_WAVES.length && (wave < target || lastWaveEmpty)) {
       wave += 1;
       const made = await this.alertWave(client, s, wave, DISPATCH_WAVES[wave - 1]!.scope);

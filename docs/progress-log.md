@@ -11,6 +11,7 @@ Newest entry first. Add a new dated section at the top whenever something meanin
 - Session completion by trainer (jobs page) or ops (admin); ops flagged after 3 hours; streak now counts real sessions.
 - All customer notifications also go out by email and push (WhatsApp seam off). Package expiry reminders. Retention covers old push tokens and job alerts.
 - Found and fixed before release: a lock that would have frozen the notification worker (customer channel records are written on the worker's own transaction).
+- Admin > Sessions has a switch "Alert every trainer at once" (migration `0022_app_settings.sql`). Off = waves, on = whole city immediately. Audit-logged.
 - Not built: rating screen, trainer payout, WhatsApp, SMS to trainers (needs DLT), real distance ordering (needs trainer locations).
 
 ## 5 November 2026: trainer jobs

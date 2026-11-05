@@ -156,6 +156,35 @@ suite('finding a coach, closing sessions, and telling people', () => {
       expect((await board(near.token)).open.map((j) => j.id)).not.toContain(id);
     });
 
+    it('alerts every eligible trainer at once when ops switch that on, and goes back to waves when they switch it off', async () => {
+      const near = await trainer('AllNear', '400050');
+      const far = await trainer('AllFar', '411001');
+      const wrongSkill = await trainer('AllStrong', '400050', ['strength']);
+      expect((await http().get('/v1/admin/sessions/dispatch-settings').set(as(owner)).expect(200)).body).toEqual({ alertAll: false });
+      await http().get('/v1/admin/sessions/dispatch-settings').set(as(customer)).expect(403);
+      await http().put('/v1/admin/sessions/dispatch-settings').set(as(customer)).send({ alertAll: true }).expect(403);
+      await http().put('/v1/admin/sessions/dispatch-settings').set(as(owner)).send({ alertAll: 'yes' }).expect(400);
+
+      await http().put('/v1/admin/sessions/dispatch-settings').set(as(owner)).send({ alertAll: true }).expect(200);
+      try {
+        const id = await scheduled(customer, await addressFor(customer, '400050'), slot(22));
+        await dispatch().runOnce();
+        const to = await alertedTo(id);
+        expect(to).toEqual(expect.arrayContaining([near.id, far.id]));
+        expect(to).not.toContain(wrongSkill.id);
+        expect((await board(far.token)).open.map((j) => j.id)).toContain(id);
+        expect((await pool.query(`select dispatch_wave from bookings where id = $1`, [id])).rows[0].dispatch_wave).toBe(3);
+        expect((await pool.query(`select 1 from audit_log where action = 'settings.dispatch_alert_all'`)).rowCount).toBeGreaterThan(0);
+      } finally {
+        await http().put('/v1/admin/sessions/dispatch-settings').set(as(owner)).send({ alertAll: false }).expect(200);
+      }
+      // Off again: a new session goes to the same pincode only at first.
+      const later = await scheduled(customer, await addressFor(customer, '400050'), slot(23));
+      await dispatch().runOnce();
+      expect(await alertedTo(later)).toContain(near.id);
+      expect(await alertedTo(later)).not.toContain(far.id);
+    });
+
     it('moves straight on when a wave has nobody', async () => {
       const a = await trainer('Skip', '400050');
       const id = await scheduled(customer, await addressFor(customer, '400051'), slot(4));

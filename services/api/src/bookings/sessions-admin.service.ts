@@ -7,6 +7,7 @@ import { notifyCustomer } from '../customer/notify';
 import { queueTrainerAlert } from '../notifications/trainer-alerts';
 import { DatabaseService } from '../database/database.service';
 import { PackagesService } from '../packages/packages.service';
+import { ALERT_ALL_KEY, alertAllSwitch } from './dispatch.service';
 import { assertBookableSlot, sessionCodeOf, type BookingStatus } from './bookings.service';
 import { formatWhen } from './rules';
 
@@ -50,6 +51,22 @@ function toSession(r: ListRow, now = new Date()): AdminSession {
 @Injectable()
 export class SessionsAdminService {
   constructor(private readonly db: DatabaseService, private readonly packages: PackagesService) {}
+
+  async getDispatchSettings(): Promise<{ alertAll: boolean }> {
+    return { alertAll: await alertAllSwitch(this.db) };
+  }
+
+  async setDispatchSettings(adminId: string, alertAll: boolean): Promise<{ alertAll: boolean }> {
+    await this.db.tx(async (client) => {
+      await client.query(
+        `insert into app_settings (key, value, updated_by, updated_at) values ($1, $2::jsonb, $3, now())
+         on conflict (key) do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now()`,
+        [ALERT_ALL_KEY, JSON.stringify(alertAll), adminId],
+      );
+      await client.query(`insert into audit_log (actor_user_id, action, entity_type, entity_id, after) values ($1, 'settings.dispatch_alert_all', 'app_settings', null, $2)`, [adminId, JSON.stringify({ alertAll })]);
+    });
+    return { alertAll };
+  }
 
   async summary(): Promise<{ needsTrainer: number; trainerCancelled: number; overdue: number }> {
     const r = (await this.db.query<{ needs: string; cancelled: string; overdue: string }>(
