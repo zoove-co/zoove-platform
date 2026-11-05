@@ -351,11 +351,27 @@ export interface MyPackages {
   credits: { creditsLeft: number; nextExpiry: string | null };
 }
 
+export interface RewardOffer {
+  worth: string; // "10% off"
+  validDays: number;
+}
+
+export interface MyReward {
+  code: string;
+  side: 'referrer' | 'friend';
+  worth: string;
+  state: 'unused' | 'used' | 'expired' | 'switched_off';
+  expiresAt: string | null;
+}
+
 export interface ReferralSummary {
   code: string;
   signedUp: number;
   booked: number;
   referredBy: boolean;
+  // What a referral earns right now (null = switched off, promise nothing) and this customer's own reward codes.
+  offer: { referrer: RewardOffer | null; friend: RewardOffer | null };
+  rewards: MyReward[];
 }
 
 export type FitnessGoal = 'lose_weight' | 'build_strength' | 'stay_active' | 'flexibility' | 'stress_relief';

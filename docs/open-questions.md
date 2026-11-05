@@ -18,7 +18,7 @@ These block the booking, pricing and matching tables (migration 0002). Everythin
 8. Health data. Onboarding collects age, gender, height, weight and medical issues. Who may see it
    (assigned trainer, admin, both)? Consent wording and retention?
 9. Insurance and liability for at-home injuries. Gender-preference matching?
-10. Referral rewards: what does the referrer and the friend get?
+10. ~~Referral rewards~~ DECIDED (5 Nov 2026): both sides get 10% off one session, single use, valid 15 days, made automatically when the friend makes their first booking, emailed and shown in the app. Percent and days are editable in Admin > Rewards. Still switched OFF until an owner turns it on. Open: whether the friend's code should come at sign-up instead of first booking (we kept first booking to stop fake sign-ups).
 11. Prototype folder in Drive is shared as "anyone with the link": restrict to named people.
 12-18. New questions from the v1 prototype: see section 6 of `prototype-v1-analysis.md`
     (final visual direction, coach continuity, Online/Studio formats, instant 4-hour promise,

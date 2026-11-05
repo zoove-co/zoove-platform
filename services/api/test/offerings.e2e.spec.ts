@@ -188,6 +188,69 @@ suite('offerings, rewards and trainer cancellation', () => {
       expect(after.issued.find((i: { id: string }) => i.id === unused.id).state).toBe('switched_off');
     });
 
+    it('10% for both, one use, 15 days: codes show in the app, are emailed, and admin sees made and used', async () => {
+      const ten = { enabled: true, kind: 'percent', flatOffPaise: null, percentOff: 10, maxDiscountPaise: null, validDays: 15 };
+      // Switched off: the app promises nothing.
+      expect((await http().get('/v1/referral').set(as(me)).expect(200)).body).toMatchObject({ offer: { referrer: null, friend: null }, rewards: [] });
+      await http().put('/v1/admin/rewards/referrer').set(as(owner)).send(ten).expect(200);
+      await http().put('/v1/admin/rewards/friend').set(as(owner)).send(ten).expect(200);
+      expect((await http().get('/v1/referral').set(as(me)).expect(200)).body.offer).toEqual({ referrer: { worth: '10% off', validDays: 15 }, friend: { worth: '10% off', validDays: 15 } });
+      await pool.query(`update users set verified_email = 'friend-one@zoove.test' where phone_e164 = $1`, [FRIEND]);
+      await pool.query(`update users set verified_email = 'me-one@zoove.test' where phone_e164 = $1`, [ME]);
+      mail.sent.length = 0;
+      await referredFriend();
+      const addr = await addressFor(friend);
+      await book(friend, addr, 3).expect(201);
+
+      // Both customers see their own code in the app: 10% off, valid about 15 days, unused.
+      for (const token of [me, friend]) {
+        const mine = (await http().get('/v1/referral').set(as(token)).expect(200)).body.rewards as { code: string; worth: string; state: string; expiresAt: string }[];
+        expect(mine).toHaveLength(1);
+        expect(mine[0]).toMatchObject({ worth: '10% off', state: 'unused' });
+        const days = (new Date(mine[0]!.expiresAt).getTime() - Date.now()) / 86_400_000;
+        expect(days).toBeGreaterThan(14.9);
+        expect(days).toBeLessThan(15.1);
+      }
+      // Both are emailed once, each with their own code.
+      await app.get(OutboxWorkerService).runOnce();
+      const sent = mail.sent.filter((m) => m.subject.includes('10% off'));
+      expect(sent.map((m) => m.to).sort()).toEqual(['friend-one@zoove.test', 'me-one@zoove.test']);
+      const meCode = ((await http().get('/v1/referral').set(as(me)).expect(200)).body.rewards[0] as { code: string }).code;
+      expect(sent.find((m) => m.to === 'me-one@zoove.test')!.text).toContain(meCode);
+      mail.sent.length = 0;
+      await app.get(OutboxWorkerService).runOnce();
+      expect(mail.sent).toHaveLength(0); // sent once, not again
+
+      // Admin sees it made; after use, sees it used with a date. One use only.
+      let view = (await http().get('/v1/admin/rewards').set(as(owner)).expect(200)).body;
+      expect(view.issued).toHaveLength(2);
+      expect(view.issued.every((i: { state: string; usedAt: string | null; worth: string }) => i.state === 'unused' && i.usedAt === null && i.worth === '10% off')).toBe(true);
+      const used = await book(me, await addressFor(me), 5, { discountCode: meCode }).expect(201);
+      expect(used.body).toMatchObject({ discountPaise: 15_000, totalPaise: 135_000 });
+      await book(me, await addressFor(me), 6, { discountCode: meCode }).expect(422); // already used
+      view = (await http().get('/v1/admin/rewards').set(as(owner)).expect(200)).body;
+      const row = view.issued.find((i: { code: string }) => i.code === meCode);
+      expect(row.state).toBe('used');
+      expect(typeof row.usedAt).toBe('string');
+      expect((await http().get('/v1/referral').set(as(me)).expect(200)).body.rewards[0].state).toBe('used');
+      // Changing the percent only affects later rewards.
+      await http().put('/v1/admin/rewards/referrer').set(as(owner)).send({ ...ten, percentOff: 20 }).expect(200);
+      expect((await http().get('/v1/referral').set(as(friend)).expect(200)).body.rewards[0].worth).toBe('10% off');
+    });
+
+    it('a phone-only customer still gets the code in the app, without an email', async () => {
+      const ten = { enabled: true, kind: 'percent', flatOffPaise: null, percentOff: 10, maxDiscountPaise: null, validDays: 15 };
+      await http().put('/v1/admin/rewards/referrer').set(as(owner)).send(ten).expect(200);
+      await pool.query(`update users set verified_email = null where phone_e164 = $1`, [ME]);
+      mail.sent.length = 0;
+      await referredFriend();
+      await book(friend, await addressFor(friend), 3).expect(201);
+      await app.get(OutboxWorkerService).runOnce();
+      expect(mail.sent).toHaveLength(0);
+      expect((await http().get('/v1/referral').set(as(me)).expect(200)).body.rewards).toHaveLength(1);
+      expect((await pool.query(`select count(*)::int as c from outbox_events where event_type = 'referral.reward_granted' and published_at is null`)).rows[0].c).toBe(0);
+    });
+
     it('a reward that fails never blocks the friend\'s booking', async () => {
       await http().put('/v1/admin/rewards/referrer').set(as(owner)).send({ enabled: true, kind: 'flat', flatOffPaise: 20_000, percentOff: null, maxDiscountPaise: null, validDays: 30 }).expect(200);
       await pool.query(`create or replace function zz_boom() returns trigger language plpgsql as $$ begin raise exception 'reward store is down'; end $$`);

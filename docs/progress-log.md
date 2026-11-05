@@ -4,6 +4,12 @@ Newest entry first. Add a new dated section at the top whenever something meanin
 
 ---
 
+## 5 November 2026: referral reward decided and built
+- Both sides: 10% off one session, single use, 15 days. Made automatically (discount-code engine, reason `referral`) on the friend's first booking, stored in `discount_codes` / `referral_rewards`, emailed (outbox event `referral.reward_granted`), shown in the app (Refer a friend > Your reward codes), and listed in Admin > Rewards with made, expiry and used-on.
+- Percent, flat amount, cap and days are edited in Admin > Rewards; a change affects only codes made afterwards. Both sides stay switched off until an owner turns them on.
+- Migration `0019_referral_reward_defaults.sql` (data only) prefills 10% / 15 days on untouched rules.
+- Tests: 181 pass.
+
 ## 22 October 2026: where we are
 
 ### One-paragraph summary

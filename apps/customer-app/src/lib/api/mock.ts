@@ -924,7 +924,7 @@ export const mockApi: Api = {
   async getReferral() {
     await wait(150);
     // The real API issues a unique code per customer. Rewards are undecided (open question 10).
-    return { code: `ZOOVE${(signedInPhone ?? '0000').slice(-4)}`, signedUp: mockReferral.signedUp, booked: 0, referredBy: mockReferral.referredBy };
+    return { code: `ZOOVE${(signedInPhone ?? '0000').slice(-4)}`, signedUp: mockReferral.signedUp, booked: 0, referredBy: mockReferral.referredBy, offer: { referrer: null, friend: null }, rewards: [] };
   },
   async applyReferralCode(code) {
     await wait(300);

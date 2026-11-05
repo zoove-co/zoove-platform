@@ -12,7 +12,9 @@ import { ApiError } from '@/lib/api';
 import { track } from '@/lib/analytics/track';
 import { colors, radius, spacing } from '@/theme';
 
-// No reward is promised anywhere on this screen: referral rewards are undecided (open question 10).
+const dayOf = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
+
+// A reward is promised only while the admin Rewards tab has it switched on (the API sends offer = null otherwise).
 export default function ReferralScreen() {
   const { t } = useTranslation();
   const { data, isPending } = useReferral();
@@ -41,6 +43,8 @@ export default function ReferralScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <AppText variant="screenTitle">{t('referral.heading')}</AppText>
         <AppText color={colors.muted}>{t('referral.body')}</AppText>
+        {data?.offer.referrer ? <AppText color={colors.muted}>{t('referral.offerReferrer', { worth: data.offer.referrer.worth, days: data.offer.referrer.validDays })}</AppText> : null}
+        {data?.offer.friend ? <AppText color={colors.muted}>{t('referral.offerFriend', { worth: data.offer.friend.worth, days: data.offer.friend.validDays })}</AppText> : null}
         <View style={styles.codeCard}>
           <AppText variant="eyebrow" color={colors.purple}>
             {t('referral.codeLabel').toUpperCase()}
@@ -66,6 +70,25 @@ export default function ReferralScreen() {
             </View>
           </View>
         ) : null}
+        {data && data.rewards.length > 0 ? (
+          <View style={styles.rewards}>
+            <AppText variant="bodyStrong">{t('referral.rewardsTitle')}</AppText>
+            <AppText variant="caption" color={colors.muted}>{t('referral.rewardHint')}</AppText>
+            {data.rewards.map((reward) => (
+              <View key={reward.code} style={styles.reward}>
+                <View style={styles.rewardText}>
+                  <AppText variant="bodyStrong" selectable>{reward.code}</AppText>
+                  <AppText variant="caption" color={colors.muted}>{reward.worth}</AppText>
+                </View>
+                <AppText variant="caption" color={reward.state === 'unused' ? colors.success : colors.muted}>
+                  {reward.state === 'unused' && reward.expiresAt
+                    ? t('referral.rewardUnused', { date: dayOf(reward.expiresAt) })
+                    : reward.state === 'used' ? t('referral.rewardUsed') : reward.state === 'expired' ? t('referral.rewardExpired') : t('referral.rewardOff')}
+                </AppText>
+              </View>
+            ))}
+          </View>
+        ) : null}
         {data && !data.referredBy ? (
           <View style={styles.apply}>
             <AppText variant="bodyStrong">{t('referral.haveCode')}</AppText>
@@ -85,6 +108,9 @@ const styles = StyleSheet.create({
   stats: { flexDirection: 'row', gap: spacing.md },
   stat: { flex: 1, alignItems: 'center', padding: spacing.lg, borderRadius: radius.xl, backgroundColor: colors.lavender, gap: 2 },
   apply: { gap: spacing.sm, marginTop: spacing.md },
+  rewards: { gap: spacing.sm },
+  reward: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, padding: spacing.lg, borderRadius: radius.xl, backgroundColor: colors.lavender },
+  rewardText: { flexShrink: 1, gap: 2 },
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.xl, gap: spacing.lg },
   codeCard: {

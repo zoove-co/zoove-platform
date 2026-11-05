@@ -17,6 +17,7 @@ export type {
   ParticipantRule,
   ProgressProfile,
   ReferralSummary,
+  MyReward,
   CoachRef,
   OtpRequestResult,
   FocusArea,

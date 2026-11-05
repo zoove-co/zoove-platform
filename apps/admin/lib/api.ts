@@ -325,7 +325,7 @@ export const setParticipantRule = (participant: string, percent: number, perHead
 
 export type RewardSide = 'referrer' | 'friend';
 export type RewardRule = { side: RewardSide; enabled: boolean; kind: 'flat' | 'percent' | null; flatOffPaise: number | null; percentOff: number | null; maxDiscountPaise: number | null; validDays: number };
-export type IssuedReward = { id: string; side: RewardSide; customer: string; code: string; state: 'unused' | 'used' | 'expired' | 'switched_off'; createdAt: string; expiresAt: string | null };
+export type IssuedReward = { id: string; side: RewardSide; customer: string; code: string; worth: string; state: 'unused' | 'used' | 'expired' | 'switched_off'; createdAt: string; expiresAt: string | null; usedAt: string | null };
 export type RewardsOverview = { rules: RewardRule[]; issued: IssuedReward[]; stats: { signedUp: number; booked: number; rewardsGiven: number } };
 export const getRewards = () => api<RewardsOverview>('/v1/admin/rewards');
 export const saveReward = (side: RewardSide, rule: Omit<RewardRule, 'side'>) => api<RewardsOverview>(`/v1/admin/rewards/${side}`, { method: 'PUT', json: rule });

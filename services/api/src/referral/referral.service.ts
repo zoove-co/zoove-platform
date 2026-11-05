@@ -7,12 +7,16 @@ import { v7 as uuidv7 } from 'uuid';
 import { DomainError } from '../common/domain-error';
 import { notifyCustomer } from '../customer/notify';
 import { DatabaseService } from '../database/database.service';
-import { RewardsService } from './rewards.service';
+import { RewardsService, type MyReward, type RewardOffer, type RewardSide } from './rewards.service';
 
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const makeCode = () => Array.from({ length: 8 }, () => ALPHABET[randomInt(0, ALPHABET.length)]).join('');
 
-export type ReferralSummary = { code: string; signedUp: number; booked: number; referredBy: boolean };
+export type ReferralSummary = {
+  code: string; signedUp: number; booked: number; referredBy: boolean;
+  // What the programme offers right now (null = switched off) and this customer's own reward codes.
+  offer: Record<RewardSide, RewardOffer | null>; rewards: MyReward[];
+};
 
 // The link between two customers is tracked here. What a referral earns is set in the admin Rewards tab
 // (switched off until the business decides, open question 10); RewardsService gives it out on the first booking.
@@ -22,7 +26,8 @@ export class ReferralService {
   constructor(private readonly db: DatabaseService, private readonly rewards: RewardsService) {}
 
   async summary(userId: string): Promise<ReferralSummary> {
-    return this.db.tx(async (client) => {
+    const [offer, rewards] = await Promise.all([this.rewards.offer(), this.rewards.forCustomer(userId)]);
+    const base = await this.db.tx(async (client) => {
       let code = (await client.query<{ code: string }>(`select code from referral_codes where user_id = $1`, [userId])).rows[0]?.code;
       for (let attempt = 0; !code && attempt < 5; attempt += 1) {
         const made = makeCode();
@@ -35,6 +40,7 @@ export class ReferralService {
       const by = (await client.query(`select 1 from referrals where referred_id = $1`, [userId])).rows[0];
       return { code, signedUp: Number(counts.signed_up), booked: Number(counts.booked), referredBy: Boolean(by) };
     });
+    return { ...base, offer, rewards };
   }
 
   // A new customer types a friend's code. Allowed once, and only before their first booking.

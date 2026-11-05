@@ -3,6 +3,7 @@ import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nest
 import { APP_CONFIG, type Env } from '../config/env';
 import { DatabaseService } from '../database/database.service';
 import { EmailProvider, type EmailMessage } from '../email/email.provider';
+import { referralRewardEmail } from './customer-emails';
 import { partyRequestedEmail, teamInviteEmail, sessionOverdueEmail, trainerCancelledEmail } from './team-emails';
 import { approvedEmail, changesEmail, opsNewApplicationEmail, receivedEmail, rejectedEmail } from './trainer-emails';
 
@@ -10,7 +11,7 @@ type OutboxRow = { id: string; aggregate_id: string; event_type: string; payload
 
 type ApplicationInfo = { first_name: string | null; last_name: string | null; email: string | null; phone_e164: string | null; review_note: string | null };
 
-const HANDLED = ['trainer.application_submitted', 'trainer.application_approved', 'trainer.application_rejected', 'trainer.application_changes_requested', 'team.member_invited', 'party.requested', 'booking.trainer_cancelled', 'booking.overdue'];
+const HANDLED = ['trainer.application_submitted', 'trainer.application_approved', 'trainer.application_rejected', 'trainer.application_changes_requested', 'team.member_invited', 'party.requested', 'booking.trainer_cancelled', 'booking.overdue', 'referral.reward_granted'];
 const MAX_ATTEMPTS = 10;
 const BATCH = 10;
 
@@ -90,6 +91,15 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
       for (const ops of this.config.OPS_NOTIFY_EMAILS.split(',').map((value) => value.trim()).filter(Boolean)) {
         await this.email.send(trainerCancelledEmail(ops, { sessionCode: p.sessionCode ?? '', serviceName: p.serviceName ?? 'a', when: p.when ?? '', reason: p.reason ?? '' }, `${this.config.ADMIN_URL}/sessions?code=${encodeURIComponent(p.sessionCode ?? '')}`));
       }
+      return;
+    }
+    if (event.event_type === 'referral.reward_granted') {
+      const p = event.payload as { userId?: string; side?: 'referrer' | 'friend'; code?: string; worth?: string; until?: string };
+      if (!p.userId || !p.code) return;
+      const who = await this.db.query<{ email: string | null }>(`select coalesce(verified_email, email) as email from users where id = $1 and status = 'active'`, [p.userId]);
+      const to = who.rows[0]?.email;
+      if (!to) return; // phone-only customer: they still see the code in the app
+      await this.email.send(referralRewardEmail(to, { side: p.side ?? 'friend', code: p.code, worth: p.worth ?? '', until: p.until ?? '' }));
       return;
     }
     if (event.event_type === 'booking.overdue') {

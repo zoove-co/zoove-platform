@@ -13,7 +13,11 @@ export type RewardRule = {
   maxDiscountPaise: number | null; validDays: number;
 };
 export type RewardRuleInput = Omit<RewardRule, 'side'>;
-export type IssuedReward = { id: string; side: RewardSide; customer: string; code: string; state: 'unused' | 'used' | 'expired' | 'switched_off'; createdAt: string; expiresAt: string | null };
+export type RewardState = 'unused' | 'used' | 'expired' | 'switched_off';
+export type IssuedReward = { id: string; side: RewardSide; customer: string; code: string; worth: string; state: RewardState; createdAt: string; expiresAt: string | null; usedAt: string | null };
+// What a customer sees: their own reward codes, and what the programme currently offers (null when switched off).
+export type MyReward = { code: string; side: RewardSide; worth: string; state: RewardState; expiresAt: string | null };
+export type RewardOffer = { worth: string; validDays: number };
 
 type RuleRow = { side: RewardSide; enabled: boolean; kind: 'flat' | 'percent' | null; flat_off_paise: number | null; percent_off: number | null; max_discount_paise: number | null; valid_days: number };
 const toRule = (r: RuleRow): RewardRule => ({
@@ -21,6 +25,14 @@ const toRule = (r: RuleRow): RewardRule => ({
 });
 
 const TITLES: Record<RewardSide, string> = { referrer: 'You earned a referral reward', friend: 'A welcome reward from your friend\'s referral' };
+
+const rupees = (paise: number) => `₹${(paise / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+// "10% off", "10% off (up to ₹150)", "₹200 off"
+export const worthOf = (r: { kind: 'flat' | 'percent' | null; percent_off: number | null; flat_off_paise: number | null; max_discount_paise: number | null }): string =>
+  r.kind === 'percent' ? `${r.percent_off}% off${r.max_discount_paise ? ` (up to ${rupees(r.max_discount_paise)})` : ''}` : `${rupees(r.flat_off_paise ?? 0)} off`;
+const dayOf = (d: Date) => d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
+const stateOf = (row: { redemption_count: number; disabled_at: Date | null; expires_at: Date | null }, now: number): RewardState =>
+  row.redemption_count > 0 ? 'used' : row.disabled_at ? 'switched_off' : row.expires_at && row.expires_at.getTime() <= now ? 'expired' : 'unused';
 
 // What a referral earns is set in the admin panel (Rewards). A reward is a single-use discount code made for one customer,
 // so it uses the same checks as every other code. Both sides start switched off: nothing is decided yet (open question 10).
@@ -39,22 +51,48 @@ export class RewardsService {
       if (existing.rows[0]) continue;
       const codeId = uuidv7();
       let code = '';
+      let expiresAt: Date | null = null;
       for (let attempt = 0; attempt < 8 && !code; attempt += 1) {
         const made = generateCode(8);
-        const ins = await client.query(
+        const ins = await client.query<{ expires_at: Date }>(
           `insert into discount_codes (id, code, kind, percent_off, flat_off_paise, max_discount_paise, reason, note, assigned_user_id,
                                        max_redemptions, per_user_limit, applies_to, expires_at)
            values ($1, $2, $3, $4, $5, $6, 'referral', $7, $8, 1, 1, 'session', now() + ($9 || ' days')::interval)
-           on conflict (code) do nothing returning id`,
+           on conflict (code) do nothing returning expires_at`,
           [codeId, made, rule.kind, rule.percent_off, rule.flat_off_paise, rule.max_discount_paise, `Referral reward (${rule.side})`, userId, String(rule.valid_days)],
         );
-        if (ins.rows[0]) code = made;
+        if (ins.rows[0]) { code = made; expiresAt = ins.rows[0].expires_at; }
       }
-      if (!code) throw new DomainError('INTERNAL', 'Could not make a reward code.');
+      if (!code || !expiresAt) throw new DomainError('INTERNAL', 'Could not make a reward code.');
       await client.query(`insert into referral_rewards (id, referral_id, side, user_id, discount_code_id) values ($1, $2, $3, $4, $5)`, [uuidv7(), referralId, rule.side, userId, codeId]);
-      const worth = rule.kind === 'percent' ? `${rule.percent_off}% off` : `₹${((rule.flat_off_paise ?? 0) / 100).toLocaleString('en-IN')} off`;
-      await notifyCustomer(client, userId, TITLES[rule.side], `Use code ${code} for ${worth} on a session. It works once and expires in ${rule.valid_days} days.`, null);
+      const worth = worthOf(rule);
+      const until = dayOf(expiresAt);
+      await notifyCustomer(client, userId, TITLES[rule.side], `Use code ${code} for ${worth} on a session. It works once and is valid until ${until}.`, null);
+      // The email is sent by the outbox worker (retried if it fails); it is skipped for customers who signed up with a phone only.
+      await client.query(`insert into outbox_events (id, aggregate_type, aggregate_id, event_type, payload) values ($1, 'user', $2, 'referral.reward_granted', $3)`, [
+        uuidv7(), userId, JSON.stringify({ userId, side: rule.side, code, worth, until }),
+      ]);
     }
+  }
+
+  // The programme as it stands now, for the customer's Refer screen. A side that is switched off is null: promise nothing.
+  async offer(): Promise<Record<RewardSide, RewardOffer | null>> {
+    const r = await this.db.query<RuleRow>(`select side, enabled, kind, flat_off_paise, percent_off, max_discount_paise, valid_days from reward_rules where enabled`);
+    const out: Record<RewardSide, RewardOffer | null> = { referrer: null, friend: null };
+    for (const row of r.rows) out[row.side] = { worth: worthOf(row), validDays: row.valid_days };
+    return out;
+  }
+
+  // This customer's own reward codes, newest first.
+  async forCustomer(userId: string): Promise<MyReward[]> {
+    const r = await this.db.query<{ side: RewardSide; code: string; kind: 'flat' | 'percent'; percent_off: number | null; flat_off_paise: number | null; max_discount_paise: number | null; expires_at: Date | null; disabled_at: Date | null; redemption_count: number }>(
+      `select rr.side, c.code, c.kind, c.percent_off, c.flat_off_paise, c.max_discount_paise, c.expires_at, c.disabled_at, c.redemption_count
+         from referral_rewards rr join discount_codes c on c.id = rr.discount_code_id
+        where rr.user_id = $1 order by rr.created_at desc limit 10`,
+      [userId],
+    );
+    const now = Date.now();
+    return r.rows.map((row) => ({ code: row.code, side: row.side, worth: worthOf(row), state: stateOf(row, now), expiresAt: row.expires_at ? row.expires_at.toISOString() : null }));
   }
 
   async rules(): Promise<RewardRule[]> {
@@ -87,15 +125,16 @@ export class RewardsService {
   }
 
   async issued(): Promise<IssuedReward[]> {
-    const r = await this.db.query<{ id: string; side: RewardSide; email: string | null; phone_e164: string | null; code: string; created_at: Date; expires_at: Date | null; disabled_at: Date | null; redemption_count: number }>(
-      `select rr.id, rr.side, u.email, u.phone_e164, c.code, rr.created_at, c.expires_at, c.disabled_at, c.redemption_count
+    const r = await this.db.query<{ id: string; side: RewardSide; email: string | null; phone_e164: string | null; code: string; kind: 'flat' | 'percent'; percent_off: number | null; flat_off_paise: number | null; max_discount_paise: number | null; created_at: Date; expires_at: Date | null; disabled_at: Date | null; redemption_count: number; used_at: Date | null }>(
+      `select rr.id, rr.side, u.email, u.phone_e164, c.code, c.kind, c.percent_off, c.flat_off_paise, c.max_discount_paise, rr.created_at, c.expires_at, c.disabled_at, c.redemption_count,
+              (select max(d.created_at) from discount_redemptions d where d.code_id = c.id and d.released_at is null) as used_at
          from referral_rewards rr join discount_codes c on c.id = rr.discount_code_id join users u on u.id = rr.user_id
         order by rr.created_at desc limit 200`,
     );
     const now = Date.now();
     return r.rows.map((row) => ({
-      id: row.id, side: row.side, customer: row.email ?? row.phone_e164 ?? 'Customer', code: row.code, createdAt: row.created_at.toISOString(), expiresAt: row.expires_at ? row.expires_at.toISOString() : null,
-      state: row.redemption_count > 0 ? 'used' : row.disabled_at ? 'switched_off' : row.expires_at && row.expires_at.getTime() <= now ? 'expired' : 'unused',
+      id: row.id, side: row.side, customer: row.email ?? row.phone_e164 ?? 'Customer', code: row.code, worth: worthOf(row), createdAt: row.created_at.toISOString(), expiresAt: row.expires_at ? row.expires_at.toISOString() : null,
+      usedAt: row.redemption_count > 0 && row.used_at ? row.used_at.toISOString() : null, state: stateOf(row, now),
     }));
   }
 

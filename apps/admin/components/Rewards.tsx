@@ -9,13 +9,14 @@ import { Banner, Field, Spinner } from './ui';
 
 const SIDE_TITLE: Record<RewardSide, string> = { referrer: 'The customer who shares their code', friend: 'The friend who joins with the code' };
 const SIDE_HINT: Record<RewardSide, string> = { referrer: 'Given when their friend makes a first booking.', friend: 'Given when they make their first booking.' };
+const dayTime = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' });
 const STATE_LABEL: Record<IssuedReward['state'], string> = { unused: 'Not used yet', used: 'Used', expired: 'Expired', switched_off: 'Switched off' };
 const STATE_PILL: Record<IssuedReward['state'], string> = { unused: 'in_review', used: 'approved', expired: 'rejected', switched_off: 'rejected' };
 const day = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
 
 type Draft = { enabled: boolean; kind: 'flat' | 'percent'; amount: string; cap: string; days: string };
 const toDraft = (r: RewardRule): Draft => ({
-  enabled: r.enabled, kind: r.kind ?? 'flat', amount: r.kind === 'percent' ? String(r.percentOff ?? '') : r.flatOffPaise ? String(r.flatOffPaise / 100) : '',
+  enabled: r.enabled, kind: r.kind ?? 'percent', amount: r.kind === 'percent' ? String(r.percentOff ?? '') : r.flatOffPaise ? String(r.flatOffPaise / 100) : '',
   cap: r.maxDiscountPaise ? String(r.maxDiscountPaise / 100) : '', days: String(r.validDays),
 });
 
@@ -77,7 +78,7 @@ export function Rewards({ signOut, expired }: { signOut: () => void; expired: ()
       <div className="pagehead">
         <div>
           <h1>Rewards</h1>
-          <p>What a referral earns. A reward is a one-time discount code made for that customer, valid for a session. Both start switched off until the business decides.</p>
+          <p>What a referral earns. When a friend makes their first booking, a one-time discount code is made automatically for each side, saved here, emailed and shown in their app. Change the percent or the days here at any time. It only affects codes made after you save. Both sides start switched off.</p>
         </div>
       </div>
       {error ? <Banner tone="bad">{error}</Banner> : null}
@@ -116,14 +117,15 @@ export function Rewards({ signOut, expired }: { signOut: () => void; expired: ()
           {data.issued.length === 0 ? <Banner tone="info">No rewards given yet.</Banner> : (
             <div className="panel tablewrap">
               <table className="list">
-                <thead><tr><th>Customer</th><th>For</th><th>Code</th><th>Status</th><th /></tr></thead>
+                <thead><tr><th>Customer</th><th>For</th><th>Code</th><th>Status</th><th>Used on</th><th /></tr></thead>
                 <tbody>
                   {data.issued.map((r) => (
                     <tr key={r.id}>
                       <td>{r.customer}<div className="sub muted small">{day(r.createdAt)}</div></td>
                       <td>{r.side === 'referrer' ? 'Sharing their code' : 'Joining with a code'}</td>
-                      <td><code>{r.code}</code>{r.expiresAt ? <div className="sub muted small">until {day(r.expiresAt)}</div> : null}</td>
+                      <td><code>{r.code}</code> <span className="muted small">{r.worth}</span>{r.expiresAt ? <div className="sub muted small">until {day(r.expiresAt)}</div> : null}</td>
                       <td><span className={`pill ${STATE_PILL[r.state]}`}>{STATE_LABEL[r.state]}</span></td>
+                      <td>{r.usedAt ? dayTime(r.usedAt) : <span className="muted">-</span>}</td>
                       <td>{r.state === 'unused' ? <button className="btn ghost" type="button" onClick={() => void off(r.id)}>Switch off</button> : null}</td>
                     </tr>
                   ))}
