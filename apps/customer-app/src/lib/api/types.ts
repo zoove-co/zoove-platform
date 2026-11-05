@@ -15,6 +15,7 @@ export type ApiErrorCode =
   | 'INVALID_PHONE'
   | 'OTP_INVALID'
   | 'NO_CREDITS'
+  | 'PACKAGE_EXPIRES'
   | 'INVALID_STATE'
   | 'OTP_LOCKED'
   | 'OTP_RATE_LIMITED'
@@ -197,6 +198,8 @@ export interface Booking {
   sessionCode: string;
   // The coach cancelled and we are finding another one (status rematching). The customer can wait, reschedule or cancel.
   trainerCancelled: boolean;
+  // The start time has passed and there is no coach on the session. The customer can move it or cancel it.
+  overdue: boolean;
   // Decided by the server (rule lives in the API, never in the app).
   canChange: boolean;
   inProgress: boolean; // a confirmed session whose time is running now

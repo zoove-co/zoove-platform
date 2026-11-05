@@ -109,11 +109,12 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
   const other = onTeam || onCalc || onDiscounts || onParties || onPackages || onSessions || onOfferings || onRewards;
   // Sessions waiting for a trainer, so a cancellation is noticed without opening the page.
   const [waiting, setWaiting] = useState(0);
+  const [overdue, setOverdue] = useState(0);
   const canSessions = can(me, 'sessions.manage');
   useEffect(() => {
     if (!canSessions || me === null) return;
     let live = true;
-    const tick = () => sessionSummary().then((s) => { if (live) setWaiting(s.needsTrainer); }).catch(() => undefined);
+    const tick = () => sessionSummary().then((s) => { if (live) { setWaiting(s.needsTrainer); setOverdue(s.overdue); } }).catch(() => undefined);
     void tick();
     const timer = setInterval(() => void tick(), 60_000);
     return () => { live = false; clearInterval(timer); };
@@ -144,7 +145,7 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
             <Link href="/sessions" aria-current={onSessions ? 'page' : undefined}>
               {Icons.sessions}
               Sessions
-              {waiting ? <span className="badge">{waiting}</span> : null}
+              {waiting ? <span className="badge" style={overdue ? { background: 'var(--red)', color: '#fff' } : undefined} title={overdue ? `${overdue} overdue` : undefined}>{waiting}</span> : null}
             </Link>
           ) : null}
           {can(me, 'catalog.manage') ? (

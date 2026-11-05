@@ -3,14 +3,14 @@ import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nest
 import { APP_CONFIG, type Env } from '../config/env';
 import { DatabaseService } from '../database/database.service';
 import { EmailProvider, type EmailMessage } from '../email/email.provider';
-import { partyRequestedEmail, teamInviteEmail, trainerCancelledEmail } from './team-emails';
+import { partyRequestedEmail, teamInviteEmail, sessionOverdueEmail, trainerCancelledEmail } from './team-emails';
 import { approvedEmail, changesEmail, opsNewApplicationEmail, receivedEmail, rejectedEmail } from './trainer-emails';
 
 type OutboxRow = { id: string; aggregate_id: string; event_type: string; payload: Record<string, unknown>; attempts: number };
 
 type ApplicationInfo = { first_name: string | null; last_name: string | null; email: string | null; phone_e164: string | null; review_note: string | null };
 
-const HANDLED = ['trainer.application_submitted', 'trainer.application_approved', 'trainer.application_rejected', 'trainer.application_changes_requested', 'team.member_invited', 'party.requested', 'booking.trainer_cancelled'];
+const HANDLED = ['trainer.application_submitted', 'trainer.application_approved', 'trainer.application_rejected', 'trainer.application_changes_requested', 'team.member_invited', 'party.requested', 'booking.trainer_cancelled', 'booking.overdue'];
 const MAX_ATTEMPTS = 10;
 const BATCH = 10;
 
@@ -89,6 +89,13 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
       const p = event.payload as { bookingId?: string; sessionCode?: string; serviceName?: string; when?: string; reason?: string };
       for (const ops of this.config.OPS_NOTIFY_EMAILS.split(',').map((value) => value.trim()).filter(Boolean)) {
         await this.email.send(trainerCancelledEmail(ops, { sessionCode: p.sessionCode ?? '', serviceName: p.serviceName ?? 'a', when: p.when ?? '', reason: p.reason ?? '' }, `${this.config.ADMIN_URL}/sessions?code=${encodeURIComponent(p.sessionCode ?? '')}`));
+      }
+      return;
+    }
+    if (event.event_type === 'booking.overdue') {
+      const p = event.payload as { sessionCode?: string; serviceName?: string; when?: string };
+      for (const ops of this.config.OPS_NOTIFY_EMAILS.split(',').map((value) => value.trim()).filter(Boolean)) {
+        await this.email.send(sessionOverdueEmail(ops, { sessionCode: p.sessionCode ?? '', serviceName: p.serviceName ?? 'a', when: p.when ?? '' }, `${this.config.ADMIN_URL}/sessions?code=${encodeURIComponent(p.sessionCode ?? '')}`));
       }
       return;
     }

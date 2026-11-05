@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import {
-  ApiError, assignTrainer, getSession, listAssignableTrainers, listSessions, recordTrainerCancel,
+  ApiError, assignTrainer, getSession, listAssignableTrainers, listSessions, recordTrainerCancel, recordTrainerNoShow,
   type AdminSession, type SessionDetail, type SessionFilter, type SessionStatus,
 } from '@/lib/api';
 import { can, useMe } from './me';
@@ -15,7 +15,7 @@ const stamp = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'num
 const STATUS_LABEL: Record<SessionStatus, string> = { matching: 'Finding a trainer', rematching: 'Finding a new trainer', confirmed: 'Confirmed', completed: 'Done', cancelled: 'Cancelled' };
 const STATUS_PILL: Record<SessionStatus, string> = { matching: 'changes_requested', rematching: 'submitted', confirmed: 'approved', completed: 'approved', cancelled: 'rejected' };
 const EVENT_LABEL: Record<string, string> = {
-  created: 'Booked by the customer', rescheduled: 'Moved to another time', cancelled: 'Cancelled', trainer_assigned: 'Trainer assigned', trainer_cancelled: 'Trainer cancelled',
+  created: 'Booked by the customer', rescheduled: 'Moved to another time', cancelled: 'Cancelled', trainer_assigned: 'Trainer assigned', trainer_cancelled: 'Trainer cancelled', trainer_no_show: 'Trainer did not arrive', overdue: 'Start time passed with no trainer, customer told',
 };
 const FILTERS: [SessionFilter, string][] = [['needs_trainer', 'Needs a trainer'], ['upcoming', 'Confirmed'], ['all', 'All sessions']];
 const PEOPLE: Record<string, string> = { personal: 'Personal', duo: 'Duo', loved_one: 'Loved one', group: 'Group' };
@@ -74,14 +74,14 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
     try { const d = await action(); setOpen(d); setPick(''); setReason(''); await load(); }
     catch (err) { const m = handle(err); if (m) setFormError(m); } finally { setBusy(false); }
   }
-  const cancelledTrainerIds = new Set(open?.events.filter((e) => e.type === 'trainer_cancelled').map((e) => String(e.payload.trainerId)) ?? []);
+  const cancelledTrainerIds = new Set(open?.events.filter((e) => e.type === 'trainer_cancelled' || e.type === 'trainer_no_show').map((e) => String(e.payload.trainerId)) ?? []);
 
   return (
     <Shell signOut={signOut}>
       <div className="pagehead">
         <div>
           <h1>Sessions</h1>
-          <p>Every session has a code the customer also sees. When a trainer cancels, the session lands under Needs a trainer until someone is assigned.</p>
+          <p>Every session has a code the customer also sees. A session goes under Needs a trainer when a trainer cancels or does not arrive. Overdue ones are in red at the top.</p>
         </div>
       </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -97,10 +97,10 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
             <thead><tr><th>Session</th><th>Customer</th><th>When</th><th>Status</th><th /></tr></thead>
             <tbody>
               {rows.map((s) => (
-                <tr key={s.id}>
+                <tr key={s.id} style={s.startPassed ? { background: 'rgba(220, 38, 38, 0.07)' } : undefined}>
                   <td><b>{s.sessionCode}</b><div className="sub muted small">{s.serviceName} · {s.formatName} · {PEOPLE[s.participant] ?? s.participant}{s.groupSize ? ` of ${s.groupSize}` : ''}</div></td>
                   <td>{s.customerName}<div className="sub muted small">{s.area ?? ''}</div></td>
-                  <td>{s.whenLabel}{s.startPassed ? <div className="sub small" style={{ color: 'var(--red)' }}>Start time has passed</div> : null}</td>
+                  <td>{s.whenLabel}{s.startPassed ? <div className="sub small" style={{ color: 'var(--red)', fontWeight: 600 }}>Overdue: start time has passed</div> : null}</td>
                   <td>
                     <span className={`pill ${STATUS_PILL[s.status]}`}>{STATUS_LABEL[s.status]}</span>
                     {s.trainerCancelledAt && s.status === 'rematching' ? <div className="sub muted small">Trainer cancelled {stamp(s.trainerCancelledAt)}</div> : null}
@@ -127,7 +127,7 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
               <dt>Paid</dt><dd>{open.paidWithCredit ? 'With a package credit' : rupees(open.totalPaise)}{open.discountCode ? ` (code ${open.discountCode})` : ''}</dd>
               <dt>Trainer</dt><dd>{open.trainerName ?? 'Not assigned'}{open.trainerCancelCount ? ` · cancelled ${open.trainerCancelCount} time${open.trainerCancelCount > 1 ? 's' : ''}` : ''}</dd>
             </dl>
-            {open.startPassed ? <Banner tone="warn">The start time has passed and no trainer is assigned. Call the customer to reschedule or cancel.</Banner> : null}
+            {open.startPassed ? <Banner tone="warn">Overdue: the start time has passed and no trainer is on this session. The customer has been told and can move it or cancel it. Call them to apologise and help them rebook. A trainer cannot be assigned to a time that has passed.</Banner> : null}
 
             <h3 style={{ marginBottom: 6 }}>History</h3>
             <ul className="accesslist" style={{ marginTop: 0 }}>
@@ -135,6 +135,7 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
                 <li key={i}>
                   {stamp(e.createdAt)} · {EVENT_LABEL[e.type] ?? e.type}
                   {e.type === 'trainer_cancelled' && e.payload.reason ? ` — “${String(e.payload.reason)}”` : ''}
+                  {e.type === 'trainer_no_show' && e.payload.note ? ` — “${String(e.payload.note)}”` : ''}
                 </li>
               ))}
             </ul>
@@ -145,7 +146,7 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
                   <span>Assign a trainer</span>
                   <select value={pick} onChange={(e) => setPick(e.target.value)}>
                     <option value="">Choose a trainer</option>
-                    {trainers.map((t) => <option key={t.id} value={t.id} disabled={cancelledTrainerIds.has(t.id)}>{t.name}{cancelledTrainerIds.has(t.id) ? ' (cancelled this session)' : ''}</option>)}
+                    {trainers.map((t) => <option key={t.id} value={t.id} disabled={cancelledTrainerIds.has(t.id)}>{t.name}{cancelledTrainerIds.has(t.id) ? ' (dropped this session)' : ''}</option>)}
                   </select>
                   {trainers.length === 0 ? <div className="hint">No active trainers yet. Approve a trainer application first.</div> : null}
                 </label>
@@ -154,9 +155,13 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
             {open.status === 'confirmed' ? (
               <div className="fields" style={{ marginTop: 10 }}>
                 <label className="field full">
-                  <span>The trainer cannot make it (reason)</span>
-                  <input value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)} placeholder="For example: unwell, family emergency" />
-                  <div className="hint">The customer is told and can wait, move the session or cancel. It goes back to Needs a trainer.</div>
+                  <span>{open.canMarkNoShow && open.startsAt ? 'What happened (note)' : 'The trainer cannot make it (reason)'}</span>
+                  <input value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)} placeholder={open.canMarkNoShow && open.startsAt ? 'For example: trainer not reachable, did not reach the address' : 'For example: unwell, family emergency'} />
+                  <div className="hint">
+                    {open.canMarkNoShow && open.startsAt
+                      ? 'If the trainer did not arrive, the customer is told, the session goes back to Needs a trainer, and this trainer cannot be put back on it.'
+                      : 'The customer is told and can wait, move the session or cancel. It goes back to Needs a trainer.'}
+                  </div>
                 </label>
               </div>
             ) : null}
@@ -166,8 +171,11 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
               {open.status === 'matching' || open.status === 'rematching' ? (
                 <button className="btn" type="button" disabled={busy || !pick} onClick={() => void act(() => assignTrainer(open.id, pick))}>{busy ? <Spinner /> : null} Assign trainer</button>
               ) : null}
-              {open.status === 'confirmed' ? (
+              {open.status === 'confirmed' && (!open.startsAt || !open.canMarkNoShow) ? (
                 <button className="btn" type="button" disabled={busy || reason.trim().length < 3} onClick={() => void act(() => recordTrainerCancel(open.id, reason.trim()))}>{busy ? <Spinner /> : null} Record trainer cancelled</button>
+              ) : null}
+              {open.status === 'confirmed' && open.canMarkNoShow ? (
+                <button className="btn" type="button" style={{ background: 'var(--red)' }} disabled={busy || reason.trim().length < 3} onClick={() => void act(() => recordTrainerNoShow(open.id, reason.trim()))}>{busy ? <Spinner /> : null} Trainer did not arrive</button>
               ) : null}
             </div>
           </div>

@@ -35,6 +35,8 @@ export type Booking = {
   sessionCode: string;
   // The trainer cancelled and we are finding another one. The customer can wait, reschedule or cancel.
   trainerCancelled: boolean;
+  // The start time has passed and no coach is on the session. The customer can move it or cancel it.
+  overdue: boolean;
   whenLabel: string;
   addressLabel: string;
   areaLabel: string;
@@ -132,6 +134,7 @@ export function bookingFromRow(row: Row, now = new Date()): Booking {
     coach: row.coach_id && row.status === 'confirmed' ? { id: row.coach_id, name: (row.coach_name ?? 'Your trainer').split(' ')[0] ?? 'Your trainer' } : null,
     sessionCode: sessionCodeOf(row.id),
     trainerCancelled: row.status === 'rematching' && row.trainer_cancelled_at !== null,
+    overdue: (row.status === 'matching' || row.status === 'rematching') && row.starts_at !== null && row.starts_at.getTime() <= now.getTime(),
     whenLabel: row.starts_at ? formatWhen(row.starts_at) : row.mode === 'instant' ? 'Finding your coach' : 'To be scheduled',
     addressLabel: row.address_label,
     areaLabel: row.address_area ?? '',
@@ -235,7 +238,7 @@ export class BookingsService {
         const bookingId = uuidv7();
         // The code is checked and used up inside this same transaction: if the booking fails, the code is not spent.
         if (input.useCredit && input.discountCode) throw new DomainError('INVALID_REQUEST', 'A package credit and a discount code cannot be used together.');
-        const creditPurchaseId = input.useCredit ? await this.packages.takeCredit(client, userId) : null;
+        const creditPurchaseId = input.useCredit ? await this.packages.takeCredit(client, userId, startsAt) : null;
         const discount = input.discountCode ? await this.discounts.quote(client, userId, input.discountCode, listPrice, 'session', true) : null;
         const total = creditPurchaseId ? 0 : discount ? discount.totalPaise : listPrice;
         await client.query(
@@ -275,12 +278,14 @@ export class BookingsService {
           throw new DomainError('CHANGE_WINDOW_CLOSED', 'This session can no longer be changed.');
         }
         const startsAt = this.assertBookableSlot(startsAtInput);
+        // A package covers the session only up to its end date.
+        if (row.package_purchase_id) await this.packages.assertCovers(client, row.package_purchase_id, startsAt);
         // A trainer already on this session may be busy at the new time: then the session goes back to "finding a coach".
         const clash = row.status === 'confirmed' && row.coach_id
           ? (await client.query(`select 1 from bookings where coach_id = $1 and status = 'confirmed' and starts_at = $2 and id <> $3 limit 1`, [row.coach_id, startsAt, id])).rows[0]
           : null;
-        if (clash) await client.query(`update bookings set starts_at = $2, status = 'rematching', coach_id = null where id = $1`, [id, startsAt]);
-        else await client.query(`update bookings set starts_at = $2 where id = $1`, [id, startsAt]);
+        if (clash) await client.query(`update bookings set starts_at = $2, status = 'rematching', coach_id = null, overdue_notified_at = null where id = $1`, [id, startsAt]);
+        else await client.query(`update bookings set starts_at = $2, overdue_notified_at = null where id = $1`, [id, startsAt]);
         await this.record(client, id, 'rescheduled', 'customer', { from: row.starts_at?.toISOString() ?? null, to: startsAt.toISOString(), coachFreed: Boolean(clash) });
         await this.publish(client, id, 'booking.rescheduled', { bookingId: id, userId, to: startsAt.toISOString() });
         await notifyCustomer(client, userId, 'Session rescheduled', `Your ${row.service_name} session is now ${formatWhen(startsAt)}.${clash ? ' Your coach is not free then, so we are finding another coach and will tell you as soon as one is assigned.' : ''}`, id);

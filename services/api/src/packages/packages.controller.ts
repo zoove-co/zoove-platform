@@ -11,6 +11,11 @@ import { PackagesService } from './packages.service';
 const buySchema = z.object({ packageId: z.uuid(), idempotencyKey: z.string().min(8).max(100), discountCode: z.string().trim().min(3).max(40).optional() });
 const idSchema = z.uuid();
 const paidSchema = z.object({ method: z.enum(['upi', 'bank_transfer', 'cash', 'card', 'other']), reference: z.string().trim().min(2).max(100) });
+const exceptionSchema = z.object({
+  extraSessions: z.number().int().min(0).max(20).default(0),
+  extendDays: z.number().int().min(0).max(90).default(0),
+  reason: z.string().trim().min(3).max(300),
+});
 const savePackageSchema = z.object({
   name: z.string().trim().min(1).max(80),
   sessionsCount: z.number().int().min(1).max(200),
@@ -73,6 +78,15 @@ export class PackagesAdminController {
   @Post('package-orders/:id/cancel')
   @HttpCode(200)
   cancel(@CurrentUser() user: AuthUser, @Param('id', new ZodValidationPipe(idSchema)) id: string) { return this.packages.adminCancel(user.id, id); }
+
+  @Get('package-orders/:id/history')
+  history(@Param('id', new ZodValidationPipe(idSchema)) id: string) { return this.packages.exceptionHistory(id); }
+
+  @Post('package-orders/:id/exception')
+  @HttpCode(200)
+  exception(@CurrentUser() user: AuthUser, @Param('id', new ZodValidationPipe(idSchema)) id: string, @Body(new ZodValidationPipe(exceptionSchema)) body: z.infer<typeof exceptionSchema>) {
+    return this.packages.grantException(user.id, id, body);
+  }
 
   @Get('packages')
   catalog() { return this.packages.adminPackages(); }

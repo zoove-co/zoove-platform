@@ -16,7 +16,10 @@ export type PurchaseStatus = 'awaiting_payment' | 'paid' | 'cancelled';
 export type PurchaseView = {
   id: string; name: string; sessionsCount: number; listPricePaise: number; discountPaise: number; discountCode: string | null; totalPaise: number;
   status: PurchaseStatus; creditsLeft: number; creditsTotal: number; expiresAt: string | null; paidAt: string | null; createdAt: string;
+  // Past its end date. creditsLeft is 0 then, because those sessions can no longer be booked; creditsUnused is what was left over.
+  expired: boolean; creditsUnused: number;
 };
+export type PackageException = { id: string; action: string; reason: string; extraSessions: number; extendDays: number; expiresAt: string | null; by: string; at: string };
 export type CreditSummary = { creditsLeft: number; nextExpiry: string | null };
 
 type PackageRow = { id: string; name: string; sessions_count: number; price_paise: number; original_price_paise: number | null; validity_days: number | null; badge: string | null };
@@ -30,11 +33,16 @@ const toPackage = (r: PackageRow): PackageView => ({
   id: r.id, name: r.name, sessionsCount: r.sessions_count, pricePaise: r.price_paise,
   originalPricePaise: r.original_price_paise, validityDays: r.validity_days, badge: r.badge,
 });
-export const toPurchase = (r: PurchaseRow): PurchaseView => ({
-  id: r.id, name: r.name, sessionsCount: r.sessions_count, listPricePaise: r.list_price_paise, discountPaise: r.discount_paise, discountCode: r.discount_code,
-  totalPaise: r.total_paise, status: r.status, creditsTotal: r.credits_total, creditsLeft: r.status === 'paid' ? r.credits_total - r.credits_used : 0,
-  expiresAt: r.expires_at?.toISOString() ?? null, paidAt: r.paid_at?.toISOString() ?? null, createdAt: r.created_at.toISOString(),
-});
+export const toPurchase = (r: PurchaseRow, now = new Date()): PurchaseView => {
+  const unused = r.status === 'paid' ? r.credits_total - r.credits_used : 0;
+  const expired = r.status === 'paid' && r.expires_at !== null && r.expires_at.getTime() <= now.getTime();
+  return {
+    id: r.id, name: r.name, sessionsCount: r.sessions_count, listPricePaise: r.list_price_paise, discountPaise: r.discount_paise, discountCode: r.discount_code,
+    totalPaise: r.total_paise, status: r.status, creditsTotal: r.credits_total, creditsLeft: expired ? 0 : unused, creditsUnused: unused, expired,
+    expiresAt: r.expires_at?.toISOString() ?? null, paidAt: r.paid_at?.toISOString() ?? null, createdAt: r.created_at.toISOString(),
+  };
+};
+export const formatDay = (d: Date): string => d.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric' });
 const COLS = `id, user_id, name, sessions_count, list_price_paise, discount_paise, discount_code, total_paise, status, credits_total, credits_used, expires_at, paid_at, created_at, payment_method, payment_reference`;
 
 // Packages are bought "awaiting payment" and ops mark them paid in the admin panel. A payment provider (Razorpay) later
@@ -52,7 +60,7 @@ export class PackagesService {
 
   async mine(userId: string): Promise<{ purchases: PurchaseView[]; credits: CreditSummary }> {
     const r = await this.db.query<PurchaseRow>(`select ${COLS} from package_purchases where user_id = $1 order by created_at desc limit 50`, [userId]);
-    const purchases = r.rows.map(toPurchase);
+    const purchases = r.rows.map((row) => toPurchase(row));
     return { purchases, credits: await this.credits(this.db, userId) };
   }
 
@@ -175,17 +183,75 @@ export class PackagesService {
     });
   }
 
-  // Used by bookings: take one credit from the paid package that expires first. Returns its id or throws.
-  async takeCredit(client: PoolClient, userId: string): Promise<string> {
+  // ---- exceptions (ops) ----
+  // A customer could not use their package in time (a trainer let them down, an app problem, anything ops decide is fair).
+  // Ops can add days to the end date, add sessions, or both. Always with a reason, always on the record, and the customer is told.
+  async grantException(adminId: string, id: string, input: { extraSessions: number; extendDays: number; reason: string }): Promise<PurchaseView> {
+    if (input.extraSessions === 0 && input.extendDays === 0) throw new DomainError('INVALID_REQUEST', 'Choose extra sessions, extra days, or both.');
+    const row = await this.db.tx(async (client) => {
+      const cur = (await client.query<PurchaseRow>(`select ${COLS} from package_purchases where id = $1 for update`, [id])).rows[0];
+      if (!cur) throw new DomainError('NOT_FOUND', 'Order not found.');
+      if (cur.status !== 'paid') throw new DomainError('INVALID_STATE', 'Only a paid package can be extended.');
+      if (cur.expires_at === null) throw new DomainError('INVALID_STATE', 'This package never expires, so there is nothing to extend.');
+      const expired = cur.expires_at.getTime() <= Date.now();
+      // Sessions added to a package that has already ended could never be booked, so the end date has to move too.
+      if (input.extraSessions > 0 && expired && input.extendDays === 0) throw new DomainError('INVALID_REQUEST', 'This package has ended. Add days as well, or the new session cannot be booked.');
+      // New end date: from the old one if it is still running, from today if it already ended.
+      const upd = await client.query<PurchaseRow>(
+        `update package_purchases set credits_total = credits_total + $2,
+                expires_at = case when $3 > 0 then greatest(expires_at, now()) + ($3 || ' days')::interval else expires_at end
+          where id = $1 returning ${COLS}`,
+        [id, input.extraSessions, input.extendDays],
+      );
+      const after = upd.rows[0]!;
+      await client.query(
+        `insert into audit_log (actor_user_id, action, entity_type, entity_id, before, after) values ($1, 'package.exception_granted', 'package_purchase', $2, $3, $4)`,
+        [adminId, id, JSON.stringify({ creditsTotal: cur.credits_total, creditsUsed: cur.credits_used, expiresAt: cur.expires_at.toISOString() }),
+         JSON.stringify({ reason: input.reason, extraSessions: input.extraSessions, extendDays: input.extendDays, creditsTotal: after.credits_total, expiresAt: after.expires_at?.toISOString() ?? null })],
+      );
+      const parts = [input.extraSessions > 0 ? `${input.extraSessions} extra session${input.extraSessions === 1 ? '' : 's'}` : null, input.extendDays > 0 ? `${input.extendDays} more day${input.extendDays === 1 ? '' : 's'}` : null].filter(Boolean).join(' and ');
+      await notifyCustomer(client, cur.user_id, 'Your package was extended',
+        `We added ${parts} to your ${cur.name} package. It is now valid until ${formatDay(after.expires_at!)} and you have ${after.credits_total - after.credits_used} session${after.credits_total - after.credits_used === 1 ? '' : 's'} left.`, null);
+      return after;
+    });
+    return toPurchase(row);
+  }
+
+  async exceptionHistory(id: string): Promise<PackageException[]> {
+    const r = await this.db.query<{ id: string; after: { reason?: string; extraSessions?: number; extendDays?: number; expiresAt?: string | null }; created_at: Date; name: string | null }>(
+      `select a.id, a.after, a.created_at, coalesce(p.display_name, u.email, 'Admin') as name
+         from audit_log a left join admin_profiles p on p.user_id = a.actor_user_id left join users u on u.id = a.actor_user_id
+        where a.entity_type = 'package_purchase' and a.entity_id = $1 and a.action = 'package.exception_granted' order by a.created_at desc`, [id]);
+    return r.rows.map((x) => ({ id: String(x.id), action: 'exception', reason: x.after.reason ?? '', extraSessions: x.after.extraSessions ?? 0, extendDays: x.after.extendDays ?? 0, expiresAt: x.after.expiresAt ?? null, by: x.name ?? 'Admin', at: x.created_at.toISOString() }));
+  }
+
+  // Used by bookings: take one credit from the paid package that expires first and still covers the session.
+  // A package lasts 60 days from payment, and the session itself has to start before it ends. startsAt is null for an instant session.
+  async takeCredit(client: PoolClient, userId: string, startsAt: Date | null): Promise<string> {
     const r = await client.query<{ id: string }>(
-      `select id from package_purchases where user_id = $1 and status = 'paid' and credits_used < credits_total and (expires_at is null or expires_at > now())
+      `select id from package_purchases where user_id = $1 and status = 'paid' and credits_used < credits_total
+          and (expires_at is null or (expires_at > now() and ($2::timestamptz is null or expires_at >= $2)))
         order by expires_at nulls last, created_at limit 1 for update`,
-      [userId],
+      [userId, startsAt],
     );
     const id = r.rows[0]?.id;
-    if (!id) throw new DomainError('NO_CREDITS', 'You have no session credits left.');
+    if (!id) {
+      // Credits that are still alive but end before this session: say so, so the customer can pick an earlier time.
+      const short = startsAt ? (await client.query<{ expires_at: Date }>(
+        `select max(expires_at) as expires_at from package_purchases where user_id = $1 and status = 'paid' and credits_used < credits_total and expires_at > now()`, [userId])).rows[0] : null;
+      if (short?.expires_at) throw new DomainError('PACKAGE_EXPIRES', `Your package ends on ${formatDay(short.expires_at)}. Choose a time on or before that day.`);
+      throw new DomainError('NO_CREDITS', 'You have no session credits left.');
+    }
     await client.query(`update package_purchases set credits_used = credits_used + 1 where id = $1`, [id]);
     return id;
+  }
+
+  // A session already paid with a package can only be moved to a time the package still covers.
+  async assertCovers(client: PoolClient, purchaseId: string, startsAt: Date): Promise<void> {
+    const r = (await client.query<{ expires_at: Date | null }>(`select expires_at from package_purchases where id = $1`, [purchaseId])).rows[0];
+    if (r?.expires_at && startsAt.getTime() > r.expires_at.getTime()) {
+      throw new DomainError('PACKAGE_EXPIRES', `Your package ends on ${formatDay(r.expires_at)}. Choose a time on or before that day.`);
+    }
   }
 
   async giveCreditBack(client: PoolClient, purchaseId: string): Promise<void> {

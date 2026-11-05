@@ -263,7 +263,7 @@ suite('offerings, rewards and trainer cancellation', () => {
       // Ops see it at the top of "needs a trainer", and it counts in the summary and the search.
       const needs = (await http().get('/v1/admin/sessions?filter=needs_trainer').set(as(owner)).expect(200)).body;
       expect(needs[0]).toMatchObject({ id: booking.id, status: 'rematching', trainerCancelCount: 1 });
-      expect((await http().get('/v1/admin/sessions/summary').set(as(owner)).expect(200)).body).toEqual({ needsTrainer: 1, trainerCancelled: 1 });
+      expect((await http().get('/v1/admin/sessions/summary').set(as(owner)).expect(200)).body).toEqual({ needsTrainer: 1, trainerCancelled: 1, overdue: 0 });
       const found = (await http().get(`/v1/admin/sessions?filter=all&q=${booking.sessionCode.toLowerCase()}`).set(as(owner)).expect(200)).body;
       expect(found.map((s: { id: string }) => s.id)).toEqual([booking.id]);
 
@@ -272,7 +272,7 @@ suite('offerings, rewards and trainer cancellation', () => {
       const again = (await http().post(`/v1/admin/sessions/${booking.id}/assign`).set(as(owner)).send({ trainerId: trainerB }).expect(200)).body;
       expect(again).toMatchObject({ status: 'confirmed', trainerName: 'Bela Rao' });
       expect((await http().get('/v1/notifications').set(as(me)).expect(200)).body.some((x: { title: string }) => x.title === 'Coach assigned')).toBe(true);
-      expect((await http().get('/v1/admin/sessions/summary').set(as(owner)).expect(200)).body).toEqual({ needsTrainer: 0, trainerCancelled: 0 });
+      expect((await http().get('/v1/admin/sessions/summary').set(as(owner)).expect(200)).body).toEqual({ needsTrainer: 0, trainerCancelled: 0, overdue: 0 });
     });
 
     it('emails ops with the session code and a link when a trainer cancels', async () => {

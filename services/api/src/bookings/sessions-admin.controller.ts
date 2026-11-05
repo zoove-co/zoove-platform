@@ -11,6 +11,7 @@ import { SessionsAdminService } from './sessions-admin.service';
 const idSchema = z.uuid();
 const listSchema = z.object({ filter: z.enum(['needs_trainer', 'upcoming', 'all']).default('needs_trainer'), q: z.string().trim().max(80).optional() });
 const cancelSchema = z.object({ reason: z.string().trim().min(3).max(300) });
+const noShowSchema = z.object({ note: z.string().trim().min(3).max(300) });
 const assignSchema = z.object({ trainerId: z.uuid() });
 
 @ApiTags('admin-sessions')
@@ -38,6 +39,12 @@ export class SessionsAdminController {
   @HttpCode(200)
   trainerCancel(@CurrentUser() user: AuthUser, @Param('id', new ZodValidationPipe(idSchema)) id: string, @Body(new ZodValidationPipe(cancelSchema)) body: z.infer<typeof cancelSchema>) {
     return this.sessions.trainerCancel(user.id, 'admin', id, body.reason);
+  }
+
+  @Post(':id/no-show')
+  @HttpCode(200)
+  noShow(@CurrentUser() user: AuthUser, @Param('id', new ZodValidationPipe(idSchema)) id: string, @Body(new ZodValidationPipe(noShowSchema)) body: z.infer<typeof noShowSchema>) {
+    return this.sessions.trainerNoShow(user.id, id, body.note);
   }
 
   @Post(':id/assign')

@@ -43,3 +43,16 @@ export function trainerCancelledEmail(to: string, ctx: { sessionCode: string; se
   );
   return { to, subject: `Trainer cancelled: session ${ctx.sessionCode} needs a new trainer`, html, text };
 }
+
+export function sessionOverdueEmail(to: string, ctx: { sessionCode: string; serviceName: string; when: string }, adminUrl: string): EmailMessage {
+  const { html, text } = layout(
+    `Session ${ctx.sessionCode} has no trainer and its time has passed`,
+    [
+      `The ${ctx.serviceName} session ${ctx.sessionCode} was planned for ${ctx.when} and still has no trainer.`,
+      'The customer has been told, and can move the session to another time or cancel it. Please call them to apologise and help them rebook.',
+    ],
+    { label: 'Open the session', url: adminUrl },
+    'You received this because you are on the Zoove ops notification list.',
+  );
+  return { to, subject: `Overdue: session ${ctx.sessionCode} has no trainer`, html, text };
+}

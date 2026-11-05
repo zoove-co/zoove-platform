@@ -130,6 +130,7 @@ export const en = {
     error: 'Something went wrong while booking. Please try again.',
     errorSlotTaken: 'That time was just taken or has passed. Please pick another slot.',
     errorNotServiceable: 'We are not in this area yet. Please choose another address.',
+    errorPackageEnds: 'Your package ends before that time. Please choose an earlier day.',
     errorAddress: 'We could not find that address. Please choose it again.',
     addressError: 'We could not save this address. Please try again.',
     serviceError: 'We could not load this service.',
@@ -153,6 +154,9 @@ export const en = {
     rematchTitle: 'Your coach had to cancel',
     rematchBody:
       'We are finding another coach nearby for the same time and will notify you as soon as one accepts. You can still reschedule or cancel this session.',
+    overdueTitle: 'We could not find a coach in time',
+    overdueBody:
+      'Your start time has passed and no coach is on this session. We are sorry. You can move it to a new time or cancel it.',
     rematchOptionsTitle: 'What would you like to do?',
     rematchWait: 'Wait: nothing to do. We will tell you as soon as a new coach is assigned.',
     rematchMove: 'Reschedule: pick another time and we will find a coach for it.',

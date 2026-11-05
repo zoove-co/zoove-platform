@@ -116,7 +116,27 @@ export default function SessionDetailScreen() {
           </View>
         </View>
 
-        {booking.status === 'rematching' ? (
+        {booking.overdue ? (
+          <View style={styles.banner}>
+            <Icon name="alert-circle-outline" size={18} color={colors.purple} />
+            <View style={styles.bannerText}>
+              <AppText variant="bodyStrong">{t('session.overdueTitle')}</AppText>
+              <AppText variant="caption" color={colors.muted}>
+                {t('session.overdueBody')}
+              </AppText>
+              {canReschedule ? (
+                <AppText variant="caption" color={colors.muted}>
+                  {t('session.rematchMove')}
+                </AppText>
+              ) : null}
+              <AppText variant="caption" color={colors.muted}>
+                {t('session.rematchCancel')}
+              </AppText>
+            </View>
+          </View>
+        ) : null}
+
+        {booking.status === 'rematching' && !booking.overdue ? (
           <View style={styles.banner}>
             <Icon name="search-outline" size={18} color={colors.purple} />
             <View style={styles.bannerText}>

@@ -47,6 +47,9 @@ export function bookingErrorMessage(error: unknown, t: TFunction): string {
         return t('addresses.inUse');
       case 'CHANGE_WINDOW_CLOSED':
         return t('session.changeError');
+      case 'PACKAGE_EXPIRES':
+        // The server's own sentence names the day the package ends.
+        return error.message && error.message !== error.code ? error.message : t('booking.errorPackageEnds');
       case 'NETWORK':
         return t('errors.network');
       case 'DISCOUNT_INVALID':

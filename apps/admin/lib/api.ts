@@ -287,6 +287,7 @@ export const setPartyStatus = (id: string, status: PartyStatus, adminNote?: stri
 export type PackageOrder = {
   id: string; name: string; sessionsCount: number; listPricePaise: number; discountPaise: number; discountCode: string | null; totalPaise: number;
   status: 'awaiting_payment' | 'paid' | 'cancelled'; creditsLeft: number; creditsTotal: number; expiresAt: string | null; paidAt: string | null; createdAt: string;
+  expired: boolean; creditsUnused: number;
   customer: string; paymentMethod: string | null; paymentReference: string | null;
 };
 export type AdminPackage = { id: string; name: string; sessionsCount: number; pricePaise: number; originalPricePaise: number | null; validityDays: number | null; badge: string | null; isActive: boolean };
@@ -294,6 +295,10 @@ export type PackageInput = { name: string; sessionsCount: number; pricePaise: nu
 export const listPackageOrders = () => api<PackageOrder[]>('/v1/admin/package-orders');
 export const markOrderPaid = (id: string, method: string, reference: string) => api<PackageOrder>(`/v1/admin/package-orders/${id}/mark-paid`, { method: 'POST', json: { method, reference } });
 export const cancelOrder = (id: string) => api<PackageOrder>(`/v1/admin/package-orders/${id}/cancel`, { method: 'POST', json: {} });
+export type PackageException = { id: string; reason: string; extraSessions: number; extendDays: number; expiresAt: string | null; by: string; at: string };
+export const grantPackageException = (id: string, input: { extraSessions: number; extendDays: number; reason: string }) =>
+  api<PackageOrder>(`/v1/admin/package-orders/${id}/exception`, { method: 'POST', json: input });
+export const packageExceptions = (id: string) => api<PackageException[]>(`/v1/admin/package-orders/${id}/history`);
 export const listAdminPackages = () => api<AdminPackage[]>('/v1/admin/packages');
 export const savePackage = (id: string | null, input: PackageInput) => api<AdminPackage>(id ? `/v1/admin/packages/${id}` : '/v1/admin/packages', { method: 'POST', json: input });
 
@@ -330,16 +335,17 @@ export type SessionStatus = 'matching' | 'confirmed' | 'rematching' | 'completed
 export type AdminSession = {
   id: string; sessionCode: string; status: SessionStatus; mode: string; participant: string; groupSize: number | null; serviceName: string; formatName: string;
   startsAt: string | null; whenLabel: string; startPassed: boolean; area: string | null; customerName: string; customerContact: string;
-  trainerId: string | null; trainerName: string | null; trainerCancelCount: number; trainerCancelledAt: string | null; totalPaise: number; paidWithCredit: boolean; discountCode: string | null; createdAt: string;
+  trainerId: string | null; trainerName: string | null; trainerCancelCount: number; trainerCancelledAt: string | null; canMarkNoShow: boolean; totalPaise: number; paidWithCredit: boolean; discountCode: string | null; createdAt: string;
 };
 export type SessionDetail = AdminSession & {
   addressLabel: string; addressLine: string; pincode: string | null; recipient: { name: string; phone: string } | null;
   events: { type: string; actor: string; payload: Record<string, unknown>; createdAt: string }[];
 };
 export type SessionFilter = 'needs_trainer' | 'upcoming' | 'all';
-export const sessionSummary = () => api<{ needsTrainer: number; trainerCancelled: number }>('/v1/admin/sessions/summary');
+export const sessionSummary = () => api<{ needsTrainer: number; trainerCancelled: number; overdue: number }>('/v1/admin/sessions/summary');
 export const listSessions = (filter: SessionFilter, q: string) => api<AdminSession[]>(`/v1/admin/sessions?filter=${filter}${q.trim() ? `&q=${encodeURIComponent(q.trim())}` : ''}`);
 export const getSession = (id: string) => api<SessionDetail>(`/v1/admin/sessions/${id}`);
 export const listAssignableTrainers = () => api<{ id: string; name: string }[]>('/v1/admin/sessions/trainers');
 export const recordTrainerCancel = (id: string, reason: string) => api<SessionDetail>(`/v1/admin/sessions/${id}/trainer-cancel`, { method: 'POST', json: { reason } });
 export const assignTrainer = (id: string, trainerId: string) => api<SessionDetail>(`/v1/admin/sessions/${id}/assign`, { method: 'POST', json: { trainerId } });
+export const recordTrainerNoShow = (id: string, note: string) => api<SessionDetail>(`/v1/admin/sessions/${id}/no-show`, { method: 'POST', json: { note } });

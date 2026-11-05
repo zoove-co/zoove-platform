@@ -12,7 +12,7 @@ export type SessionFilter = 'needs_trainer' | 'upcoming' | 'all';
 export type AdminSession = {
   id: string; sessionCode: string; status: BookingStatus; mode: string; participant: string; groupSize: number | null; serviceName: string; formatName: string;
   startsAt: string | null; whenLabel: string; startPassed: boolean; area: string | null; customerName: string; customerContact: string;
-  trainerId: string | null; trainerName: string | null; trainerCancelCount: number; trainerCancelledAt: string | null; totalPaise: number; paidWithCredit: boolean; discountCode: string | null; createdAt: string;
+  trainerId: string | null; trainerName: string | null; trainerCancelCount: number; trainerCancelledAt: string | null; canMarkNoShow: boolean; totalPaise: number; paidWithCredit: boolean; discountCode: string | null; createdAt: string;
 };
 export type SessionEvent = { type: string; actor: string; payload: Record<string, unknown>; createdAt: string };
 export type AdminSessionDetail = AdminSession & { addressLabel: string; addressLine: string; pincode: string | null; recipient: { name: string; phone: string } | null; events: SessionEvent[] };
@@ -35,6 +35,7 @@ function toSession(r: ListRow, now = new Date()): AdminSession {
     startsAt: r.starts_at ? r.starts_at.toISOString() : null, whenLabel: r.starts_at ? formatWhen(r.starts_at) : r.mode === 'instant' ? 'As soon as possible' : 'To be scheduled',
     startPassed: r.starts_at !== null && r.starts_at.getTime() < now.getTime() && (r.status === 'matching' || r.status === 'rematching'),
     area: r.address_area, customerName: r.customer_name ?? 'Customer', customerContact: r.email ?? r.phone_e164 ?? '',
+    canMarkNoShow: r.status === 'confirmed' && r.coach_id !== null && (r.starts_at === null || r.starts_at.getTime() <= now.getTime()),
     trainerId: r.coach_id, trainerName: r.trainer_name, trainerCancelCount: r.trainer_cancel_count, trainerCancelledAt: r.trainer_cancelled_at ? r.trainer_cancelled_at.toISOString() : null,
     totalPaise: r.total_paise, paidWithCredit: r.package_purchase_id !== null, discountCode: r.discount_code, createdAt: r.created_at.toISOString(),
   };
@@ -46,15 +47,18 @@ function toSession(r: ListRow, now = new Date()): AdminSession {
 export class SessionsAdminService {
   constructor(private readonly db: DatabaseService) {}
 
-  async summary(): Promise<{ needsTrainer: number; trainerCancelled: number }> {
-    const r = (await this.db.query<{ needs: string; cancelled: string }>(
-      `select count(*) filter (where status in ('matching', 'rematching')) as needs, count(*) filter (where status = 'rematching' and trainer_cancelled_at is not null) as cancelled from bookings where status in ('matching', 'rematching')`)).rows[0]!;
-    return { needsTrainer: Number(r.needs), trainerCancelled: Number(r.cancelled) };
+  async summary(): Promise<{ needsTrainer: number; trainerCancelled: number; overdue: number }> {
+    const r = (await this.db.query<{ needs: string; cancelled: string; overdue: string }>(
+      `select count(*) filter (where status in ('matching', 'rematching')) as needs,
+              count(*) filter (where status = 'rematching' and trainer_cancelled_at is not null) as cancelled,
+              count(*) filter (where starts_at is not null and starts_at <= now()) as overdue
+         from bookings where status in ('matching', 'rematching')`)).rows[0]!;
+    return { needsTrainer: Number(r.needs), trainerCancelled: Number(r.cancelled), overdue: Number(r.overdue) };
   }
 
   async list(filter: SessionFilter, q?: string): Promise<AdminSession[]> {
     const where = filter === 'needs_trainer' ? `b.status in ('matching', 'rematching')` : filter === 'upcoming' ? `b.status = 'confirmed' and (b.starts_at is null or b.starts_at >= now() - interval '3 hours')` : 'true';
-    const order = filter === 'needs_trainer' ? `(b.status = 'rematching') desc, b.starts_at nulls first, b.created_at` : filter === 'upcoming' ? `b.starts_at nulls first` : `b.created_at desc`;
+    const order = filter === 'needs_trainer' ? `(b.starts_at is not null and b.starts_at <= now()) desc, (b.status = 'rematching') desc, b.starts_at nulls first, b.created_at` : filter === 'upcoming' ? `b.starts_at nulls first` : `b.created_at desc`;
     const term = q?.trim().replace(/^zv-/i, '') ?? '';
     const r = await this.db.query<ListRow>(
       `select ${COLS} ${FROM} where ${where} and ($1 = '' or upper(right(replace(b.id::text, '-', ''), 8)) = upper($1) or u.email ilike $2 or u.full_name ilike $2)
@@ -118,6 +122,28 @@ export class SessionsAdminService {
     return this.detail(id);
   }
 
+  // The trainer was assigned but did not arrive. Ops record it after the start time: the session goes back to "finding a
+  // trainer" with no trainer on it, the trainer is marked against the session, and the customer is told what they can do.
+  // The customer keeps their package credit or discount (it is returned if they cancel). Nothing is cancelled for them.
+  async trainerNoShow(adminId: string, id: string, note: string): Promise<AdminSessionDetail> {
+    await this.db.tx(async (client) => {
+      const row = await this.lock(client, id);
+      if (row.status !== 'confirmed' || !row.coach_id) throw new DomainError('INVALID_STATE', 'Only a session with a trainer on it can be marked as a no-show.');
+      if (row.starts_at && row.starts_at.getTime() > Date.now()) throw new DomainError('INVALID_STATE', 'This session has not started yet. If the trainer cannot come, record a trainer cancellation instead.');
+      const code = sessionCodeOf(id);
+      await client.query(`update bookings set status = 'rematching', coach_id = null, trainer_cancelled_at = now(), overdue_notified_at = now() where id = $1`, [id]);
+      await client.query(`insert into booking_events (id, booking_id, type, actor, payload) values ($1, $2, 'trainer_no_show', 'admin', $3)`, [uuidv7(), id, JSON.stringify({ note, trainerId: row.coach_id, byUserId: adminId })]);
+      await client.query(`insert into audit_log (actor_user_id, action, entity_type, entity_id, after) values ($1, 'session.trainer_no_show', 'booking', $2, $3)`, [adminId, id, JSON.stringify({ note, trainerId: row.coach_id })]);
+      const options = row.mode === 'instant' ? 'You can wait while we find another coach, or cancel.' : 'You can move the session to another time, or cancel. Any package credit or discount code is returned if you cancel.';
+      await notifyCustomer(
+        client, row.user_id, 'Your coach did not arrive',
+        `We are very sorry. Your coach did not arrive for your ${row.service_name} session${row.starts_at ? ` on ${formatWhen(row.starts_at)}` : ''} (session ${code}). ${options}`,
+        id,
+      );
+    });
+    return this.detail(id);
+  }
+
   async assign(adminId: string, id: string, trainerId: string): Promise<AdminSessionDetail> {
     await this.db.tx(async (client) => {
       const row = await this.lock(client, id);
@@ -127,8 +153,8 @@ export class SessionsAdminService {
         `select coalesce(nullif(trim(concat_ws(' ', ta.first_name, ta.last_name)), ''), u.full_name, 'Your coach') as name
            from trainers t join trainer_applications ta on ta.id = t.application_id join users u on u.id = t.user_id where t.user_id = $1 and t.status = 'active'`, [trainerId])).rows[0];
       if (!trainer) throw new DomainError('INVALID_REQUEST', 'That trainer is not active.');
-      const cancelledBefore = await client.query(`select 1 from booking_events where booking_id = $1 and type = 'trainer_cancelled' and payload->>'trainerId' = $2 limit 1`, [id, trainerId]);
-      if (cancelledBefore.rows[0]) throw new DomainError('INVALID_REQUEST', 'This trainer already cancelled this session. Choose another trainer.');
+      const cancelledBefore = await client.query(`select 1 from booking_events where booking_id = $1 and type in ('trainer_cancelled', 'trainer_no_show') and payload->>'trainerId' = $2 limit 1`, [id, trainerId]);
+      if (cancelledBefore.rows[0]) throw new DomainError('INVALID_REQUEST', 'This trainer already dropped this session. Choose another trainer.');
       if (row.starts_at) {
         const clash = await client.query(`select 1 from bookings where coach_id = $1 and status = 'confirmed' and starts_at = $2 and id <> $3 limit 1`, [trainerId, row.starts_at, id]);
         if (clash.rows[0]) throw new DomainError('SLOT_CONFLICT', 'That trainer already has a session at this time.');
