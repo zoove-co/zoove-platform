@@ -4,6 +4,12 @@ Newest entry first. Add a new dated section at the top whenever something meanin
 
 ---
 
+## 5 November 2026: trainer jobs
+- Admin Assign shows only trainers free at that session's time (and not one who dropped it), with how many sessions they already have that day. The server re-checks, and a per-trainer lock stops double booking.
+- The trainer is emailed when ops assign them or move their session (outbox events `trainer.job_assigned`, `trainer.job_moved`).
+- Trainer site: approved trainers get a Jobs page. Open jobs (first to accept wins, no address or customer shown), Your sessions (address after accepting), and "I cannot make it" (reason, session goes back to open, customer and ops told).
+- API: `GET /v1/trainer/jobs`, `POST /v1/trainer/jobs/:id/accept`, `POST /v1/trainer/jobs/:id/cancel`, `GET /v1/admin/sessions/:id/available-trainers`. Tests: 192 pass. Defaults to confirm are in open questions 57 to 60.
+
 ## 5 November 2026: referral reward decided and built
 - Both sides: 10% off one session, single use, 15 days. Made automatically (discount-code engine, reason `referral`) on the friend's first booking, stored in `discount_codes` / `referral_rewards`, emailed (outbox event `referral.reward_granted`), shown in the app (Refer a friend > Your reward codes), and listed in Admin > Rewards with made, expiry and used-on.
 - Percent, flat amount, cap and days are edited in Admin > Rewards; a change affects only codes made afterwards. Both sides stay switched off until an owner turns them on.

@@ -18,6 +18,8 @@ export type AdminSession = {
 export type SessionEvent = { type: string; actor: string; payload: Record<string, unknown>; createdAt: string };
 export type AdminSessionDetail = AdminSession & { addressLabel: string; addressLine: string; pincode: string | null; recipient: { name: string; phone: string } | null; events: SessionEvent[] };
 export type TrainerOption = { id: string; name: string };
+// A trainer who can take this session: not busy at its time and has not dropped it. sameDay = confirmed sessions already that day.
+export type AvailableTrainer = { id: string; name: string; sameDay: number };
 
 type ListRow = {
   id: string; status: BookingStatus; mode: string; participant: string; group_size: number | null; service_name: string; format_name: string; starts_at: Date | null;
@@ -91,9 +93,30 @@ export class SessionsAdminService {
     return r.rows.map((row) => ({ id: row.user_id, name: row.name }));
   }
 
+  // Trainers who are free for this session: active, not already confirmed on another session at the same start time, and not
+  // one who already dropped this session. Instant sessions have no start time, so only the "dropped" rule applies.
+  async availableTrainers(id: string): Promise<AvailableTrainer[]> {
+    const b = (await this.db.query<{ status: BookingStatus; starts_at: Date | null }>(`select status, starts_at from bookings where id = $1`, [id])).rows[0];
+    if (!b) throw new DomainError('NOT_FOUND', 'We could not find that session.');
+    if (b.status !== 'matching' && b.status !== 'rematching') return [];
+    if (b.starts_at && b.starts_at.getTime() <= Date.now()) return [];
+    const r = await this.db.query<{ user_id: string; name: string; same_day: string }>(
+      `select t.user_id, coalesce(nullif(trim(concat_ws(' ', ta.first_name, ta.last_name)), ''), u.full_name, u.email, 'Trainer') as name,
+              (select count(*) from bookings x where x.coach_id = t.user_id and x.status = 'confirmed' and $2::timestamptz is not null
+                  and (x.starts_at at time zone 'Asia/Kolkata')::date = ($2::timestamptz at time zone 'Asia/Kolkata')::date) as same_day
+         from trainers t join trainer_applications ta on ta.id = t.application_id join users u on u.id = t.user_id
+        where t.status = 'active'
+          and not exists (select 1 from booking_events e where e.booking_id = $1 and e.type in ('trainer_cancelled', 'trainer_no_show') and e.payload->>'trainerId' = t.user_id::text)
+          and ($2::timestamptz is null or not exists (select 1 from bookings x where x.coach_id = t.user_id and x.status = 'confirmed' and x.starts_at = $2 and x.id <> $1))
+        order by name`,
+      [id, b.starts_at],
+    );
+    return r.rows.map((row) => ({ id: row.user_id, name: row.name, sameDay: Number(row.same_day) }));
+  }
+
   private async lock(client: PoolClient, id: string) {
-    const r = await client.query<{ id: string; user_id: string; status: BookingStatus; mode: string; starts_at: Date | null; coach_id: string | null; service_name: string; package_purchase_id: string | null }>(
-      `select b.id, b.user_id, b.status, b.mode, b.starts_at, b.coach_id, b.package_purchase_id, s.name as service_name from bookings b join services s on s.id = b.service_id where b.id = $1 for update of b`, [id]);
+    const r = await client.query<{ id: string; user_id: string; status: BookingStatus; mode: string; starts_at: Date | null; coach_id: string | null; service_name: string; package_purchase_id: string | null; address_area: string | null }>(
+      `select b.id, b.user_id, b.status, b.mode, b.starts_at, b.coach_id, b.package_purchase_id, b.address_area, s.name as service_name from bookings b join services s on s.id = b.service_id where b.id = $1 for update of b`, [id]);
     const row = r.rows[0];
     if (!row) throw new DomainError('NOT_FOUND', 'We could not find that session.');
     return row;
@@ -101,10 +124,12 @@ export class SessionsAdminService {
 
   // A trainer cannot make a confirmed session. It goes back to "finding a trainer", the customer and ops are told (with the
   // session code), and the customer keeps the discount or package credit they used because they did nothing wrong.
-  async trainerCancel(actorUserId: string, actor: 'admin' | 'trainer', id: string, reason: string): Promise<AdminSessionDetail> {
+  // `onlyCoachId` is set when a trainer cancels for themselves: it must still be their session when the row is locked.
+  async trainerCancel(actorUserId: string, actor: 'admin' | 'trainer', id: string, reason: string, onlyCoachId?: string): Promise<AdminSessionDetail> {
     await this.db.tx(async (client) => {
       const row = await this.lock(client, id);
       if (row.status !== 'confirmed' || !row.coach_id) throw new DomainError('INVALID_STATE', 'Only a session that has a trainer can be cancelled by its trainer.');
+      if (onlyCoachId && row.coach_id !== onlyCoachId) throw new DomainError('INVALID_STATE', 'This session is no longer yours.');
       if (row.starts_at && row.starts_at.getTime() <= Date.now()) throw new DomainError('INVALID_STATE', 'This session has already started.');
       const code = sessionCodeOf(id);
       await client.query(`update bookings set status = 'rematching', coach_id = null, trainer_cancelled_at = now(), trainer_cancel_count = trainer_cancel_count + 1 where id = $1`, [id]);
@@ -146,8 +171,8 @@ export class SessionsAdminService {
   }
 
   // Ops can move any live session to another time for the customer, in every case (also after the start time has passed, and
-  // inside the 2-hour window the customer is held to). A trainer who is already on it stays on it unless they are busy then;
-  // the trainer is not told by the app yet, so ops call them. The customer is always told.
+  // inside the 2-hour window the customer is held to). A trainer who is already on it stays on it unless they are busy then,
+  // and is told the new time by email. The customer is always told.
   async reschedule(adminId: string, id: string, startsAtInput: string, reason: string): Promise<AdminSessionDetail> {
     try {
       await this.db.tx(async (client) => {
@@ -166,6 +191,12 @@ export class SessionsAdminService {
         ]);
         await client.query(`insert into outbox_events (id, aggregate_type, aggregate_id, event_type, payload) values ($1, 'booking', $2, 'booking.rescheduled', $3)`, [uuidv7(), id, JSON.stringify({ bookingId: id, userId: row.user_id, to: startsAt.toISOString(), by: 'admin' })]);
         await client.query(`insert into audit_log (actor_user_id, action, entity_type, entity_id, after) values ($1, 'session.rescheduled_by_admin', 'booking', $2, $3)`, [adminId, id, JSON.stringify({ to: startsAt.toISOString(), reason })]);
+        // A trainer who stays on the session is told the new time by email.
+        if (row.status === 'confirmed' && row.coach_id && !clash) {
+          await client.query(`insert into outbox_events (id, aggregate_type, aggregate_id, event_type, payload) values ($1, 'booking', $2, 'trainer.job_moved', $3)`, [
+            uuidv7(), id, JSON.stringify({ trainerId: row.coach_id, sessionCode: sessionCodeOf(id), serviceName: row.service_name, when: formatWhen(startsAt), area: row.address_area ?? '' }),
+          ]);
+        }
         await notifyCustomer(
           client, row.user_id, 'Your session was moved',
           `Our team moved your ${row.service_name} session (session ${sessionCodeOf(id)}) to ${formatWhen(startsAt)}.${clash ? ' Your coach is not free then, so we are finding another coach and will tell you as soon as one is assigned.' : ''} You can still move it again or cancel it from the app.`,
@@ -190,6 +221,8 @@ export class SessionsAdminService {
         `select coalesce(nullif(trim(concat_ws(' ', ta.first_name, ta.last_name)), ''), u.full_name, 'Your coach') as name
            from trainers t join trainer_applications ta on ta.id = t.application_id join users u on u.id = t.user_id where t.user_id = $1 and t.status = 'active'`, [trainerId])).rows[0];
       if (!trainer) throw new DomainError('INVALID_REQUEST', 'That trainer is not active.');
+      // One trainer cannot be put on two sessions at the same time by two people at once: take this trainer's lock first.
+      await client.query(`select 1 from trainers where user_id = $1 for update`, [trainerId]);
       const cancelledBefore = await client.query(`select 1 from booking_events where booking_id = $1 and type in ('trainer_cancelled', 'trainer_no_show') and payload->>'trainerId' = $2 limit 1`, [id, trainerId]);
       if (cancelledBefore.rows[0]) throw new DomainError('INVALID_REQUEST', 'This trainer already dropped this session. Choose another trainer.');
       if (row.starts_at) {
@@ -201,6 +234,10 @@ export class SessionsAdminService {
       await client.query(`insert into outbox_events (id, aggregate_type, aggregate_id, event_type, payload) values ($1, 'booking', $2, 'booking.trainer_assigned', $3)`, [uuidv7(), id, JSON.stringify({ bookingId: id, userId: row.user_id, trainerId })]);
       await client.query(`insert into audit_log (actor_user_id, action, entity_type, entity_id, after) values ($1, 'session.trainer_assigned', 'booking', $2, $3)`, [adminId, id, JSON.stringify({ trainerId })]);
       await notifyCustomer(client, row.user_id, 'Coach assigned', `Coach ${trainer.name.split(' ')[0]} will take your ${row.service_name} session${row.starts_at ? ` on ${formatWhen(row.starts_at)}` : ''} (session ${sessionCodeOf(id)}).`, id);
+      // The trainer is told by email (outbox worker, retried). They can cancel from the Jobs page if they cannot make it.
+      await client.query(`insert into outbox_events (id, aggregate_type, aggregate_id, event_type, payload) values ($1, 'booking', $2, 'trainer.job_assigned', $3)`, [
+        uuidv7(), id, JSON.stringify({ trainerId, sessionCode: sessionCodeOf(id), serviceName: row.service_name, when: row.starts_at ? formatWhen(row.starts_at) : 'as soon as possible', area: row.address_area ?? '' }),
+      ]);
     });
     return this.detail(id);
   }

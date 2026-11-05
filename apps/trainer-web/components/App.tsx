@@ -78,7 +78,7 @@ export function App() {
         ['none', 'draft', 'changes_requested'].includes(state.view.status) ? (
           <Wizard key="wizard" initial={state.view} source={source} onChange={(view) => setState({ kind: 'ready', view })} onExpired={expired} />
         ) : (
-          <Status view={state.view} />
+          <Status view={state.view} onExpired={expired} />
         )
       ) : null}
       </div>

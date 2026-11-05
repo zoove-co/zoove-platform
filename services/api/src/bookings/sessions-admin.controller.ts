@@ -33,6 +33,9 @@ export class SessionsAdminController {
   @Get()
   list(@Query(new ZodValidationPipe(listSchema)) query: z.infer<typeof listSchema>) { return this.sessions.list(query.filter, query.q); }
 
+  @Get(':id/available-trainers')
+  available(@Param('id', new ZodValidationPipe(idSchema)) id: string) { return this.sessions.availableTrainers(id); }
+
   @Get(':id')
   detail(@Param('id', new ZodValidationPipe(idSchema)) id: string) { return this.sessions.detail(id); }
 

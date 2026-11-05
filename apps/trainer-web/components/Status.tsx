@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 
 import { listServices, type ApplicationView, type Service } from '@/lib/api';
 import { FALLBACK_SERVICES } from '@/lib/steps';
+import { Jobs } from './Jobs';
 
 function Badge({ tone }: { tone: 'good' | 'wait' | 'hold' | 'no' }) {
   const path = tone === 'good' ? 'M5 12.5l4.5 4.5L19 7.5' : tone === 'wait' ? 'M12 7v5l3 2' : tone === 'hold' ? 'M9 7v10M15 7v10' : 'M7 7l10 10M17 7L7 17';
@@ -46,7 +47,7 @@ function Profile({ rows, name, note }: { rows: [string, string][]; name: string;
   );
 }
 
-function Approved({ view, name }: { view: ApplicationView; name: string }) {
+function Approved({ view, name, onExpired }: { view: ApplicationView; name: string; onExpired: () => void }) {
   const [services, setServices] = useState<Service[]>(FALLBACK_SERVICES);
   useEffect(() => {
     listServices().then(setServices).catch(() => undefined);
@@ -75,20 +76,15 @@ function Approved({ view, name }: { view: ApplicationView; name: string }) {
   return (
     <>
       <Hero tone="good" title={`You are approved, ${name}!`}>Welcome to Zoove. Your KYC is verified and you are part of our trainer network.</Hero>
-      <div className="card soft">
-        <b>What happens next</b>
-        <p className="muted small" style={{ margin: '4px 0 0' }}>
-          You do not need to do anything now. We will email you at <b>{f.email}</b> with the next steps, including when the trainer app is ready. You can come back to this page any time with the same email.
-        </p>
-      </div>
+      <Jobs onExpired={onExpired} />
       <Profile rows={rows} name={name} note="To change any of these details, contact the Zoove team." />
     </>
   );
 }
 
-export function Status({ view }: { view: ApplicationView }) {
+export function Status({ view, onExpired }: { view: ApplicationView; onExpired: () => void }) {
   const name = view.form.firstName ?? 'there';
-  if (view.status === 'approved') return <Approved view={view} name={name} />;
+  if (view.status === 'approved') return <Approved view={view} name={name} onExpired={onExpired} />;
   if (view.status === 'rejected') {
     return (
       <>

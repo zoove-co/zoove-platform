@@ -65,3 +65,9 @@ Zoove Party (from the mockups, 14 Oct 2026)
 55. **Trainer terms and consent text.** The form records agreement to "terms" and "privacy" (version 2026-10), but the actual trainer agreement and privacy wording are not written. Who writes them, and do trainers sign an independent-contractor agreement?
 56. **SMS for trainer OTP.** Real OTP SMS needs an SMS provider and DLT registration in India (a few days). Until then only the development code works. Which provider (MSG91 is the usual choice), and who owns the DLT registration?
 
+## Trainer jobs (5 Nov 2026) - built with these defaults, please confirm
+57. **Trainer availability.** There is no declared availability yet. "Free" today means: no other confirmed session at the same start time (and not one who dropped the session). Do trainers set their own working days and hours? Is travel time between homes needed (a buffer after each session)?
+58. **Open jobs.** Today every active trainer sees every open job, first to accept wins, ops can still assign directly. Should jobs be limited by area or trainer specialty, and should trainers be alerted (push, WhatsApp, email) when a new open job appears? Today they only see it when they open the Jobs page.
+59. **What a trainer sees.** Open job: service, time, group size, area. After accepting: customer first name and full address. No customer phone (masked calls or WhatsApp is undecided, question 43). Payout is not shown (question 6).
+60. **Trainer cancelling.** Allowed any time before the start, with a reason, and the trainer cannot pick that session again. Is there a cutoff (for example 2 hours before) and a penalty (question 30)?
+

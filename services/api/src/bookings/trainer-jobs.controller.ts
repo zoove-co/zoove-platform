@@ -1,0 +1,35 @@
+import { Body, Controller, Get, HttpCode, Param, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { z } from 'zod';
+
+import { ZodValidationPipe } from '../common/zod-validation.pipe';
+import { AuthGuard, CurrentUser, type AuthUser } from '../identity/auth.guard';
+import { TrainerJobsService } from './trainer-jobs.service';
+
+const idSchema = z.uuid();
+const cancelSchema = z.object({ reason: z.string().trim().min(3).max(300) });
+
+// For signed-in trainers only (the service refuses anyone who is not an active trainer).
+@ApiTags('trainer-jobs')
+@ApiBearerAuth()
+@UseGuards(AuthGuard)
+@Controller('trainer/jobs')
+export class TrainerJobsController {
+  constructor(private readonly jobs: TrainerJobsService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Open jobs nobody has taken, and my own upcoming sessions' })
+  board(@CurrentUser() user: AuthUser) { return this.jobs.board(user.id); }
+
+  @Post(':id/accept')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Take an open job (first to accept gets it)' })
+  accept(@CurrentUser() user: AuthUser, @Param('id', new ZodValidationPipe(idSchema)) id: string) { return this.jobs.accept(user.id, id); }
+
+  @Post(':id/cancel')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'I cannot make a session I was given: it goes back to open and the customer and ops are told' })
+  cancel(@CurrentUser() user: AuthUser, @Param('id', new ZodValidationPipe(idSchema)) id: string, @Body(new ZodValidationPipe(cancelSchema)) body: z.infer<typeof cancelSchema>) {
+    return this.jobs.cancel(user.id, id, body.reason);
+  }
+}

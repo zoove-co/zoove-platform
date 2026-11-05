@@ -345,7 +345,9 @@ export type SessionFilter = 'needs_trainer' | 'upcoming' | 'all';
 export const sessionSummary = () => api<{ needsTrainer: number; trainerCancelled: number; overdue: number }>('/v1/admin/sessions/summary');
 export const listSessions = (filter: SessionFilter, q: string) => api<AdminSession[]>(`/v1/admin/sessions?filter=${filter}${q.trim() ? `&q=${encodeURIComponent(q.trim())}` : ''}`);
 export const getSession = (id: string) => api<SessionDetail>(`/v1/admin/sessions/${id}`);
-export const listAssignableTrainers = () => api<{ id: string; name: string }[]>('/v1/admin/sessions/trainers');
+// Trainers who are free for this session (not busy at its time, did not drop it). sameDay = sessions they already have that day.
+export type AvailableTrainer = { id: string; name: string; sameDay: number };
+export const listAvailableTrainers = (id: string) => api<AvailableTrainer[]>(`/v1/admin/sessions/${id}/available-trainers`);
 export const recordTrainerCancel = (id: string, reason: string) => api<SessionDetail>(`/v1/admin/sessions/${id}/trainer-cancel`, { method: 'POST', json: { reason } });
 export const assignTrainer = (id: string, trainerId: string) => api<SessionDetail>(`/v1/admin/sessions/${id}/assign`, { method: 'POST', json: { trainerId } });
 export const recordTrainerNoShow = (id: string, note: string) => api<SessionDetail>(`/v1/admin/sessions/${id}/no-show`, { method: 'POST', json: { note } });

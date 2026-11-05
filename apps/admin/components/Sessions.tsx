@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import {
-  ApiError, assignTrainer, getSession, listAssignableTrainers, listSessions, moveSession, recordTrainerCancel, recordTrainerNoShow,
+  ApiError, assignTrainer, getSession, listAvailableTrainers, type AvailableTrainer, listSessions, moveSession, recordTrainerCancel, recordTrainerNoShow,
   type AdminSession, type SessionDetail, type SessionFilter, type SessionStatus,
 } from '@/lib/api';
 import { can, useMe } from './me';
@@ -30,7 +30,7 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
   const [rows, setRows] = useState<AdminSession[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<SessionDetail | null>(null);
-  const [trainers, setTrainers] = useState<{ id: string; name: string }[]>([]);
+  const [trainers, setTrainers] = useState<AvailableTrainer[]>([]);
   const [pick, setPick] = useState('');
   const [reason, setReason] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
@@ -79,7 +79,7 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
   async function show(id: string) {
     setFormError(null); setPick(''); setReason(''); setMoving(false); setMoveDate(''); setMoveReason('');
     try {
-      const [detail, list] = await Promise.all([getSession(id), listAssignableTrainers()]);
+      const [detail, list] = await Promise.all([getSession(id), listAvailableTrainers(id)]);
       setOpen(detail); setTrainers(list);
     } catch (err) { setError(handle(err) || null); }
   }
@@ -92,7 +92,6 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
       if (open) { try { setOpen(await getSession(open.id)); await load(); } catch { /* keep what is shown */ } }
     } finally { setBusy(false); }
   }
-  const cancelledTrainerIds = new Set(open?.events.filter((e) => e.type === 'trainer_cancelled' || e.type === 'trainer_no_show').map((e) => String(e.payload.trainerId)) ?? []);
 
   return (
     <Shell signOut={signOut}>
@@ -152,6 +151,8 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
               {open.events.map((e, i) => (
                 <li key={i}>
                   {stamp(e.createdAt)} · {EVENT_LABEL[e.type] ?? e.type}
+                  {e.type === 'trainer_assigned' && e.actor === 'trainer' ? ' (picked by the trainer)' : ''}
+                  {e.type === 'trainer_cancelled' && e.actor === 'trainer' ? ' by the trainer' : ''}
                   {e.type === 'trainer_cancelled' && e.payload.reason ? ` — “${String(e.payload.reason)}”` : ''}
                   {e.type === 'trainer_no_show' && e.payload.note ? ` — “${String(e.payload.note)}”` : ''}
                   {e.type === 'rescheduled' && e.actor === 'admin' ? ` by our team${e.payload.reason ? ` — “${String(e.payload.reason)}”` : ''}` : ''}
@@ -165,9 +166,11 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
                   <span>Assign a trainer</span>
                   <select value={pick} onChange={(e) => setPick(e.target.value)}>
                     <option value="">Choose a trainer</option>
-                    {trainers.map((t) => <option key={t.id} value={t.id} disabled={cancelledTrainerIds.has(t.id)}>{t.name}{cancelledTrainerIds.has(t.id) ? ' (dropped this session)' : ''}</option>)}
+                    {trainers.map((t) => <option key={t.id} value={t.id}>{t.name}{t.sameDay ? ` · ${t.sameDay} session${t.sameDay > 1 ? 's' : ''} that day` : ''}</option>)}
                   </select>
-                  {trainers.length === 0 ? <div className="hint">No active trainers yet. Approve a trainer application first.</div> : null}
+                  {trainers.length === 0
+                    ? <div className="hint">No trainer is free at this time. Move the session to another time, or leave it open: trainers can pick it up themselves from their jobs page.</div>
+                    : <div className="hint">Only trainers who are free at this time are listed. The trainer is emailed. Trainers can also pick open sessions themselves.</div>}
                 </label>
               </div>
             ) : null}
@@ -191,7 +194,7 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
                 <label className="field full">
                   <span>Why are you moving it?</span>
                   <input value={moveReason} maxLength={300} onChange={(e) => setMoveReason(e.target.value)} placeholder="For example: customer asked on the phone, trainer was late" />
-                  <div className="hint">The customer is told. A trainer already on the session stays on it unless they are busy then. Trainers are not told by the app yet, so call them.</div>
+                  <div className="hint">The customer is told. A trainer already on the session stays on it unless they are busy then. A trainer on it is emailed the new time.</div>
                 </label>
               </div>
             ) : null}

@@ -210,3 +210,11 @@ export async function listServices(): Promise<Service[]> {
   const data = (await response.json()) as Service[];
   return data.map((item) => ({ slug: item.slug, name: item.name }));
 }
+
+// ---- Jobs: open sessions nobody has taken (first to accept gets it), and my own sessions ----
+export type OpenJob = { id: string; sessionCode: string; serviceName: string; formatName: string; startsAt: string | null; whenLabel: string; participant: string; groupSize: number | null; area: string | null };
+export type MyJob = OpenJob & { customerFirstName: string; addressLabel: string; addressLine: string; pincode: string | null; canCancel: boolean };
+export type JobBoard = { open: OpenJob[]; mine: MyJob[] };
+export const getJobs = () => api<JobBoard>('/v1/trainer/jobs');
+export const acceptJob = (id: string) => api<JobBoard>(`/v1/trainer/jobs/${id}/accept`, { method: 'POST', json: {} });
+export const cancelJob = (id: string, reason: string) => api<JobBoard>(`/v1/trainer/jobs/${id}/cancel`, { method: 'POST', json: { reason } });

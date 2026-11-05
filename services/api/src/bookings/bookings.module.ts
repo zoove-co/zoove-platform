@@ -11,11 +11,13 @@ import { BookingsService } from './bookings.service';
 import { OverdueSweepService } from './overdue-sweep.service';
 import { SessionsAdminController } from './sessions-admin.controller';
 import { SessionsAdminService } from './sessions-admin.service';
+import { TrainerJobsController } from './trainer-jobs.controller';
+import { TrainerJobsService } from './trainer-jobs.service';
 
 @Module({
   imports: [IdentityModule, CatalogModule, AddressesModule, DiscountsModule, PackagesModule, ReferralModule],
-  controllers: [BookingsController, SessionsAdminController],
-  providers: [BookingsService, SessionsAdminService, OverdueSweepService],
+  controllers: [BookingsController, SessionsAdminController, TrainerJobsController],
+  providers: [BookingsService, SessionsAdminService, OverdueSweepService, TrainerJobsService],
   exports: [OverdueSweepService],
 })
 export class BookingsModule {}

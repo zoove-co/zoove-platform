@@ -4,6 +4,7 @@ import { APP_CONFIG, type Env } from '../config/env';
 import { DatabaseService } from '../database/database.service';
 import { EmailProvider, type EmailMessage } from '../email/email.provider';
 import { referralRewardEmail } from './customer-emails';
+import { jobAssignedEmail, jobMovedEmail } from './trainer-job-emails';
 import { partyRequestedEmail, teamInviteEmail, sessionOverdueEmail, trainerCancelledEmail } from './team-emails';
 import { approvedEmail, changesEmail, opsNewApplicationEmail, receivedEmail, rejectedEmail } from './trainer-emails';
 
@@ -11,7 +12,7 @@ type OutboxRow = { id: string; aggregate_id: string; event_type: string; payload
 
 type ApplicationInfo = { first_name: string | null; last_name: string | null; email: string | null; phone_e164: string | null; review_note: string | null };
 
-const HANDLED = ['trainer.application_submitted', 'trainer.application_approved', 'trainer.application_rejected', 'trainer.application_changes_requested', 'team.member_invited', 'party.requested', 'booking.trainer_cancelled', 'booking.overdue', 'referral.reward_granted'];
+const HANDLED = ['trainer.application_submitted', 'trainer.application_approved', 'trainer.application_rejected', 'trainer.application_changes_requested', 'team.member_invited', 'party.requested', 'booking.trainer_cancelled', 'booking.overdue', 'referral.reward_granted', 'trainer.job_assigned', 'trainer.job_moved'];
 const MAX_ATTEMPTS = 10;
 const BATCH = 10;
 
@@ -91,6 +92,18 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
       for (const ops of this.config.OPS_NOTIFY_EMAILS.split(',').map((value) => value.trim()).filter(Boolean)) {
         await this.email.send(trainerCancelledEmail(ops, { sessionCode: p.sessionCode ?? '', serviceName: p.serviceName ?? 'a', when: p.when ?? '', reason: p.reason ?? '' }, `${this.config.ADMIN_URL}/sessions?code=${encodeURIComponent(p.sessionCode ?? '')}`));
       }
+      return;
+    }
+    if (event.event_type === 'trainer.job_assigned' || event.event_type === 'trainer.job_moved') {
+      const p = event.payload as { trainerId?: string; sessionCode?: string; serviceName?: string; when?: string; area?: string };
+      if (!p.trainerId) return;
+      const who = await this.db.query<{ email: string | null; first_name: string | null }>(
+        `select coalesce(u.verified_email, u.email, ta.email) as email, ta.first_name
+           from trainers t join users u on u.id = t.user_id join trainer_applications ta on ta.id = t.application_id where t.user_id = $1 and t.status = 'active'`, [p.trainerId]);
+      const trainer = who.rows[0];
+      if (!trainer?.email) return; // no email on file or no longer active: nothing to send
+      const ctx = { firstName: trainer.first_name ?? 'there', sessionCode: p.sessionCode ?? '', serviceName: p.serviceName ?? 'a', when: p.when ?? '', area: p.area ?? '' };
+      await this.email.send((event.event_type === 'trainer.job_assigned' ? jobAssignedEmail : jobMovedEmail)(trainer.email, ctx, this.config.TRAINER_SITE_URL));
       return;
     }
     if (event.event_type === 'referral.reward_granted') {
