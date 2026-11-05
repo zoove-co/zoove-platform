@@ -53,6 +53,13 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
     return () => clearTimeout(t);
   }, [load, me, query]);
 
+  // New cancellations and overdue sessions show up by themselves: the list refreshes every 30 seconds while no window is open.
+  useEffect(() => {
+    if (!can(me, 'sessions.manage') || open) return;
+    const timer = setInterval(() => void load(), 30_000);
+    return () => clearInterval(timer);
+  }, [load, me, open]);
+
   if (!can(me, 'sessions.manage')) {
     return (
       <Shell signOut={signOut}>
@@ -72,7 +79,11 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
   async function act(action: () => Promise<SessionDetail>) {
     setBusy(true); setFormError(null);
     try { const d = await action(); setOpen(d); setPick(''); setReason(''); await load(); }
-    catch (err) { const m = handle(err); if (m) setFormError(m); } finally { setBusy(false); }
+    catch (err) {
+      const m = handle(err); if (m) setFormError(m);
+      // Someone else may have changed this session while the window was open: show the current state.
+      if (open) { try { setOpen(await getSession(open.id)); await load(); } catch { /* keep what is shown */ } }
+    } finally { setBusy(false); }
   }
   const cancelledTrainerIds = new Set(open?.events.filter((e) => e.type === 'trainer_cancelled' || e.type === 'trainer_no_show').map((e) => String(e.payload.trainerId)) ?? []);
 

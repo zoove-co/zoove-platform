@@ -173,6 +173,71 @@ suite('overdue sessions, trainer no-show and package expiry', () => {
     });
   });
 
+  describe('several things at the same moment', () => {
+    it('two admins assigning two trainers to one session: one wins, the other is told it is taken', async () => {
+      const t1 = await makeTrainer('Asha');
+      const t2 = await makeTrainer('Dev');
+      const booked = (await book(me, 3).expect(201)).body;
+      const [a, b] = await Promise.all([assign(booked.id, t1), assign(booked.id, t2)]);
+      expect([a.status, b.status].sort()).toEqual([200, 409]);
+      const row = (await pool.query(`select status, coach_id from bookings where id = $1`, [booked.id])).rows[0];
+      expect(row.status).toBe('confirmed');
+      expect([t1, t2]).toContain(row.coach_id);
+      expect((await pool.query(`select count(*)::int as c from booking_events where booking_id = $1 and type = 'trainer_assigned'`, [booked.id])).rows[0].c).toBe(1);
+    });
+
+    it('a double press on "did not arrive" records one no-show and tells the customer once', async () => {
+      const t1 = await makeTrainer('Asha');
+      const booked = (await book(me, 3).expect(201)).body;
+      await assign(booked.id, t1).expect(200);
+      await pastStart(booked.id);
+      const [a, b] = await Promise.all([noShow(booked.id), noShow(booked.id)]);
+      expect([a.status, b.status].sort()).toEqual([200, 409]);
+      expect((await notices()).filter((t) => t === 'Your coach did not arrive')).toHaveLength(1);
+    });
+
+    it('the trainer cancelling while the customer cancels: no error, the credit comes back once', async () => {
+      const t1 = await makeTrainer('Asha');
+      await paidPackage();
+      const booked = (await book(me, 3, { useCredit: true }).expect(201)).body;
+      await assign(booked.id, t1).expect(200);
+      const [trainer, customer] = await Promise.all([
+        http().post(`/v1/admin/sessions/${booked.id}/trainer-cancel`).set(as(owner)).send({ reason: 'Family emergency' }),
+        http().post(`/v1/bookings/${booked.id}/cancel`).set(as(me)),
+      ]);
+      expect([200, 409]).toContain(trainer.status);
+      expect(customer.status).toBe(201);
+      expect((await pool.query(`select status from bookings where id = $1`, [booked.id])).rows[0].status).toBe('cancelled');
+      expect((await http().get('/v1/me/packages').set(as(me)).expect(200)).body.credits.creditsLeft).toBe(4);
+    });
+
+    it('the overdue check running twice at once tells the customer once', async () => {
+      const sweep = app.get(OverdueSweepService);
+      const booked = (await book(me, 3).expect(201)).body;
+      await pastStart(booked.id);
+      const counts = await Promise.all([sweep.runOnce(), sweep.runOnce()]);
+      expect(counts.reduce((x, y) => x + y, 0)).toBe(1);
+      expect((await notices()).filter((t) => t === 'We could not find a coach in time')).toHaveLength(1);
+    });
+
+    it('a trainer cancelling and an overdue session arriving together both reach the queue', async () => {
+      const t1 = await makeTrainer('Asha');
+      const sweep = app.get(OverdueSweepService);
+      const first = (await book(me, 3).expect(201)).body;
+      const second = (await book(me, 4).expect(201)).body;
+      await assign(first.id, t1).expect(200);
+      await pastStart(second.id);
+      await Promise.all([
+        http().post(`/v1/admin/sessions/${first.id}/trainer-cancel`).set(as(owner)).send({ reason: 'Unwell' }).expect(200),
+        sweep.runOnce(),
+      ]);
+      const queue = (await http().get('/v1/admin/sessions?filter=needs_trainer').set(as(owner)).expect(200)).body;
+      expect(queue.map((s: { id: string }) => s.id).sort()).toEqual([first.id, second.id].sort());
+      expect(queue[0].id).toBe(second.id); // the overdue one is listed first
+      expect((await http().get('/v1/admin/sessions/summary').set(as(owner)).expect(200)).body).toMatchObject({ needsTrainer: 2, trainerCancelled: 1, overdue: 1 });
+    });
+  });
+
   describe('package expiry and exceptions', () => {
     it('a package lasts 60 days from payment', async () => {
       await paidPackage();

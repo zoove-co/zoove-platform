@@ -116,7 +116,7 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
     let live = true;
     const tick = () => sessionSummary().then((s) => { if (live) { setWaiting(s.needsTrainer); setOverdue(s.overdue); } }).catch(() => undefined);
     void tick();
-    const timer = setInterval(() => void tick(), 60_000);
+    const timer = setInterval(() => void tick(), 30_000);
     return () => { live = false; clearInterval(timer); };
   }, [canSessions, me]);
   return (
