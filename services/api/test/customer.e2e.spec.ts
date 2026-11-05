@@ -130,8 +130,8 @@ suite('home, notifications, streak', () => {
     expect(streak.weekStreak).toBeGreaterThanOrEqual(1);
   });
 
-  it('past coaches and packages are empty until those features exist', async () => {
+  it('past coaches are empty until coaches are assigned, and packages come from the catalog', async () => {
     expect((await http().get('/v1/coaches/past').set(as(token)).expect(200)).body).toEqual([]);
-    expect((await http().get('/v1/packages').set(as(token)).expect(200)).body).toEqual([]);
+    expect((await http().get('/v1/packages').set(as(token)).expect(200)).body.length).toBeGreaterThan(0);
   });
 });

@@ -88,6 +88,7 @@ export default function RootLayout() {
           <Stack.Screen name="help" />
           <Stack.Screen name="policies" />
           <Stack.Screen name="referral" />
+          <Stack.Screen name="progress" />
           <Stack.Screen name="addresses" />
           <Stack.Screen name="notifications" />
           <Stack.Screen name="profile" />

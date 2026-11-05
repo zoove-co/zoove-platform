@@ -34,6 +34,9 @@ export const TRACKED_EVENTS = [
   'profile_completed',
   'signed_out',
   'account_deleted',
+  'package_ordered',
+  'referral_applied',
+  'progress_profile_saved',
 ] as const;
 
 export type TrackedEventName = (typeof TRACKED_EVENTS)[number];

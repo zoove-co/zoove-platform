@@ -272,3 +272,27 @@ export const KIND_LABEL: Record<string, string> = {
 
 // Specialties are stored as slugs (yoga, pilates). Show them as words.
 export const nice = (slug: string): string => slug.replace(/[-_]/g, ' ').replace(/^./, (c) => c.toUpperCase());
+
+// ---- Party requests and packages (mirror the API) ----
+
+export type PartyStatus = 'new' | 'contacted' | 'confirmed' | 'cancelled';
+export type PartyRequest = {
+  id: string; occasion: string; serviceSlug: string; guests: number; startsAt: string; status: PartyStatus; createdAt: string;
+  customer: string; contactPhone: string | null; note: string | null; adminNote: string | null; address: string; handledBy: string | null; handledAt: string | null;
+};
+export const listPartyRequests = () => api<PartyRequest[]>('/v1/admin/party-requests');
+export const setPartyStatus = (id: string, status: PartyStatus, adminNote?: string) =>
+  api<PartyRequest>(`/v1/admin/party-requests/${id}/status`, { method: 'POST', json: adminNote ? { status, adminNote } : { status } });
+
+export type PackageOrder = {
+  id: string; name: string; sessionsCount: number; listPricePaise: number; discountPaise: number; discountCode: string | null; totalPaise: number;
+  status: 'awaiting_payment' | 'paid' | 'cancelled'; creditsLeft: number; creditsTotal: number; expiresAt: string | null; paidAt: string | null; createdAt: string;
+  customer: string; paymentMethod: string | null; paymentReference: string | null;
+};
+export type AdminPackage = { id: string; name: string; sessionsCount: number; pricePaise: number; originalPricePaise: number | null; validityDays: number | null; badge: string | null; isActive: boolean };
+export type PackageInput = { name: string; sessionsCount: number; pricePaise: number; originalPricePaise: number | null; validityDays: number | null; badge: string | null; isActive: boolean };
+export const listPackageOrders = () => api<PackageOrder[]>('/v1/admin/package-orders');
+export const markOrderPaid = (id: string, method: string, reference: string) => api<PackageOrder>(`/v1/admin/package-orders/${id}/mark-paid`, { method: 'POST', json: { method, reference } });
+export const cancelOrder = (id: string) => api<PackageOrder>(`/v1/admin/package-orders/${id}/cancel`, { method: 'POST', json: {} });
+export const listAdminPackages = () => api<AdminPackage[]>('/v1/admin/packages');
+export const savePackage = (id: string | null, input: PackageInput) => api<AdminPackage>(id ? `/v1/admin/packages/${id}` : '/v1/admin/packages', { method: 'POST', json: input });

@@ -18,4 +18,27 @@ export class PricingService {
     const row = result.rows[0];
     return row ? Number(row.price_paise) : null;
   }
+
+  // Duo, Loved one and Group are a share of the Personal price (table participant_pricing, placeholders until the
+  // business answers open questions 5, 8, 9). Group is priced per person.
+  async priceForParticipant(db: Queryable, serviceId: string, mode: BookingMode, participant: string, groupSize: number | null): Promise<number | null> {
+    const base = await this.priceFor(db, serviceId, mode);
+    if (base === null || participant === 'personal') return base;
+    const rule = (await db.query(`select percent_of_personal, per_head from participant_pricing where participant = $1`, [participant])).rows[0];
+    if (!rule) return base;
+    return participantPrice(base, Number(rule.percent_of_personal), rule.per_head === true, participant === 'group' ? groupSize ?? 1 : 1);
+  }
+
+  async participantRules(db: Queryable): Promise<ParticipantRules> {
+    const rows = (await db.query(`select participant, percent_of_personal, per_head from participant_pricing`)).rows;
+    return Object.fromEntries(rows.map((r) => [String(r.participant), { percent: Number(r.percent_of_personal), perHead: r.per_head === true }]));
+  }
+}
+
+export type ParticipantRules = Record<string, { percent: number; perHead: boolean }>;
+
+// Whole paise, rounded to the nearest rupee so a customer never sees paise in a price.
+export function participantPrice(basePaise: number, percent: number, perHead: boolean, people: number): number {
+  const raw = (basePaise * percent) / 100 * (perHead ? people : 1);
+  return Math.round(raw / 100) * 100;
 }

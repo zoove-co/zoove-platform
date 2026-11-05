@@ -10,8 +10,8 @@ if (!USE_MOCK && apiUrl === '') {
 
 export const API_URL = apiUrl;
 
-// Features whose backend is not built yet. They stay on the "Coming soon" screen with the real API.
+// Features that can be switched off per build (they fall back to the "Coming soon" screen).
 export const FEATURES = {
-  referral: USE_MOCK,
-  partyPlan: USE_MOCK,
+  referral: true,
+  partyPlan: true,
 };

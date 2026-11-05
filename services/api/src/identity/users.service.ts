@@ -59,6 +59,13 @@ export class UsersService {
       await client.query(`delete from refresh_tokens where user_id = $1`, [userId]);
       await client.query(`delete from customer_notifications where user_id = $1`, [userId]);
       await client.query(`delete from customer_profiles where user_id = $1`, [userId]);
+      await client.query(`delete from referral_codes where user_id = $1`, [userId]);
+      await client.query(
+        `update party_requests set address_label = 'Deleted', address_line = 'Deleted', address_area = null, address_pincode = null, contact_name = null, contact_phone = null, note = null where user_id = $1`,
+        [userId],
+      );
+      // Unpaid package orders are dropped; paid credits that are left are forfeited with the account.
+      await client.query(`update package_purchases set status = 'cancelled' where user_id = $1 and status = 'awaiting_payment'`, [userId]);
       // Addresses stay only because past bookings point at them: the details and the pin are wiped.
       await client.query(
         `update addresses set label = 'Deleted', line1 = 'Deleted', line2 = null, locality = null, pincode = null,

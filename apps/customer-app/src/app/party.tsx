@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,10 +12,12 @@ import { Icon } from '@/components/ui/Icon';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { StepHeading } from '@/components/ui/StepHeading';
+import { TextField } from '@/components/ui/TextField';
 import { useSavePartyPlan } from '@/features/booking/hooks';
 import { track } from '@/lib/analytics/track';
 import type { Address, PartyOccasion } from '@/lib/api';
 import { formatWhen, nextDays } from '@/lib/dates';
+import { isValidRecipientName, normalizeIndianMobile } from '@/lib/participant';
 import { bannerImages, serviceImages } from '@/lib/images';
 import { colors, radius, spacing } from '@/theme';
 
@@ -40,6 +42,11 @@ export default function PartyScreen() {
   const [dayIso, setDayIso] = useState(() => nextDays(1)[0]?.iso ?? '');
   const [slotStartsAt, setSlotStartsAt] = useState<string | undefined>();
   const [address, setAddress] = useState<Address | undefined>();
+  const [contactName, setContactName] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  // One key per party plan: a retry after a dropped connection is the same request, not a second one.
+  const requestKey = useRef<string | null>(null);
+  const phone = normalizeIndianMobile(contactPhone);
 
   useEffect(() => {
     track('party_viewed');
@@ -47,12 +54,15 @@ export default function PartyScreen() {
 
   const activityName = (slug: string) => slug.charAt(0).toUpperCase() + slug.slice(1);
   const canContinue =
-    step === 1 ? Boolean(occasion) : step === 2 ? Boolean(activity) : step === 3 ? Boolean(slotStartsAt && address?.serviceable) : true;
+    step === 1 ? Boolean(occasion) : step === 2 ? Boolean(activity) : step === 3 ? Boolean(slotStartsAt && address?.serviceable) : phone !== null && (contactName.trim() === '' || isValidRecipientName(contactName));
 
   const onSave = () => {
-    if (!occasion || !activity || !slotStartsAt || !address) return;
+    if (!occasion || !activity || !slotStartsAt || !address || !phone) return;
     save.mutate(
-      { occasion, serviceSlug: activity, guests, startsAt: slotStartsAt, addressId: address.id },
+      {
+        occasion, serviceSlug: activity, guests, startsAt: slotStartsAt, addressId: address.id, contactPhone: phone,
+        ...(contactName.trim() ? { contactName: contactName.trim() } : {}), idempotencyKey: (requestKey.current ??= `party-${Date.now()}-${Math.random().toString(36).slice(2)}`),
+      },
       {
         onSuccess: () => {
           track('party_plan_saved', { occasion, activity, guests });
@@ -190,6 +200,15 @@ export default function PartyScreen() {
               <Row label={t('party.rowWhen')} value={formatWhen(slotStartsAt)} />
               <Row label={t('party.rowWhere')} value={`${address.label}, ${address.area}`} last />
             </View>
+            <TextField
+              label={t('party.contactPhone')}
+              value={contactPhone}
+              onChangeText={setContactPhone}
+              keyboardType="phone-pad"
+              autoComplete="tel"
+              error={contactPhone.length > 0 && !phone ? t('booking.recipientPhoneError') : undefined}
+            />
+            <TextField label={t('party.contactName')} value={contactName} onChangeText={setContactName} autoComplete="name" />
             <AppText variant="micro" color={colors.muted}>
               {t('party.reviewNote')}
             </AppText>

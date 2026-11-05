@@ -15,6 +15,9 @@ import { EmailModule } from './email/email.module';
 import { HealthModule } from './health/health.module';
 import { IdentityModule } from './identity/identity.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { PackagesModule } from './packages/packages.module';
+import { PartyModule } from './party/party.module';
+import { ReferralModule } from './referral/referral.module';
 import { StorageModule } from './storage/storage.module';
 import { TeamModule } from './team/team.module';
 import { TrainersModule } from './trainers/trainers.module';
@@ -40,6 +43,9 @@ import { TrainersModule } from './trainers/trainers.module';
     CatalogModule,
     AddressesModule,
     DiscountsModule,
+    PackagesModule,
+    PartyModule,
+    ReferralModule,
     BookingsModule,
     CustomerModule,
     TrainersModule,

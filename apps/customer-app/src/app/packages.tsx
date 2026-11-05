@@ -1,24 +1,34 @@
 import { formatInr } from '@zoove/shared';
-import { useRouter } from 'expo-router';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/AppText';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { TextField } from '@/components/ui/TextField';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { TabFooter } from '@/components/ui/TabFooter';
-import { usePackages } from '@/features/booking/hooks';
+import { useBuyPackage, useCancelPackageOrder, useMyPackages, usePackages } from '@/features/booking/hooks';
+import { discountErrorMessage } from '@/lib/api/errorMessage';
 import { track } from '@/lib/analytics/track';
-import type { SessionPackage } from '@/lib/api';
+import type { PackagePurchase, SessionPackage } from '@/lib/api';
 import { colors, fonts, radius, spacing } from '@/theme';
 
 // Everything on this screen (price, discount, validity, badge) comes from the API: Pratik, admins and
 // support change it in the admin panel and it shows here without an app update (decision D13).
 export default function PackagesScreen() {
   const { t } = useTranslation();
-  const router = useRouter();
   const { data, isPending, isError, refetch } = usePackages();
+  const mine = useMyPackages();
+  const buy = useBuyPackage();
+  const cancelOrder = useCancelPackageOrder();
+  const [chosen, setChosen] = useState<SessionPackage | null>(null);
+  const [code, setCode] = useState('');
+  const [placed, setPlaced] = useState<PackagePurchase | null>(null);
+  const orderKey = useRef<{ key: string; signature: string } | null>(null);
+  const waiting = (mine.data?.purchases ?? []).filter((order) => order.status === 'awaiting_payment');
+  const creditsLeft = mine.data?.credits.creditsLeft ?? 0;
 
   const onChoose = (item: SessionPackage) => {
     track('package_selected', {
@@ -26,8 +36,28 @@ export default function PackagesScreen() {
       sessions_count: item.sessionsCount,
       price_paise: item.pricePaise,
     });
-    // Checkout waits for payments (open questions 1 to 7).
-    router.push({ pathname: '/soon', params: { title: item.name } });
+    setChosen(item);
+    setPlaced(null);
+    buy.reset();
+  };
+
+  const onOrder = () => {
+    if (!chosen || buy.isPending) return;
+    const signature = `${chosen.id}|${code.trim().toUpperCase()}`;
+    if (!orderKey.current || orderKey.current.signature !== signature) {
+      orderKey.current = { key: `pk-${Date.now()}-${Math.random().toString(36).slice(2)}`, signature };
+    }
+    buy.mutate(
+      { packageId: chosen.id, ...(code.trim() ? { discountCode: code.trim() } : {}), idempotencyKey: orderKey.current.key },
+      {
+        onSuccess: (order) => {
+          track('package_ordered', { package_id: chosen.id, amount_paise: order.totalPaise });
+          setPlaced(order);
+          setChosen(null);
+          setCode('');
+        },
+      },
+    );
   };
 
   return (
@@ -56,9 +86,40 @@ export default function PackagesScreen() {
             <AppText variant="screenTitle">{t('packages.heading')}</AppText>
             <AppText color={colors.muted}>{t('packages.detail')}</AppText>
           </View>
+          {creditsLeft > 0 ? (
+            <View style={styles.balance}>
+              <AppText variant="bodyStrong" color={colors.purple}>{t('packages.credits', { count: creditsLeft })}</AppText>
+              <AppText variant="micro" color={colors.muted}>{t('packages.creditsHint')}</AppText>
+            </View>
+          ) : null}
+          {placed ? (
+            <View style={styles.balance}>
+              <AppText variant="bodyStrong">{t('packages.placedTitle', { name: placed.name })}</AppText>
+              <AppText color={colors.muted}>{t('packages.placedBody', { price: formatInr(placed.totalPaise) })}</AppText>
+            </View>
+          ) : null}
+          {waiting.filter((order) => order.id !== placed?.id).map((order) => (
+            <View key={order.id} style={styles.balance}>
+              <AppText variant="bodyStrong">{t('packages.waitingTitle', { name: order.name, price: formatInr(order.totalPaise) })}</AppText>
+              <AppText variant="micro" color={colors.muted}>{t('packages.waitingBody')}</AppText>
+              <Pressable accessibilityRole="button" onPress={() => cancelOrder.mutate(order.id)} hitSlop={10}>
+                <AppText variant="bodyStrong" color={colors.danger}>{t('packages.cancelOrder')}</AppText>
+              </Pressable>
+            </View>
+          ))}
           {data.map((item) => (
             <PackageCard key={item.id} item={item} onChoose={() => onChoose(item)} />
           ))}
+          {chosen ? (
+            <View style={styles.order}>
+              <AppText variant="heading">{t('packages.orderTitle', { name: chosen.name })}</AppText>
+              <AppText color={colors.muted}>{t('packages.orderBody', { price: formatInr(chosen.pricePaise) })}</AppText>
+              <TextField label={t('packages.codeLabel')} value={code} onChangeText={(text) => setCode(text.toUpperCase())} autoCapitalize="characters" />
+              {buy.isError ? <AppText variant="caption" color={colors.danger}>{discountErrorMessage(buy.error, t)}</AppText> : null}
+              <PrimaryButton label={t('packages.orderCta')} loading={buy.isPending} onPress={onOrder} />
+              <PrimaryButton label={t('packages.orderBack')} variant="soft" onPress={() => setChosen(null)} />
+            </View>
+          ) : null}
         </ScrollView>
       )}
       <TabFooter />
@@ -113,6 +174,8 @@ function PackageCard({ item, onChoose }: { item: SessionPackage; onChoose: () =>
 }
 
 const styles = StyleSheet.create({
+  balance: { gap: 4, padding: 14, borderRadius: radius.xl, backgroundColor: colors.lavender },
+  order: { gap: 10, padding: 16, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.purple, backgroundColor: colors.white },
   screen: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.xxl },
   centerText: { textAlign: 'center' },

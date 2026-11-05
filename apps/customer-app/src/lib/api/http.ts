@@ -10,6 +10,11 @@ import {
   type BookingResult,
   type DiscountQuote,
   type HomeData,
+  type MyPackages,
+  type PackagePurchase,
+  type PartyPlan,
+  type ProgressProfile,
+  type ReferralSummary,
   type OtpRequestResult,
   type OtpVerifyResult,
   type PastCoach,
@@ -29,6 +34,7 @@ const KNOWN_CODES: ReadonlySet<string> = new Set<ApiErrorCode>([
   'UNAUTHORIZED', 'ACCOUNT_BLOCKED', 'EMAIL_TAKEN', 'EMAIL_FAILED', 'SMS_FAILED', 'IDEMPOTENCY_KEY_REUSED',
   'TOO_MANY_REQUESTS', 'NOT_AVAILABLE', 'NETWORK', 'INTERNAL', 'CONSENT_REQUIRED', 'HAS_ACTIVE_BOOKINGS', 'FORBIDDEN',
   'DISCOUNT_INVALID', 'DISCOUNT_EXPIRED', 'DISCOUNT_USED', 'DISCOUNT_NOT_APPLICABLE',
+  'NO_CREDITS', 'INVALID_STATE',
 ]);
 
 type TokenReply = { token: string; refreshToken: string; expiresInSeconds: number; isNewUser?: boolean };
@@ -41,6 +47,7 @@ type CatalogItem = {
   intensity: string | null;
   formats: { slug: string; name: string; description: string | null }[];
   pricePaise: Record<'instant' | 'scheduled' | 'demo', number | null>;
+  participantRules?: Record<string, { percent: number; perHead: boolean }>;
 };
 
 let session: Session | null = null;
@@ -172,6 +179,7 @@ export const httpApi: Api = {
       intensityLabel: item.intensity ?? '',
       formats: item.formats.map((format) => ({ slug: format.slug, name: format.name, description: format.description ?? '' })),
       pricePaise: { instant: item.pricePaise.instant ?? 0, scheduled: item.pricePaise.scheduled ?? 0, demo: item.pricePaise.demo ?? 0 },
+      participantRules: item.participantRules ?? {},
     };
   },
 
@@ -203,7 +211,14 @@ export const httpApi: Api = {
   listPackages: () => call<SessionPackage[]>('GET', '/v1/packages'),
   getStreak: () => call<StreakData>('GET', '/v1/streak'),
 
-  // No backend yet. The screens that call these are kept on the "Coming soon" page (see FEATURES in config.ts).
-  getReferralCode: () => Promise.reject(new ApiError('NOT_AVAILABLE')),
-  savePartyPlan: () => Promise.reject(new ApiError('NOT_AVAILABLE')),
+  savePartyPlan: (input) => call<PartyPlan>('POST', '/v1/party-requests', input),
+  getReferral: () => call<ReferralSummary>('GET', '/v1/referral'),
+  async applyReferralCode(code) {
+    await call<unknown>('POST', '/v1/referral/apply', { code });
+  },
+  getMyPackages: () => call<MyPackages>('GET', '/v1/me/packages'),
+  buyPackage: (input) => call<PackagePurchase>('POST', '/v1/me/packages', input),
+  cancelPackageOrder: (id) => call<PackagePurchase>('POST', `/v1/me/packages/${encodeURIComponent(id)}/cancel`),
+  getProgressProfile: () => call<ProgressProfile>('GET', '/v1/me/progress-profile'),
+  saveProgressProfile: (input) => call<ProgressProfile>('PUT', '/v1/me/progress-profile', input),
 };

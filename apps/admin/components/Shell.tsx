@@ -101,6 +101,8 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
   const onTeam = path.startsWith('/team');
   const onCalc = path.startsWith('/economics');
   const onDiscounts = path.startsWith('/discounts');
+  const onParties = path.startsWith('/parties');
+  const onPackages = path.startsWith('/packages');
   return (
     <div className="app">
       <aside className="side">
@@ -110,7 +112,7 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
         </Link>
         <nav className="nav" aria-label="Main">
           {can(me, 'trainers.view') ? (
-            <Link href="/" aria-current={onTeam || onCalc || onDiscounts ? undefined : 'page'}>
+            <Link href="/" aria-current={onTeam || onCalc || onDiscounts || onParties || onPackages ? undefined : 'page'}>
               {Icons.users}
               Trainers
               {pending ? <span className="badge">{pending}</span> : null}
@@ -123,6 +125,18 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
               <span className="soontag">Soon</span>
             </span>
           ))}
+          {can(me, 'parties.manage') ? (
+            <Link href="/parties" aria-current={onParties ? 'page' : undefined}>
+              {Icons.sessions}
+              Party requests
+            </Link>
+          ) : null}
+          {can(me, 'packages.manage') ? (
+            <Link href="/packages" aria-current={onPackages ? 'page' : undefined}>
+              {Icons.card}
+              Packages
+            </Link>
+          ) : null}
           {can(me, 'discounts.manage') ? (
             <Link href="/discounts" aria-current={onDiscounts ? 'page' : undefined}>
               {Icons.tag}

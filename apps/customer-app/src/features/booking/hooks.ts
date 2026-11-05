@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { api, type BookingInput, type BookingMode, type BookingStatus, type NewAddress, type PartyPlanInput } from '@/lib/api';
+import { api, type BookingInput, type BookingMode, type BookingStatus, type NewAddress, type PartyPlanInput, type ProgressProfile } from '@/lib/api';
 
 // Waiting on the system to find a coach: keep the screen fresh without the customer pulling.
 const isSearchingStatus = (status: BookingStatus | undefined) => status === 'matching' || status === 'rematching';
@@ -52,6 +52,8 @@ export function useCreateBooking() {
         queryClient.invalidateQueries({ queryKey: ['bookings'] }),
         queryClient.invalidateQueries({ queryKey: ['streak'] }),
         queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+        queryClient.invalidateQueries({ queryKey: ['my-packages'] }),
+        queryClient.invalidateQueries({ queryKey: ['referral'] }),
       ]),
     // Slots may have changed under us (someone else took one); refetch either way.
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['slots'] }),
@@ -80,8 +82,48 @@ export function usePastCoaches() {
   return useQuery({ queryKey: ['past-coaches'], queryFn: () => api.listPastCoaches() });
 }
 
-export function useReferralCode() {
-  return useQuery({ queryKey: ['referral-code'], queryFn: () => api.getReferralCode(), staleTime: Infinity });
+export function useReferral() {
+  return useQuery({ queryKey: ['referral'], queryFn: () => api.getReferral() });
+}
+
+export function useApplyReferralCode() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) => api.applyReferralCode(code),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['referral'] }),
+  });
+}
+
+export function useMyPackages() {
+  return useQuery({ queryKey: ['my-packages'], queryFn: () => api.getMyPackages() });
+}
+
+export function useBuyPackage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { packageId: string; discountCode?: string; idempotencyKey: string }) => api.buyPackage(input),
+    onSuccess: () => Promise.all([queryClient.invalidateQueries({ queryKey: ['my-packages'] }), queryClient.invalidateQueries({ queryKey: ['notifications'] })]),
+  });
+}
+
+export function useCancelPackageOrder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.cancelPackageOrder(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-packages'] }),
+  });
+}
+
+export function useProgressProfile() {
+  return useQuery({ queryKey: ['progress-profile'], queryFn: () => api.getProgressProfile() });
+}
+
+export function useSaveProgressProfile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ProgressProfile) => api.saveProgressProfile(input),
+    onSuccess: () => Promise.all([queryClient.invalidateQueries({ queryKey: ['progress-profile'] }), queryClient.invalidateQueries({ queryKey: ['streak'] }), queryClient.invalidateQueries({ queryKey: ['home'] })]),
+  });
 }
 
 export function useStreak() {
@@ -109,6 +151,7 @@ function useRefreshBookings() {
       queryClient.invalidateQueries({ queryKey: ['home'] }),
       queryClient.invalidateQueries({ queryKey: ['streak'] }),
       queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+      queryClient.invalidateQueries({ queryKey: ['my-packages'] }),
     ]);
   };
 }

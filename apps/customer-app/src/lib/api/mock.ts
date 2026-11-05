@@ -2,6 +2,8 @@ import { rupeesToPaise } from '@zoove/shared';
 
 import { formatClock, formatWhen, toIsoDate } from '@/lib/dates';
 
+import { participantListPaise } from '@/lib/participant';
+
 import { isActiveStatus } from './status';
 
 import {
@@ -19,6 +21,9 @@ import {
   type BookingMode,
   type BookingResult,
   type HomeData,
+  type MyPackages,
+  type PackagePurchase,
+  type ProgressProfile,
   type ServiceDetail,
   type TimeSlot,
 } from './types';
@@ -48,6 +53,19 @@ const packages: SessionPackage[] = [6, 12, 24, 36].map((count, index) => {
   };
 });
 
+// Placeholder rules, same as the server seed.
+const MOCK_RULES = { duo: { percent: 160, perHead: false }, loved_one: { percent: 100, perHead: false }, group: { percent: 70, perHead: true } };
+
+// An order the customer already made and a paid one with credits, so the screens can be tried by hand.
+const mockOrders: PackagePurchase[] = [
+  {
+    id: 'order-paid', name: '6 sessions', sessionsCount: 6, listPricePaise: rupeesToPaise(9000), discountPaise: 0, discountCode: null, totalPaise: rupeesToPaise(9000),
+    status: 'paid', creditsLeft: 4, creditsTotal: 6, expiresAt: null, paidAt: new Date().toISOString(), createdAt: new Date().toISOString(),
+  },
+];
+const mockReferral = { signedUp: 2, referredBy: false };
+const mockProgress: ProgressProfile = { goal: null, targetDaysPerWeek: null, heightCm: null, weightKg: null, healthConsent: false };
+
 const home: HomeData = {
   customerFirstName: null,
   locationLabel: null,
@@ -75,6 +93,7 @@ const serviceDetails: Record<string, ServiceDetail | undefined> = {
     durationLabel: '45–60 mins',
     intensityLabel: 'Low–Moderate',
     pricePaise: prices,
+    participantRules: MOCK_RULES,
     formats: [
       {
         slug: 'power-yoga',
@@ -102,6 +121,7 @@ const serviceDetails: Record<string, ServiceDetail | undefined> = {
     durationLabel: '45–60 mins',
     intensityLabel: 'Moderate–High',
     pricePaise: prices,
+    participantRules: MOCK_RULES,
     formats: [
       {
         slug: 'strength-training',
@@ -127,6 +147,7 @@ const serviceDetails: Record<string, ServiceDetail | undefined> = {
     durationLabel: '45–60 mins',
     intensityLabel: 'Low–Moderate',
     pricePaise: prices,
+    participantRules: MOCK_RULES,
     formats: [
       {
         slug: 'mat-pilates',
@@ -152,6 +173,7 @@ const serviceDetails: Record<string, ServiceDetail | undefined> = {
     durationLabel: '40–55 mins',
     intensityLabel: 'Moderate–High',
     pricePaise: prices,
+    participantRules: MOCK_RULES,
     formats: [
       {
         slug: 'zumba',
@@ -277,6 +299,7 @@ const bookingRecords: BookingRecord[] = [
     areaLabel: 'Bandra West, Mumbai',
     totalPaise: prices.scheduled,
     discountPaise: 0,
+    paidWithCredit: false,
     discountCode: null,
     addressId: 'addr-home',
     coach: COACHES[0] ?? null,
@@ -303,6 +326,7 @@ const bookingRecords: BookingRecord[] = [
       areaLabel: 'Bandra West, Mumbai',
       totalPaise: prices.scheduled,
       discountPaise: 0,
+      paidWithCredit: false,
       discountCode: null,
       addressId: 'addr-home',
       coach: COACHES[1] ?? null,
@@ -737,15 +761,21 @@ export const mockApi: Api = {
           : 'To be scheduled';
     const mockPercent = input.discountCode ? MOCK_CODES[input.discountCode.trim().toUpperCase()] : undefined;
     if (input.discountCode && !mockPercent) throw new ApiError('DISCOUNT_INVALID');
-    const listPrice = detail.pricePaise[input.mode];
-    const discountPaise = mockPercent ? Math.floor((listPrice * mockPercent) / 100) : 0;
+    const listPrice = participantListPaise(detail.pricePaise[input.mode], input.participant, input.groupSize ?? 1, MOCK_RULES);
+    if (input.useCredit && input.discountCode) throw new ApiError('INVALID_REQUEST');
+    if (input.useCredit) {
+      const order = mockOrders.find((o) => o.status === 'paid' && o.creditsLeft > 0);
+      if (!order) throw new ApiError('NO_CREDITS');
+      order.creditsLeft -= 1;
+    }
+    const discountPaise = mockPercent && !input.useCredit ? Math.floor((listPrice * mockPercent) / 100) : 0;
     const result: BookingResult = {
       id: `mock-${Date.now()}`,
       serviceName: detail.name,
       formatName: format?.name ?? detail.name,
       mode: input.mode,
       whenLabel,
-      totalPaise: listPrice - discountPaise,
+      totalPaise: input.useCredit ? 0 : listPrice - discountPaise,
     };
     bookingRecords.push({
       id: result.id,
@@ -763,6 +793,7 @@ export const mockApi: Api = {
       areaLabel: address.area,
       totalPaise: result.totalPaise,
       discountPaise,
+      paidWithCredit: Boolean(input.useCredit),
       discountCode: mockPercent && input.discountCode ? input.discountCode.trim().toUpperCase() : null,
       addressId: address.id,
       preferredCoachId: input.preferredCoachId,
@@ -888,17 +919,66 @@ export const mockApi: Api = {
     };
   },
 
-  async getReferralCode() {
+  async getReferral() {
     await wait(150);
     // The real API issues a unique code per customer. Rewards are undecided (open question 10).
-    return `ZOOVE${(signedInPhone ?? '0000').slice(-4)}`;
+    return { code: `ZOOVE${(signedInPhone ?? '0000').slice(-4)}`, signedUp: mockReferral.signedUp, booked: 0, referredBy: mockReferral.referredBy };
+  },
+  async applyReferralCode(code) {
+    await wait(300);
+    if (mockReferral.referredBy) throw new ApiError('INVALID_STATE');
+    if (code.trim().toUpperCase() === 'FRIEND234') {
+      mockReferral.referredBy = true;
+      return;
+    }
+    throw new ApiError('NOT_FOUND');
+  },
+
+  async getMyPackages(): Promise<MyPackages> {
+    await wait(200);
+    const left = mockOrders.filter((o) => o.status === 'paid').reduce((sum, o) => sum + o.creditsLeft, 0);
+    return { purchases: mockOrders.map((o) => ({ ...o })), credits: { creditsLeft: left, nextExpiry: null } };
+  },
+  async buyPackage(input): Promise<PackagePurchase> {
+    await wait(400);
+    const pkg = packages.find((item) => item.id === input.packageId);
+    if (!pkg) throw new ApiError('NOT_FOUND');
+    const percent = input.discountCode ? MOCK_CODES[input.discountCode.trim().toUpperCase()] : undefined;
+    if (input.discountCode && !percent) throw new ApiError('DISCOUNT_INVALID');
+    const discountPaise = percent ? Math.floor((pkg.pricePaise * percent) / 100) : 0;
+    const order: PackagePurchase = {
+      id: `order-${Date.now()}`, name: pkg.name, sessionsCount: pkg.sessionsCount, listPricePaise: pkg.pricePaise, discountPaise,
+      discountCode: percent && input.discountCode ? input.discountCode.trim().toUpperCase() : null, totalPaise: pkg.pricePaise - discountPaise,
+      status: 'awaiting_payment', creditsLeft: 0, creditsTotal: pkg.sessionsCount, expiresAt: null, paidAt: null, createdAt: new Date().toISOString(),
+    };
+    mockOrders.unshift(order);
+    notify('Package ordered', `Your ${pkg.name} package is waiting for payment. Our team will confirm it once payment is received.`, null);
+    return order;
+  },
+  async cancelPackageOrder(id) {
+    await wait(250);
+    const order = mockOrders.find((o) => o.id === id);
+    if (!order) throw new ApiError('NOT_FOUND');
+    if (order.status === 'awaiting_payment') order.status = 'cancelled';
+    return { ...order };
+  },
+
+  async getProgressProfile() {
+    await wait(150);
+    return { ...mockProgress };
+  },
+  async saveProgressProfile(input) {
+    await wait(300);
+    if ((input.heightCm != null || input.weightKg != null) && !input.healthConsent) throw new ApiError('CONSENT_REQUIRED');
+    Object.assign(mockProgress, input, input.healthConsent ? {} : { heightCm: null, weightKg: null });
+    return { ...mockProgress };
   },
 
   async savePartyPlan(input) {
     await wait(500);
     if (input.guests < 2 || input.guests > 30) throw new ApiError('INVALID_REQUEST');
-    const plan = { ...input, id: `party-${Date.now()}`, createdAt: new Date().toISOString() };
-    notify('Party plan saved', 'We will confirm coach availability and pricing for your group soon.', null);
+    const plan = { id: `party-${Date.now()}`, occasion: input.occasion, serviceSlug: input.serviceSlug, guests: input.guests, startsAt: input.startsAt, status: 'new' as const, createdAt: new Date().toISOString() };
+    notify('Party request received', 'Thanks! Our team will call you soon to confirm the details and the price.', null);
     return plan;
   },
 
@@ -963,6 +1043,10 @@ export const mockApi: Api = {
     const record = findRecord(id);
     if (!isChangeable(record)) throw new ApiError('CHANGE_WINDOW_CLOSED');
     record.status = 'cancelled';
+    if (record.paidWithCredit) {
+      const order = mockOrders.find((o) => o.status === 'paid' && o.creditsLeft < o.creditsTotal);
+      if (order) order.creditsLeft += 1;
+    }
     matchTimers.delete(id);
     rematchTimers.delete(id);
     notify('Session cancelled', `Your ${record.serviceName} session was cancelled.`, id);

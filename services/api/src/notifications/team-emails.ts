@@ -15,3 +15,17 @@ export function teamInviteEmail(to: string, ctx: { name: string; jobTitle: strin
   );
   return { to, subject: 'You have been added to Zoove admin', html, text };
 }
+
+export function partyRequestedEmail(to: string, ctx: { name: string; occasion: string; guests: number; when: string; where: string; phone: string }, adminUrl: string): EmailMessage {
+  const { html, text } = layout(
+    'New party request',
+    [
+      `${ctx.name} asked for a ${ctx.occasion} party for ${ctx.guests} guests.`,
+      `When: ${ctx.when}. Where: ${ctx.where}.`,
+      `Call them on ${ctx.phone} to confirm, then mark it confirmed in the admin panel.`,
+    ],
+    { label: 'Open party requests', url: adminUrl },
+    'You received this because you are on the Zoove ops notification list.',
+  );
+  return { to, subject: `New party request: ${ctx.occasion}, ${ctx.guests} guests`, html, text };
+}

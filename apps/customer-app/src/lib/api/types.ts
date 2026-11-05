@@ -14,6 +14,8 @@ export type ApiErrorCode =
   | 'INVALID_REQUEST'
   | 'INVALID_PHONE'
   | 'OTP_INVALID'
+  | 'NO_CREDITS'
+  | 'INVALID_STATE'
   | 'OTP_LOCKED'
   | 'OTP_RATE_LIMITED'
   | 'UNAUTHORIZED'
@@ -66,6 +68,13 @@ export interface ServiceDetail {
   intensityLabel: string;
   formats: ServiceFormat[];
   pricePaise: Record<BookingMode, Paise>;
+  // Duo, Loved one and Group are a share of the Personal price (placeholder numbers until the business decides).
+  participantRules: Record<string, ParticipantRule>;
+}
+
+export interface ParticipantRule {
+  percent: number;
+  perHead: boolean; // Group: the percent applies to each person
 }
 
 export interface Address {
@@ -124,6 +133,8 @@ export interface BookingInput {
   // A coach the customer has had before. If not free at that time, another coach is matched.
   preferredCoachId?: string;
   discountCode?: string;
+  // Pay with one credit from a paid package instead of money.
+  useCredit?: boolean;
   // Same key = same booking. A retry after a dropped connection must never double-book.
   idempotencyKey: string;
 }
@@ -181,6 +192,7 @@ export interface Booking {
   totalPaise: Paise; // what the customer pays, after any discount
   discountPaise: Paise;
   discountCode: string | null;
+  paidWithCredit: boolean;
   // Decided by the server (rule lives in the API, never in the app).
   canChange: boolean;
   inProgress: boolean; // a confirmed session whose time is running now
@@ -264,11 +276,23 @@ export interface PartyPlanInput {
   guests: number;
   startsAt: string;
   addressId: string;
+  // The number our team calls to confirm. +91 and ten digits.
+  contactPhone: string;
+  contactName?: string;
+  note?: string;
+  // Same key = same request, so a retry never sends the team two requests.
+  idempotencyKey: string;
 }
 
-// A saved plan, not a booking: no price and no payment until the party rules are decided (open questions 35 to 43).
-export interface PartyPlan extends PartyPlanInput {
+// A request, not a booking: no price and no payment. The Zoove team calls to confirm (decision D16).
+export type PartyStatus = 'new' | 'contacted' | 'confirmed' | 'cancelled';
+export interface PartyPlan {
   id: string;
+  occasion: PartyOccasion;
+  serviceSlug: string;
+  guests: number;
+  startsAt: string;
+  status: PartyStatus;
   createdAt: string;
 }
 
@@ -298,6 +322,43 @@ export interface StreakData {
   weekStreak: number;
   focusAreas: FocusArea[];
   recentSessions: Booking[];
+}
+
+export interface PackagePurchase {
+  id: string;
+  name: string;
+  sessionsCount: number;
+  listPricePaise: Paise;
+  discountPaise: Paise;
+  discountCode: string | null;
+  totalPaise: Paise;
+  status: 'awaiting_payment' | 'paid' | 'cancelled';
+  creditsLeft: number;
+  creditsTotal: number;
+  expiresAt: string | null;
+  paidAt: string | null;
+  createdAt: string;
+}
+export interface MyPackages {
+  purchases: PackagePurchase[];
+  credits: { creditsLeft: number; nextExpiry: string | null };
+}
+
+export interface ReferralSummary {
+  code: string;
+  signedUp: number;
+  booked: number;
+  referredBy: boolean;
+}
+
+export type FitnessGoal = 'lose_weight' | 'build_strength' | 'stay_active' | 'flexibility' | 'stress_relief';
+export interface ProgressProfile {
+  goal: FitnessGoal | null;
+  targetDaysPerWeek: number | null;
+  heightCm: number | null;
+  weightKg: number | null;
+  // Height and weight are kept only while this is true.
+  healthConsent: boolean;
 }
 
 export interface Api {
@@ -336,7 +397,15 @@ export interface Api {
   listPastCoaches(): Promise<PastCoach[]>;
   listPackages(): Promise<SessionPackage[]>;
   getStreak(): Promise<StreakData>;
-  getReferralCode(): Promise<string>;
+  getReferral(): Promise<ReferralSummary>;
+  // A friend's code, once, before the first booking.
+  applyReferralCode(code: string): Promise<void>;
+  getMyPackages(): Promise<MyPackages>;
+  // Orders the package; it waits for payment until our team marks it paid.
+  buyPackage(input: { packageId: string; discountCode?: string; idempotencyKey: string }): Promise<PackagePurchase>;
+  cancelPackageOrder(id: string): Promise<PackagePurchase>;
+  getProgressProfile(): Promise<ProgressProfile>;
+  saveProgressProfile(input: ProgressProfile): Promise<ProgressProfile>;
   savePartyPlan(input: PartyPlanInput): Promise<PartyPlan>;
   rescheduleBooking(id: string, startsAt: string): Promise<Booking>;
   // Development only: the mock implements it so the trainer-cancel flow can be tried by hand.

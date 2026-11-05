@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { DatabaseService } from '../database/database.service';
-import { BOOKING_MODES, type BookingMode } from './pricing.service';
+import { BOOKING_MODES, PricingService, type BookingMode, type ParticipantRules } from './pricing.service';
 
 export type CatalogFormat = { slug: string; name: string; description: string | null };
 export type CatalogItem = {
@@ -14,6 +14,8 @@ export type CatalogItem = {
   formats: CatalogFormat[];
   // Rupees are never used: paise only. Set in the admin panel (D13); the app only displays them.
   pricePaise: Record<BookingMode, number | null>;
+  // Duo/Group/Loved one are a share of the Personal price; the app shows it, the server charges it.
+  participantRules: ParticipantRules;
 };
 
 type Row = {
@@ -31,7 +33,7 @@ type Queryable = { query: (text: string, params?: unknown[]) => Promise<{ rows: 
 
 @Injectable()
 export class CatalogService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly db: DatabaseService, private readonly pricing: PricingService) {}
 
   async listServices(): Promise<CatalogItem[]> {
     const result = await this.db.query<Row>(
@@ -62,6 +64,7 @@ export class CatalogService {
       entry[row.mode] = row.price === null ? null : Number(row.price);
       priceBySlug.set(row.slug, entry);
     }
+    const participantRules = await this.pricing.participantRules(this.db);
     return result.rows.map((row) => ({
       slug: row.slug,
       name: row.name,
@@ -70,6 +73,7 @@ export class CatalogService {
       durationMaxMinutes: row.duration_max_minutes,
       intensity: row.intensity,
       formats: row.formats,
+      participantRules,
       pricePaise: priceBySlug.get(row.slug) ?? Object.fromEntries(BOOKING_MODES.map((m) => [m, null])) as Record<BookingMode, number | null>,
     }));
   }

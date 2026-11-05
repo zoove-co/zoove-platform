@@ -65,6 +65,7 @@ export class CustomerService {
     // A session that is on right now comes first, then the soonest.
     const next = activeRows.find((row) => isInProgress(row.status, row.starts_at, row.duration_max_minutes, now)) ?? activeRows[0];
     const upcoming = next ? bookingFromRow(next, now) : null;
+    const goal = (await this.db.query<{ d: number | null }>(`select target_days_per_week as d from customer_profiles where user_id = $1`, [userId])).rows[0]?.d ?? WEEKLY_GOAL;
 
     return {
       customerFirstName: user.rows[0]?.first_name ?? null,
@@ -80,9 +81,9 @@ export class CustomerService {
       },
       services: services.map((item) => ({ slug: item.slug, name: item.name })),
       upcomingSession: upcoming
-        ? { id: upcoming.id, serviceName: upcoming.serviceName, whenLabel: upcoming.whenLabel, status: upcoming.status, sessionsDoneThisWeek: done, weeklyGoal: WEEKLY_GOAL, upcomingCount: activeRows.length, inProgress: upcoming.inProgress }
+        ? { id: upcoming.id, serviceName: upcoming.serviceName, whenLabel: upcoming.whenLabel, status: upcoming.status, sessionsDoneThisWeek: done, weeklyGoal: goal, upcomingCount: activeRows.length, inProgress: upcoming.inProgress }
         : null,
-      weekly: { done, goal: WEEKLY_GOAL },
+      weekly: { done, goal },
     };
   }
 
@@ -94,6 +95,8 @@ export class CustomerService {
       `${BOOKING_SELECT} where b.user_id = $1 and b.starts_at is not null and b.status in ('matching','confirmed','rematching','completed') order by b.starts_at desc limit 500`,
       [userId],
     );
+    const goalRow = await this.db.query<{ d: number | null }>(`select target_days_per_week as d from customer_profiles where user_id = $1`, [userId]);
+    const weeklyGoal = goalRow.rows[0]?.d ?? WEEKLY_GOAL;
     const completed = result.rows.filter((row) => row.status === 'completed');
     const active = result.rows.filter((row) => ACTIVE.has(row.status));
     const weekStart = istWeekStart(now);
@@ -124,7 +127,7 @@ export class CustomerService {
     return {
       weekDays,
       sessionsThisWeek: completed.filter((row) => row.starts_at && row.starts_at.getTime() >= weekStart.getTime() && row.starts_at.getTime() < weekStart.getTime() + WEEK_MS).length,
-      weeklyGoal: WEEKLY_GOAL,
+      weeklyGoal,
       totalSessions: completed.length,
       weekStreak,
       focusAreas: [...bySlug.entries()].map(([serviceSlug, value]) => ({ serviceSlug, ...value })).sort((a, b) => b.sessions - a.sessions),
@@ -134,11 +137,6 @@ export class CustomerService {
 
   // Coaches are not assigned to sessions yet (trainer matching is not built), so nobody can be "past".
   pastCoaches(): { id: string; name: string; sessionsTogether: number; lastSessionLabel: string }[] {
-    return [];
-  }
-
-  // Package definitions are set in the admin panel (decision D13) and that screen does not exist yet. Nothing is invented here.
-  packages(): unknown[] {
     return [];
   }
 }

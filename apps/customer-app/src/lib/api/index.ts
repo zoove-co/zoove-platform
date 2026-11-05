@@ -11,6 +11,12 @@ export const api: Api = USE_MOCK ? mockApi : httpApi;
 export { ApiError } from './types';
 export type {
   ApiErrorCode,
+  FitnessGoal,
+  MyPackages,
+  PackagePurchase,
+  ParticipantRule,
+  ProgressProfile,
+  ReferralSummary,
   CoachRef,
   OtpRequestResult,
   FocusArea,

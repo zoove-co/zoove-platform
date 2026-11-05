@@ -23,3 +23,17 @@ export function normalizeIndianMobile(input: string): string | null {
 }
 
 export const isValidRecipientName = (name: string): boolean => name.trim().length >= 2 && name.trim().length <= 80;
+
+// The list price for who the session is for, from the rules the server sends. The server charges the same figure;
+// this only shows it. Rounded to whole rupees, like the server.
+export function participantListPaise(
+  basePaise: number,
+  participant: Participant,
+  groupSize: number,
+  rules: Record<string, { percent: number; perHead: boolean }>,
+): number {
+  const rule = participant === 'personal' ? undefined : rules[participant];
+  if (!rule) return basePaise;
+  const raw = ((basePaise * rule.percent) / 100) * (rule.perHead ? Math.max(1, groupSize) : 1);
+  return Math.round(raw / 100) * 100;
+}

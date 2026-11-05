@@ -9,7 +9,7 @@ import { BookingRow } from '@/components/orders/BookingRow';
 import { AppText } from '@/components/ui/AppText';
 import { Icon } from '@/components/ui/Icon';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
-import { useStreak } from '@/features/booking/hooks';
+import { useMyPackages, useStreak } from '@/features/booking/hooks';
 import { track } from '@/lib/analytics/track';
 import type { StreakDay } from '@/lib/api';
 import { serviceImages } from '@/lib/images';
@@ -23,6 +23,8 @@ export default function StreakScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const { data, isPending, isError, refetch } = useStreak();
+  const myPackages = useMyPackages();
+  const creditsLeft = myPackages.data?.credits.creditsLeft ?? 0;
   useRefetchOnFocus(refetch);
 
   useEffect(() => {
@@ -127,14 +129,43 @@ export default function StreakScreen() {
           )}
         </View>
 
+        <View style={styles.section}>
+          <AppText variant="heading">{t('streak.milestonesTitle')}</AppText>
+          <View style={styles.milestones}>
+            {MILESTONES.map((count) => {
+              const done = data.totalSessions >= count;
+              return (
+                <View key={count} style={[styles.milestone, done && styles.milestoneDone]}>
+                  <Icon name={done ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={done ? colors.white : colors.muted} />
+                  <AppText variant="bodyStrong" color={done ? colors.white : colors.ink}>{t('streak.milestone', { count })}</AppText>
+                  <AppText variant="micro" color={done ? 'rgba(255,255,255,0.85)' : colors.muted}>
+                    {done ? t('streak.milestoneDone') : t('streak.milestoneNext', { left: count - data.totalSessions })}
+                  </AppText>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+
+        <Pressable accessibilityRole="button" onPress={() => router.push('/progress')} style={styles.packageCard}>
+          <View style={styles.packageText}>
+            <AppText variant="bodyStrong">{t('progress.cta')}</AppText>
+            <AppText variant="micro" color={colors.muted}>{t('progress.ctaBody')}</AppText>
+          </View>
+          <Icon name="chevron-forward" size={20} color={colors.purple} />
+        </Pressable>
+
         <View style={styles.packageCard}>
           <View style={styles.packageText}>
-            <AppText variant="bodyStrong">{t('streak.packageTitle')}</AppText>
-            <AppText variant="micro" color={colors.muted}>
-              {t('streak.packageBody')}
-            </AppText>
+            <AppText variant="bodyStrong">{creditsLeft > 0 ? t('streak.credits', { count: creditsLeft }) : t('streak.packageTitle')}</AppText>
+            <AppText variant="micro" color={colors.muted}>{creditsLeft > 0 ? t('streak.creditsBody') : t('streak.packageBody')}</AppText>
           </View>
           <PrimaryButton label={t('streak.packageCta')} variant="soft" onPress={() => router.push('/packages')} />
+        </View>
+
+        <View style={styles.note}>
+          <AppText variant="eyebrow" color={colors.purple}>{t('streak.noteTitle').toUpperCase()}</AppText>
+          <AppText color={colors.muted}>{t('streak.noteBody')}</AppText>
         </View>
 
         <View style={styles.section}>
@@ -201,7 +232,13 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
+const MILESTONES = [5, 10, 25, 50];
+
 const styles = StyleSheet.create({
+  milestones: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  milestone: { flexGrow: 1, flexBasis: '45%', gap: 2, padding: spacing.md, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white },
+  milestoneDone: { backgroundColor: colors.purple, borderColor: colors.purple },
+  note: { gap: 4, padding: spacing.lg, borderRadius: radius.xl, backgroundColor: colors.lavender },
   screen: { flex: 1, backgroundColor: colors.background },
   center: { alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.xl },
   content: { padding: spacing.xl, gap: spacing.lg, paddingBottom: 40 },

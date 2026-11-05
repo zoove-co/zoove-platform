@@ -116,9 +116,9 @@ export class DiscountsService {
   }
 
   // Records the use. Call it in the same transaction as the booking insert, after it (the use points at the booking).
-  async redeem(db: Queryable, userId: string, quote: DiscountQuote, bookingId: string): Promise<void> {
-    await db.query(`insert into discount_redemptions (id, code_id, user_id, booking_id, discount_paise) values ($1, $2, $3, $4, $5)`, [
-      uuidv7(), quote.codeId, userId, bookingId, quote.discountPaise,
+  async redeem(db: Queryable, userId: string, quote: DiscountQuote, bookingId: string | null, packagePurchaseId: string | null = null): Promise<void> {
+    await db.query(`insert into discount_redemptions (id, code_id, user_id, booking_id, package_purchase_id, discount_paise) values ($1, $2, $3, $4, $5, $6)`, [
+      uuidv7(), quote.codeId, userId, bookingId, packagePurchaseId, quote.discountPaise,
     ]);
     await db.query(`update discount_codes set redemption_count = redemption_count + 1 where id = $1`, [quote.codeId]);
   }
@@ -128,6 +128,16 @@ export class DiscountsService {
     const released = await db.query<{ code_id: string }>(
       `update discount_redemptions set released_at = now() where booking_id = $1 and released_at is null returning code_id`,
       [bookingId],
+    );
+    const row = released.rows[0];
+    if (row) await db.query(`update discount_codes set redemption_count = greatest(0, redemption_count - 1) where id = $1`, [row.code_id]);
+  }
+
+  // A cancelled package purchase gives its code back too.
+  async releaseForPurchase(db: Queryable, purchaseId: string): Promise<void> {
+    const released = await db.query<{ code_id: string }>(
+      `update discount_redemptions set released_at = now() where package_purchase_id = $1 and released_at is null returning code_id`,
+      [purchaseId],
     );
     const row = released.rows[0];
     if (row) await db.query(`update discount_codes set redemption_count = greatest(0, redemption_count - 1) where id = $1`, [row.code_id]);

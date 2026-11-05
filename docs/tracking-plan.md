@@ -38,6 +38,9 @@ Rules
 | profile_completed | Customer saved their name and details in Edit profile | none |
 | signed_out | Customer signed out from Account | none |
 | account_deleted | Customer deleted their account from Account | none |
+| package_ordered | Customer ordered a package (waits for payment) | package_id, amount_paise |
+| referral_applied | Customer entered a friend's referral code | none |
+| progress_profile_saved | Customer saved goal, days a week, and optionally height and weight | none |
 
 Retention triggers planned in CleverTap: started but not confirmed within 30 minutes; no booking within
 10 to 11 days of the last completed session; streak about to break.
