@@ -5,7 +5,8 @@ import { v7 as uuidv7 } from 'uuid';
 import { DomainError } from '../common/domain-error';
 import { notifyCustomer } from '../customer/notify';
 import { DatabaseService } from '../database/database.service';
-import { sessionCodeOf, type BookingStatus } from './bookings.service';
+import { PackagesService } from '../packages/packages.service';
+import { assertBookableSlot, sessionCodeOf, type BookingStatus } from './bookings.service';
 import { formatWhen } from './rules';
 
 export type SessionFilter = 'needs_trainer' | 'upcoming' | 'all';
@@ -45,7 +46,7 @@ function toSession(r: ListRow, now = new Date()): AdminSession {
 // There is no trainer app yet, so ops record a trainer's cancellation for them (the trainer's own endpoint will call the same method).
 @Injectable()
 export class SessionsAdminService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly db: DatabaseService, private readonly packages: PackagesService) {}
 
   async summary(): Promise<{ needsTrainer: number; trainerCancelled: number; overdue: number }> {
     const r = (await this.db.query<{ needs: string; cancelled: string; overdue: string }>(
@@ -91,8 +92,8 @@ export class SessionsAdminService {
   }
 
   private async lock(client: PoolClient, id: string) {
-    const r = await client.query<{ id: string; user_id: string; status: BookingStatus; mode: string; starts_at: Date | null; coach_id: string | null; service_name: string }>(
-      `select b.id, b.user_id, b.status, b.mode, b.starts_at, b.coach_id, s.name as service_name from bookings b join services s on s.id = b.service_id where b.id = $1 for update of b`, [id]);
+    const r = await client.query<{ id: string; user_id: string; status: BookingStatus; mode: string; starts_at: Date | null; coach_id: string | null; service_name: string; package_purchase_id: string | null }>(
+      `select b.id, b.user_id, b.status, b.mode, b.starts_at, b.coach_id, b.package_purchase_id, s.name as service_name from bookings b join services s on s.id = b.service_id where b.id = $1 for update of b`, [id]);
     const row = r.rows[0];
     if (!row) throw new DomainError('NOT_FOUND', 'We could not find that session.');
     return row;
@@ -144,11 +145,47 @@ export class SessionsAdminService {
     return this.detail(id);
   }
 
+  // Ops can move any live session to another time for the customer, in every case (also after the start time has passed, and
+  // inside the 2-hour window the customer is held to). A trainer who is already on it stays on it unless they are busy then;
+  // the trainer is not told by the app yet, so ops call them. The customer is always told.
+  async reschedule(adminId: string, id: string, startsAtInput: string, reason: string): Promise<AdminSessionDetail> {
+    try {
+      await this.db.tx(async (client) => {
+        const row = await this.lock(client, id);
+        if (row.status === 'completed' || row.status === 'cancelled') throw new DomainError('INVALID_STATE', 'This session is finished, so it cannot be moved.');
+        if (row.mode === 'instant') throw new DomainError('INVALID_STATE', 'An instant session has no set time. Cancel it and ask the customer to book a scheduled session.');
+        const startsAt = assertBookableSlot(startsAtInput);
+        if (row.package_purchase_id) await this.packages.assertCovers(client, row.package_purchase_id, startsAt);
+        const clash = row.status === 'confirmed' && row.coach_id
+          ? (await client.query(`select 1 from bookings where coach_id = $1 and status = 'confirmed' and starts_at = $2 and id <> $3 limit 1`, [row.coach_id, startsAt, id])).rows[0]
+          : null;
+        if (clash) await client.query(`update bookings set starts_at = $2, status = 'rematching', coach_id = null, overdue_notified_at = null where id = $1`, [id, startsAt]);
+        else await client.query(`update bookings set starts_at = $2, overdue_notified_at = null where id = $1`, [id, startsAt]);
+        await client.query(`insert into booking_events (id, booking_id, type, actor, payload) values ($1, $2, 'rescheduled', 'admin', $3)`, [
+          uuidv7(), id, JSON.stringify({ from: row.starts_at?.toISOString() ?? null, to: startsAt.toISOString(), reason, byUserId: adminId, coachFreed: Boolean(clash) }),
+        ]);
+        await client.query(`insert into outbox_events (id, aggregate_type, aggregate_id, event_type, payload) values ($1, 'booking', $2, 'booking.rescheduled', $3)`, [uuidv7(), id, JSON.stringify({ bookingId: id, userId: row.user_id, to: startsAt.toISOString(), by: 'admin' })]);
+        await client.query(`insert into audit_log (actor_user_id, action, entity_type, entity_id, after) values ($1, 'session.rescheduled_by_admin', 'booking', $2, $3)`, [adminId, id, JSON.stringify({ to: startsAt.toISOString(), reason })]);
+        await notifyCustomer(
+          client, row.user_id, 'Your session was moved',
+          `Our team moved your ${row.service_name} session (session ${sessionCodeOf(id)}) to ${formatWhen(startsAt)}.${clash ? ' Your coach is not free then, so we are finding another coach and will tell you as soon as one is assigned.' : ''} You can still move it again or cancel it from the app.`,
+          id,
+        );
+      });
+    } catch (error) {
+      if (typeof error === 'object' && error !== null && (error as { code?: string }).code === '23505' && (error as { constraint?: string }).constraint === 'bookings_no_double_booking') {
+        throw new DomainError('SLOT_CONFLICT', 'The customer already has another session at that time.');
+      }
+      throw error;
+    }
+    return this.detail(id);
+  }
+
   async assign(adminId: string, id: string, trainerId: string): Promise<AdminSessionDetail> {
     await this.db.tx(async (client) => {
       const row = await this.lock(client, id);
       if (row.status !== 'matching' && row.status !== 'rematching') throw new DomainError('INVALID_STATE', 'This session already has a trainer or is finished.');
-      if (row.starts_at && row.starts_at.getTime() <= Date.now()) throw new DomainError('INVALID_STATE', 'This session\'s start time has passed. Ask the customer to reschedule or cancel.');
+      if (row.starts_at && row.starts_at.getTime() <= Date.now()) throw new DomainError('INVALID_STATE', 'This session\'s start time has passed. Move it to a new time first (Move to another time), then assign a trainer.');
       const trainer = (await client.query<{ name: string }>(
         `select coalesce(nullif(trim(concat_ws(' ', ta.first_name, ta.last_name)), ''), u.full_name, 'Your coach') as name
            from trainers t join trainer_applications ta on ta.id = t.application_id join users u on u.id = t.user_id where t.user_id = $1 and t.status = 'active'`, [trainerId])).rows[0];

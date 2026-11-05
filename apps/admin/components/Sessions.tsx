@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import {
-  ApiError, assignTrainer, getSession, listAssignableTrainers, listSessions, recordTrainerCancel, recordTrainerNoShow,
+  ApiError, assignTrainer, getSession, listAssignableTrainers, listSessions, moveSession, recordTrainerCancel, recordTrainerNoShow,
   type AdminSession, type SessionDetail, type SessionFilter, type SessionStatus,
 } from '@/lib/api';
 import { can, useMe } from './me';
@@ -18,6 +18,9 @@ const EVENT_LABEL: Record<string, string> = {
   created: 'Booked by the customer', rescheduled: 'Moved to another time', cancelled: 'Cancelled', trainer_assigned: 'Trainer assigned', trainer_cancelled: 'Trainer cancelled', trainer_no_show: 'Trainer did not arrive', overdue: 'Start time passed with no trainer, customer told',
 };
 const FILTERS: [SessionFilter, string][] = [['needs_trainer', 'Needs a trainer'], ['upcoming', 'Confirmed'], ['all', 'All sessions']];
+const SLOT_TIMES = ['06:00', '07:00', '08:00', '09:00', '16:00', '17:00', '18:00', '19:00'];
+const clock = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number) as [number, number]; return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; };
+const todayIst = () => new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10);
 const PEOPLE: Record<string, string> = { personal: 'Personal', duo: 'Duo', loved_one: 'Loved one', group: 'Group' };
 
 export function Sessions({ signOut, expired }: { signOut: () => void; expired: () => void }) {
@@ -32,6 +35,10 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
   const [reason, setReason] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const [moveDate, setMoveDate] = useState('');
+  const [moveTime, setMoveTime] = useState('18:00');
+  const [moveReason, setMoveReason] = useState('');
 
   const handle = useCallback((err: unknown): string => {
     if (err instanceof ApiError && err.code === 'SESSION_EXPIRED') { expired(); return ''; }
@@ -70,7 +77,7 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
   }
 
   async function show(id: string) {
-    setFormError(null); setPick(''); setReason('');
+    setFormError(null); setPick(''); setReason(''); setMoving(false); setMoveDate(''); setMoveReason('');
     try {
       const [detail, list] = await Promise.all([getSession(id), listAssignableTrainers()]);
       setOpen(detail); setTrainers(list);
@@ -78,7 +85,7 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
   }
   async function act(action: () => Promise<SessionDetail>) {
     setBusy(true); setFormError(null);
-    try { const d = await action(); setOpen(d); setPick(''); setReason(''); await load(); }
+    try { const d = await action(); setOpen(d); setPick(''); setReason(''); setMoving(false); setMoveDate(''); setMoveReason(''); await load(); }
     catch (err) {
       const m = handle(err); if (m) setFormError(m);
       // Someone else may have changed this session while the window was open: show the current state.
@@ -138,7 +145,7 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
               <dt>Paid</dt><dd>{open.paidWithCredit ? 'With a package credit' : rupees(open.totalPaise)}{open.discountCode ? ` (code ${open.discountCode})` : ''}</dd>
               <dt>Trainer</dt><dd>{open.trainerName ?? 'Not assigned'}{open.trainerCancelCount ? ` · cancelled ${open.trainerCancelCount} time${open.trainerCancelCount > 1 ? 's' : ''}` : ''}</dd>
             </dl>
-            {open.startPassed ? <Banner tone="warn">Overdue: the start time has passed and no trainer is on this session. The customer has been told and can move it or cancel it. Call them to apologise and help them rebook. A trainer cannot be assigned to a time that has passed.</Banner> : null}
+            {open.startPassed ? <Banner tone="warn">Overdue: the start time has passed and no trainer is on this session. The customer has been told and can move it or cancel it. Call them to apologise and help them rebook. To give it a trainer, first move it to a new time with “Move to another time”.</Banner> : null}
 
             <h3 style={{ marginBottom: 6 }}>History</h3>
             <ul className="accesslist" style={{ marginTop: 0 }}>
@@ -147,6 +154,7 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
                   {stamp(e.createdAt)} · {EVENT_LABEL[e.type] ?? e.type}
                   {e.type === 'trainer_cancelled' && e.payload.reason ? ` — “${String(e.payload.reason)}”` : ''}
                   {e.type === 'trainer_no_show' && e.payload.note ? ` — “${String(e.payload.note)}”` : ''}
+                  {e.type === 'rescheduled' && e.actor === 'admin' ? ` by our team${e.payload.reason ? ` — “${String(e.payload.reason)}”` : ''}` : ''}
                 </li>
               ))}
             </ul>
@@ -176,9 +184,27 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
                 </label>
               </div>
             ) : null}
+            {moving && open.mode !== 'instant' ? (
+              <div className="fields" style={{ marginTop: 10 }}>
+                <label className="field"><span>New date</span><input type="date" min={todayIst()} value={moveDate} onChange={(e) => setMoveDate(e.target.value)} /></label>
+                <label className="field"><span>New time</span><select value={moveTime} onChange={(e) => setMoveTime(e.target.value)}>{SLOT_TIMES.map((t) => <option key={t} value={t}>{clock(t)}</option>)}</select></label>
+                <label className="field full">
+                  <span>Why are you moving it?</span>
+                  <input value={moveReason} maxLength={300} onChange={(e) => setMoveReason(e.target.value)} placeholder="For example: customer asked on the phone, trainer was late" />
+                  <div className="hint">The customer is told. A trainer already on the session stays on it unless they are busy then. Trainers are not told by the app yet, so call them.</div>
+                </label>
+              </div>
+            ) : null}
             {formError ? <Banner tone="bad">{formError}</Banner> : null}
             <div className="actions">
               <button className="btn ghost" type="button" disabled={busy} onClick={() => setOpen(null)}>Close</button>
+              {(open.status === 'matching' || open.status === 'rematching' || open.status === 'confirmed') && open.mode !== 'instant' ? (
+                moving ? (
+                  <button className="btn" type="button" disabled={busy || !moveDate || moveReason.trim().length < 3} onClick={() => void act(() => moveSession(open.id, `${moveDate}T${moveTime}:00+05:30`, moveReason.trim()))}>{busy ? <Spinner /> : null} Move session</button>
+                ) : (
+                  <button className="btn ghost" type="button" disabled={busy} onClick={() => setMoving(true)}>Move to another time</button>
+                )
+              ) : null}
               {open.status === 'matching' || open.status === 'rematching' ? (
                 <button className="btn" type="button" disabled={busy || !pick} onClick={() => void act(() => assignTrainer(open.id, pick))}>{busy ? <Spinner /> : null} Assign trainer</button>
               ) : null}

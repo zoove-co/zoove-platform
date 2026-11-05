@@ -349,3 +349,4 @@ export const listAssignableTrainers = () => api<{ id: string; name: string }[]>(
 export const recordTrainerCancel = (id: string, reason: string) => api<SessionDetail>(`/v1/admin/sessions/${id}/trainer-cancel`, { method: 'POST', json: { reason } });
 export const assignTrainer = (id: string, trainerId: string) => api<SessionDetail>(`/v1/admin/sessions/${id}/assign`, { method: 'POST', json: { trainerId } });
 export const recordTrainerNoShow = (id: string, note: string) => api<SessionDetail>(`/v1/admin/sessions/${id}/no-show`, { method: 'POST', json: { note } });
+export const moveSession = (id: string, startsAt: string, reason: string) => api<SessionDetail>(`/v1/admin/sessions/${id}/reschedule`, { method: 'POST', json: { startsAt, reason } });

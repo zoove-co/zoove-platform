@@ -173,6 +173,66 @@ suite('overdue sessions, trainer no-show and package expiry', () => {
     });
   });
 
+  describe('ops moving a session for the customer', () => {
+    const move = (id: string, startsAt: string, t = owner, reason = 'Customer asked on the phone') => http().post(`/v1/admin/sessions/${id}/reschedule`).set(as(t)).send({ startsAt, reason });
+
+    it('works on an overdue session with no trainer, tells the customer, clears the overdue mark, and then a trainer can be assigned', async () => {
+      const sweep = app.get(OverdueSweepService);
+      const t1 = await makeTrainer('Asha');
+      const booked = (await book(me, 3).expect(201)).body;
+      await pastStart(booked.id);
+      await sweep.runOnce();
+      await move(booked.id, slot(4), staff).expect(403);
+      await http().post(`/v1/admin/sessions/${booked.id}/reschedule`).set(as(owner)).send({ startsAt: slot(4), reason: 'x' }).expect(400);
+      const done = (await move(booked.id, slot(4)).expect(200)).body;
+      expect(done).toMatchObject({ status: 'matching', startPassed: false });
+      expect(done.events.map((e: { type: string }) => e.type)).toContain('rescheduled');
+      expect((await http().get(`/v1/bookings/${booked.id}`).set(as(me)).expect(200)).body).toMatchObject({ overdue: false, startsAt: slot(4) });
+      expect(await notices()).toContain('Your session was moved');
+      expect((await pool.query(`select count(*)::int as c from audit_log where action = 'session.rescheduled_by_admin'`)).rows[0].c).toBe(1);
+      await assign(booked.id, t1).expect(200);
+    });
+
+    it('works on a confirmed session inside the two-hour window; the trainer stays unless busy, then it goes back to finding a trainer', async () => {
+      const t1 = await makeTrainer('Asha');
+      const a = (await book(me, 3).expect(201)).body;
+      const b = (await book(me, 4).expect(201)).body;
+      await assign(a.id, t1).expect(200);
+      await assign(b.id, t1).expect(200);
+      await pool.query(`update bookings set starts_at = now() + interval '30 minutes' where id = $1`, [a.id]); // customer could no longer move this one
+      await http().post(`/v1/bookings/${a.id}/reschedule`).set(as(me)).send({ startsAt: slot(5) }).expect(409);
+      expect((await move(a.id, slot(5)).expect(200)).body).toMatchObject({ status: 'confirmed', trainerId: t1 });
+      // Another customer's session already holds the trainer at that time, so b cannot keep them.
+      const friend = await signIn(app, pool, '+919812345678');
+      const friendAddress = (await http().post('/v1/addresses').set(as(friend)).send({ label: 'Home', line: 'E-9, Test Heights', area: 'Bandra West', pincode: '400050' }).expect(201)).body.id as string;
+      const theirs = (await http().post('/v1/bookings').set(as(friend)).send({ serviceSlug: 'yoga', formatSlug: 'power-yoga', mode: 'scheduled', addressId: friendAddress, startsAt: slot(6), idempotencyKey: key() }).expect(201)).body;
+      await assign(theirs.id, t1).expect(200);
+      const busy = (await move(b.id, slot(6)).expect(200)).body;
+      expect(busy).toMatchObject({ status: 'rematching', trainerId: null });
+      expect(busy.events.find((e: { type: string; actor: string }) => e.type === 'rescheduled' && e.actor === 'admin').payload.coachFreed).toBe(true);
+    });
+
+    it('refuses what cannot be moved: a time that is not a slot, the past, a finished or instant session, or a clash for the customer', async () => {
+      const booked = (await book(me, 3).expect(201)).body;
+      const other = (await book(me, 4).expect(201)).body;
+      expect((await move(booked.id, new Date(Date.now() + 3 * 86_400_000 + 7 * 60_000).toISOString()).expect(409)).body.error.code).toBe('SLOT_UNAVAILABLE');
+      await move(booked.id, new Date(Date.now() - 3_600_000).toISOString()).expect(409);
+      expect((await move(booked.id, slot(4)).expect(409)).body.error.code).toBe('SLOT_CONFLICT');
+      const instant = (await http().post('/v1/bookings').set(as(me)).send({ serviceSlug: 'yoga', formatSlug: 'power-yoga', mode: 'instant', addressId: address, idempotencyKey: key() }).expect(201)).body;
+      await move(instant.id, slot(6)).expect(409);
+      await http().post(`/v1/bookings/${other.id}/cancel`).set(as(me)).expect(201);
+      await move(other.id, slot(6)).expect(409);
+    });
+
+    it('cannot move a session past the end of its package', async () => {
+      const id = await paidPackage();
+      await pool.query(`update package_purchases set expires_at = now() + interval '2 days' where id = $1`, [id]);
+      const booked = (await book(me, 1, { useCredit: true }).expect(201)).body;
+      expect((await move(booked.id, slot(5)).expect(409)).body.error.code).toBe('PACKAGE_EXPIRES');
+      await move(booked.id, slot(1, 19)).expect(200);
+    });
+  });
+
   describe('several things at the same moment', () => {
     it('two admins assigning two trainers to one session: one wins, the other is told it is taken', async () => {
       const t1 = await makeTrainer('Asha');

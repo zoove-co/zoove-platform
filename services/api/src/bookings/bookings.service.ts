@@ -147,6 +147,17 @@ export function bookingFromRow(row: Row, now = new Date()): Booking {
   };
 }
 
+// A session can only be booked or moved to a real start time (one of the app's slots), in the future, within the booking horizon.
+export function assertBookableSlot(value: string | undefined): Date {
+  const startsAt = value ? new Date(value) : null;
+  if (!startsAt || Number.isNaN(startsAt.getTime())) throw new DomainError('INVALID_REQUEST', 'Choose a time for your session.');
+  const now = new Date();
+  if (startsAt.getTime() <= now.getTime() || !withinHorizon(startsAt, now) || !isSlotStart(startsAt)) {
+    throw new DomainError('SLOT_UNAVAILABLE', 'That time is not available. Please pick another.');
+  }
+  return startsAt;
+}
+
 const isUnique = (error: unknown, constraint: string): boolean =>
   typeof error === 'object' && error !== null && (error as { code?: string }).code === '23505' &&
   (error as { constraint?: string }).constraint === constraint;
@@ -316,13 +327,7 @@ export class BookingsService {
   }
 
   private assertBookableSlot(value: string | undefined): Date {
-    const startsAt = value ? new Date(value) : null;
-    if (!startsAt || Number.isNaN(startsAt.getTime())) throw new DomainError('INVALID_REQUEST', 'Choose a time for your session.');
-    const now = new Date();
-    if (startsAt.getTime() <= now.getTime() || !withinHorizon(startsAt, now) || !isSlotStart(startsAt)) {
-      throw new DomainError('SLOT_UNAVAILABLE', 'That time is not available. Please pick another.');
-    }
-    return startsAt;
+    return assertBookableSlot(value);
   }
 
   private async lock(client: PoolClient, userId: string, id: string): Promise<Row> {
