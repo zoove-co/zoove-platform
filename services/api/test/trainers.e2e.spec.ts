@@ -172,6 +172,11 @@ suite('trainer onboarding', () => {
     expect(fake.body.error.code).toBe('FILE_INVALID');
     const pdfSelfie = await upload(trainerToken, 'selfie', PDF, 'me.pdf').expect(422);
     expect(pdfSelfie.body.error.code).toBe('FILE_INVALID');
+    // Raw-body upload (what the phone apps use): the bytes are the whole body.
+    const raw = await http().post('/v1/trainer-application/documents/raw?kind=aadhaar_front').set(as(trainerToken)).set('Content-Type', 'image/jpeg').send(JPEG).expect(201);
+    expect(raw.body.documents.some((d: { kind: string }) => d.kind === 'aadhaar_front')).toBe(true);
+    await http().post('/v1/trainer-application/documents/raw?kind=aadhaar_front').set(as(trainerToken)).set('Content-Type', 'image/jpeg').send(Buffer.from('not an image at all')).expect(422);
+    await http().post('/v1/trainer-application/documents/raw?kind=passport').set(as(trainerToken)).set('Content-Type', 'image/jpeg').send(JPEG).expect(400);
     await http().post('/v1/trainer-application/documents').set(as(trainerToken)).field('kind', 'pan_card').expect(422);
     await http().post('/v1/trainer-application/documents').set(as(trainerToken)).field('kind', 'passport').attach('file', JPEG, 'a.jpg').expect(400);
   });

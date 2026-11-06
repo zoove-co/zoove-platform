@@ -98,13 +98,13 @@ function refreshSession(): Promise<boolean> {
   return refreshing;
 }
 
-type Options = { method?: string; json?: unknown; form?: FormData; timeoutMs?: number; authed?: boolean };
+type Options = { method?: string; json?: unknown; form?: FormData; file?: { blob: Blob; mimeType: string }; timeoutMs?: number; authed?: boolean };
 
 async function call<T>(path: string, options: Options = {}): Promise<T> {
   const authed = options.authed ?? true;
-  const method = options.method ?? (options.json !== undefined || options.form ? 'POST' : 'GET');
-  const body = options.json !== undefined ? JSON.stringify(options.json) : options.form;
-  const headers: Record<string, string> = options.json !== undefined ? { 'Content-Type': 'application/json' } : {};
+  const method = options.method ?? (options.json !== undefined || options.form || options.file ? 'POST' : 'GET');
+  const body = options.json !== undefined ? JSON.stringify(options.json) : (options.file?.blob ?? options.form);
+  const headers: Record<string, string> = options.json !== undefined ? { 'Content-Type': 'application/json' } : options.file ? { 'Content-Type': options.file.mimeType } : {};
   const timeout = options.timeoutMs ?? TIMEOUT_MS;
   const used = authed ? (session?.accessToken ?? null) : null;
   const first = await send<T>(method, path, body, headers, used, timeout);
@@ -201,19 +201,15 @@ export const removeDocument = (id: string) => call<ApplicationView>(`/v1/trainer
 export type PickedFile = { uri: string; name: string; mimeType: string };
 
 export async function uploadDocument(kind: DocumentKind, file: PickedFile): Promise<ApplicationView> {
-  const form = new FormData();
-  form.append('kind', kind); // before the file, so the server reads it first
-  // Read the file into a Blob first. Newer Expo versions use a fetch that does not understand the old
-  // { uri, name, type } shortcut, and a Blob works with both kinds of fetch.
+  // The file's bytes are the whole request body. A multipart file part is unreliable in some phone runtimes
+  // (Expo Go especially), so the server has a plain route for this.
   let blob: Blob;
   try {
     blob = await (await fetch(file.uri)).blob();
   } catch {
     throw new ApiError('INTERNAL', 'Could not read this file from your phone. Please pick it again.', 0);
   }
-  const typed = blob.type === file.mimeType ? blob : new Blob([blob], { type: file.mimeType });
-  form.append('file', typed, file.name);
-  return call<ApplicationView>('/v1/trainer-application/documents', { form, timeoutMs: UPLOAD_TIMEOUT_MS });
+  return call<ApplicationView>(`/v1/trainer-application/documents/raw?kind=${encodeURIComponent(kind)}`, { file: { blob, mimeType: file.mimeType }, timeoutMs: UPLOAD_TIMEOUT_MS });
 }
 
 export type Service = { slug: string; name: string };

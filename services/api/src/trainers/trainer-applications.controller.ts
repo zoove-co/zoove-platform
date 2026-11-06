@@ -1,10 +1,11 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { z } from 'zod';
 
+import { DomainError } from '../common/domain-error';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { AuthGuard, CurrentUser, type AuthUser } from '../identity/auth.guard';
 import { DOCUMENT_KINDS, MAX_FILE_BYTES, PAN_PATTERN, PHONE_PATTERN, looksFakePhone, type DocumentKind } from './rules';
@@ -75,6 +76,25 @@ export class TrainerApplicationsController {
     @UploadedFile() file: { buffer: Buffer; size: number } | undefined,
   ): Promise<ApplicationView> {
     return this.applications.upload(user.id, body.kind as DocumentKind, file);
+  }
+
+  // The phone apps send the file's bytes as the whole request body (no multipart): some phone runtimes
+  // cannot build a multipart file part reliably. The file's own first bytes decide its type, as above.
+  @Post('documents/raw')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Upload a document as the raw request body (JPG, PNG, WebP or PDF, up to 8 MB), kind in the query string' })
+  async uploadRaw(@CurrentUser() user: AuthUser, @Query() query: { kind?: string }, @Req() request: Request): Promise<ApplicationView> {
+    const parsed = uploadSchema.safeParse({ kind: query.kind });
+    if (!parsed.success) throw new BadRequestException('Unknown document kind');
+    const chunks: Buffer[] = [];
+    let size = 0;
+    for await (const chunk of request as AsyncIterable<Buffer>) {
+      size += chunk.length;
+      if (size > MAX_FILE_BYTES) throw new DomainError('FILE_INVALID', 'The file is too large. The limit is 8 MB.');
+      chunks.push(chunk);
+    }
+    const buffer = Buffer.concat(chunks);
+    return this.applications.upload(user.id, parsed.data.kind as DocumentKind, { buffer, size: buffer.length });
   }
 
   @Delete('documents/:id')
