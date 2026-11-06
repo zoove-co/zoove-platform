@@ -144,7 +144,7 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
                   <td>{s.customerName}<div className="sub muted small">{s.area ?? ''}</div></td>
                   <td>{s.whenLabel}{s.startPassed ? <div className="sub small" style={{ color: 'var(--red)', fontWeight: 600 }}>Overdue: start time has passed</div> : null}</td>
                   <td>
-                    <span className={`pill ${STATUS_PILL[s.status]}`}>{STATUS_LABEL[s.status]}</span>
+                    <span className={`pill ${s.live ? 'in_review' : STATUS_PILL[s.status]}`}>{s.live ? 'Live' : STATUS_LABEL[s.status]}</span>{s.rating !== null ? <span className="sub muted small">{` ${'★'.repeat(s.rating)}`}</span> : null}
                     {s.trainerCancelledAt && s.status === 'rematching' ? <div className="sub muted small">Trainer cancelled {stamp(s.trainerCancelledAt)}</div> : null}
                     {s.trainerName && s.status === 'confirmed' ? <div className="sub muted small">{s.trainerName}</div> : null}
                   </td>
@@ -159,7 +159,7 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
       {open ? (
         <div className="modal" role="dialog" aria-modal="true" aria-label={`Session ${open.sessionCode}`}>
           <div className="sheet wide">
-            <h2>Session {open.sessionCode} <span className={`pill ${STATUS_PILL[open.status]}`}>{STATUS_LABEL[open.status]}</span></h2>
+            <h2>Session {open.sessionCode} <span className={`pill ${open.live ? 'in_review' : STATUS_PILL[open.status]}`}>{open.live ? 'Live' : STATUS_LABEL[open.status]}</span>{open.rating !== null ? <span className="sub muted small">{` Rated ${open.rating}/5`}</span> : null}</h2>
             <dl className="kv">
               <dt>Service</dt><dd>{open.serviceName} · {open.formatName} · {PEOPLE[open.participant] ?? open.participant}{open.groupSize ? ` of ${open.groupSize}` : ''}</dd>
               <dt>When</dt><dd>{open.whenLabel}{open.mode === 'instant' ? ' (instant)' : ''}</dd>
@@ -236,10 +236,10 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
               {open.status === 'matching' || open.status === 'rematching' ? (
                 <button className="btn" type="button" disabled={busy || !pick} onClick={() => void act(() => assignTrainer(open.id, pick))}>{busy ? <Spinner /> : null} Assign trainer</button>
               ) : null}
-              {open.status === 'confirmed' && (!open.startsAt || !open.canMarkNoShow) ? (
+              {open.status === 'confirmed' && !open.live && (!open.startsAt || !open.canMarkNoShow) ? (
                 <button className="btn" type="button" disabled={busy || reason.trim().length < 3} onClick={() => void act(() => recordTrainerCancel(open.id, reason.trim()))}>{busy ? <Spinner /> : null} Record trainer cancelled</button>
               ) : null}
-              {open.status === 'confirmed' && (!open.startsAt || open.canMarkNoShow) ? (
+              {open.status === 'confirmed' && (!open.startsAt || open.canMarkNoShow || open.live) ? (
                 <button className="btn" type="button" disabled={busy} onClick={() => void act(() => completeSession(open.id))}>{busy ? <Spinner /> : null} Mark as done</button>
               ) : null}
               {open.status === 'confirmed' && open.canMarkNoShow ? (

@@ -4,6 +4,8 @@ import { api, type BookingInput, type BookingMode, type BookingStatus, type NewA
 
 // Waiting on the system to find a coach: keep the screen fresh without the customer pulling.
 const isSearchingStatus = (status: BookingStatus | undefined) => status === 'matching' || status === 'rematching';
+// A confirmed session is checked often too, so "live" and "completed" appear within seconds of the coach's code.
+const isWatchedStatus = (status: BookingStatus | undefined) => isSearchingStatus(status) || status === 'confirmed';
 
 export function useService(slug: string) {
   return useQuery({ queryKey: ['service', slug], queryFn: () => api.getService(slug) });
@@ -65,7 +67,7 @@ export function useBooking(id: string) {
     queryKey: ['booking', id],
     queryFn: () => api.getBooking(id),
     // While a coach is being matched, keep checking so the screen updates by itself.
-    refetchInterval: (query) => (isSearchingStatus(query.state.data?.status) ? 5000 : false),
+    refetchInterval: (query) => (isWatchedStatus(query.state.data?.status) ? 5000 : false),
   });
 }
 
@@ -74,7 +76,7 @@ export function useBookings() {
     queryKey: ['bookings'],
     queryFn: () => api.listBookings(),
     // A trainer cancelling can happen any time, so the list keeps itself current.
-    refetchInterval: (query) => (query.state.data?.some((b) => isSearchingStatus(b.status)) ? 5000 : false),
+    refetchInterval: (query) => (query.state.data?.some((b) => isWatchedStatus(b.status)) ? 5000 : false),
   });
 }
 
@@ -187,4 +189,12 @@ export function useSimulateTrainerCancel(id: string) {
 
 export function usePreviewDiscount() {
   return useMutation({ mutationFn: (input: { code: string; serviceSlug: string; mode: BookingMode }) => api.previewDiscount(input) });
+}
+
+export function useRateBooking(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { stars: number; comment?: string }) => api.rateBooking(id, input.stars, input.comment),
+    onSuccess: () => Promise.all([queryClient.invalidateQueries({ queryKey: ['booking', id] }), queryClient.invalidateQueries({ queryKey: ['bookings'] })]),
+  });
 }

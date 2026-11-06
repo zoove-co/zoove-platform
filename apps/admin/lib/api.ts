@@ -336,7 +336,7 @@ export type SessionStatus = 'matching' | 'confirmed' | 'rematching' | 'completed
 export type AdminSession = {
   id: string; sessionCode: string; status: SessionStatus; mode: string; participant: string; groupSize: number | null; serviceName: string; formatName: string;
   startsAt: string | null; whenLabel: string; startPassed: boolean; area: string | null; customerName: string; customerContact: string;
-  trainerId: string | null; trainerName: string | null; trainerCancelCount: number; trainerCancelledAt: string | null; canMarkNoShow: boolean; totalPaise: number; paidWithCredit: boolean; discountCode: string | null; createdAt: string;
+  trainerId: string | null; trainerName: string | null; trainerCancelCount: number; trainerCancelledAt: string | null; canMarkNoShow: boolean; live: boolean; startedAt: string | null; rating: number | null; totalPaise: number; paidWithCredit: boolean; discountCode: string | null; createdAt: string;
 };
 export type SessionDetail = AdminSession & {
   addressLabel: string; addressLine: string; pincode: string | null; recipient: { name: string; phone: string } | null;

@@ -4,9 +4,9 @@ import { getJobs, type JobBoard } from '@/lib/api';
 
 export const JOBS_KEY = ['jobs'] as const;
 
-/** The job board. It checks again every 20 seconds, so a new job shows up by itself. */
+/** The job board. It checks again every 4 seconds, so a new job shows up almost at once (it pauses while the app is in the background). */
 export function useJobs() {
-  return useQuery({ queryKey: JOBS_KEY, queryFn: getJobs, refetchInterval: 20_000, staleTime: 10_000 });
+  return useQuery({ queryKey: JOBS_KEY, queryFn: getJobs, refetchInterval: 4_000, staleTime: 2_000 });
 }
 
 export function useSetBoard() {

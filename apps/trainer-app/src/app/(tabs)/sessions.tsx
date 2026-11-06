@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { Banner } from '@/components/ui/Banner';
@@ -8,12 +8,13 @@ import { Card } from '@/components/ui/Card';
 import { Chip } from '@/components/ui/Chip';
 import { Screen } from '@/components/ui/Screen';
 import { TextField } from '@/components/ui/TextField';
-import { cancelJob, completeJob, errorMessage, type JobBoard } from '@/lib/api';
+import { cancelJob, checkInJob, checkOutJob, errorMessage, type JobBoard } from '@/lib/api';
 import { SessionNote } from '@/features/jobs/SessionNote';
 import { useJobs, useSetBoard, whoFor } from '@/lib/useJobs';
 import { colors } from '@/theme';
 
-// The sessions this trainer holds: address after accepting, "Session done" after the start time, and "I cannot make it".
+// The sessions this trainer holds: address after accepting, then the customer's start code on arrival (the session goes live)
+// and the customer's finish code after the training (the session is done), and "I cannot make it".
 export default function Sessions() {
   const jobs = useJobs();
   const setBoard = useSetBoard();
@@ -23,6 +24,7 @@ export default function Sessions() {
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [showDone, setShowDone] = useState(false);
+  const [codes, setCodes] = useState<Record<string, string>>({});
 
   async function run(id: string, action: () => Promise<JobBoard>, done: string) {
     setBusy(id);
@@ -41,12 +43,7 @@ export default function Sessions() {
     }
   }
 
-  function confirmDone(id: string) {
-    Alert.alert('Mark this session as done?', 'Only do this after you have trained the client.', [
-      { text: 'Not yet', style: 'cancel' },
-      { text: 'Session done', onPress: () => void run(id, () => completeJob(id), 'Thank you. The session is marked done.') },
-    ]);
-  }
+  const setCode = (id: string, value: string) => setCodes((all) => ({ ...all, [id]: value.replace(/\D/g, '').slice(0, 4) }));
 
   const mine = jobs.data?.mine ?? [];
   const done = jobs.data?.done ?? [];
@@ -84,9 +81,16 @@ export default function Sessions() {
 
           <SessionNote id={job.id} note={job.note} />
 
-          {job.canComplete ? (
-            <View style={{ marginTop: 10 }}>
-              <Button label="Session done" small loading={busy === job.id} onPress={() => confirmDone(job.id)} />
+          {job.started ? (
+            <View style={{ marginTop: 10, gap: 10 }}>
+              <Banner tone="good">This session is live.</Banner>
+              <TextField label="Finish code" placeholder="4 digits" keyboardType="number-pad" maxLength={4} value={codes[job.id] ?? ''} onChangeText={(v) => setCode(job.id, v)} hint="After the training, ask the customer for the finish code in their app." />
+              <Button label="Finish session" small loading={busy === job.id} disabled={(codes[job.id] ?? '').length !== 4} onPress={() => void run(job.id, () => checkOutJob(job.id, codes[job.id] ?? ''), 'Thank you. The session is done.')} />
+            </View>
+          ) : job.canCheckIn ? (
+            <View style={{ marginTop: 10, gap: 10 }}>
+              <TextField label="Start code" placeholder="4 digits" keyboardType="number-pad" maxLength={4} value={codes[job.id] ?? ''} onChangeText={(v) => setCode(job.id, v)} hint="When you arrive, ask the customer for the start code in their app." />
+              <Button label="Start session" small loading={busy === job.id} disabled={(codes[job.id] ?? '').length !== 4} onPress={() => void run(job.id, () => checkInJob(job.id, codes[job.id] ?? ''), 'The session is live.')} />
             </View>
           ) : null}
 

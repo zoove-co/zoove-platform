@@ -217,12 +217,14 @@ export async function listServices(): Promise<Service[]> {
 
 // ---- Jobs: open sessions nobody has taken (first to accept gets it) and the trainer's own sessions ----
 export type OpenJob = { id: string; sessionCode: string; serviceName: string; formatName: string; startsAt: string | null; whenLabel: string; participant: string; groupSize: number | null; area: string | null; nearness: 'same_pincode' | 'near_you' | 'elsewhere' | null };
-export type MyJob = OpenJob & { customerFirstName: string; addressLabel: string; addressLine: string; pincode: string | null; canCancel: boolean; canComplete: boolean; note: string };
+export type MyJob = OpenJob & { customerFirstName: string; addressLabel: string; addressLine: string; pincode: string | null; canCancel: boolean; canCheckIn: boolean; started: boolean; startedAt: string | null; note: string };
 export type DoneJob = OpenJob & { customerFirstName: string; completedAt: string | null; note: string };
 export type JobBoard = { acceptingJobs: boolean; open: OpenJob[]; mine: MyJob[]; done: DoneJob[]; doneCount: number };
 export const getJobs = () => call<JobBoard>('/v1/trainer/jobs');
 export const acceptJob = (id: string) => call<JobBoard>(`/v1/trainer/jobs/${id}/accept`, { method: 'POST', json: {} });
-export const completeJob = (id: string) => call<JobBoard>(`/v1/trainer/jobs/${id}/complete`, { method: 'POST', json: {} });
+// The customer shows a 4-digit start code on arrival and a finish code after the training.
+export const checkInJob = (id: string, code: string) => call<JobBoard>(`/v1/trainer/jobs/${id}/check-in`, { method: 'POST', json: { code } });
+export const checkOutJob = (id: string, code: string) => call<JobBoard>(`/v1/trainer/jobs/${id}/check-out`, { method: 'POST', json: { code } });
 export const cancelJob = (id: string, reason: string) => call<JobBoard>(`/v1/trainer/jobs/${id}/cancel`, { method: 'POST', json: { reason } });
 
 // ---- Push messages (same endpoints the customer app uses) ----

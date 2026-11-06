@@ -31,6 +31,7 @@ const createSchema = z.object({
   if (value.participant !== 'loved_one' && value.recipient) ctx.addIssue({ code: 'custom', path: ['recipient'], message: 'Name and number are only for Loved one bookings.' });
 });
 const rescheduleSchema = z.object({ startsAt: z.iso.datetime({ offset: true }) });
+const ratingSchema = z.object({ stars: z.number().int().min(1).max(5), comment: z.string().trim().max(500).optional() });
 const slotsSchema = z.object({ service: z.string().trim().min(1).max(60), date: z.string() });
 
 @ApiTags('bookings')
@@ -78,5 +79,11 @@ export class BookingsController {
   @ApiOperation({ summary: 'Cancel a session' })
   cancel(@CurrentUser() user: AuthUser, @Param('id', new ZodValidationPipe(idSchema)) id: string): Promise<Booking> {
     return this.bookings.cancel(user.id, id);
+  }
+
+  @Post('bookings/:id/rating')
+  @ApiOperation({ summary: 'Rate the trainer (1 to 5 stars) after a session is complete. Once per session.' })
+  rate(@CurrentUser() user: AuthUser, @Param('id', new ZodValidationPipe(idSchema)) id: string, @Body(new ZodValidationPipe(ratingSchema)) body: z.infer<typeof ratingSchema>): Promise<Booking> {
+    return this.bookings.rate(user.id, id, body.stars, body.comment && body.comment !== '' ? body.comment : null);
   }
 }

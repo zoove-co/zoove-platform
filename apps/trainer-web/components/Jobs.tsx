@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { acceptJob, ApiError, cancelJob, completeJob, getJobs, type JobBoard, type MyJob, type OpenJob } from '@/lib/api';
+import { acceptJob, ApiError, cancelJob, checkInJob, checkOutJob, getJobs, type JobBoard, type MyJob, type OpenJob } from '@/lib/api';
 import { Spinner } from './ui';
 
 const PEOPLE: Record<string, string> = { personal: 'Personal', duo: 'Duo', loved_one: 'Loved one', group: 'Group' };
@@ -15,6 +15,7 @@ export function Jobs({ onExpired }: { onExpired: () => void }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [reason, setReason] = useState('');
+  const [codes, setCodes] = useState<Record<string, string>>({});
   const [note, setNote] = useState<string | null>(null);
 
   const fail = useCallback((err: unknown) => {
@@ -55,8 +56,11 @@ export function Jobs({ onExpired }: { onExpired: () => void }) {
           <div>{j.serviceName} · {j.formatName} · {who(j)}</div>
           <div className="muted small" style={{ marginTop: 6 }}>{j.customerFirstName} · {j.addressLabel}: {j.addressLine}{j.pincode ? `, ${j.pincode}` : ''}</div>
           <div className="muted small">Session {j.sessionCode}</div>
-          {j.canComplete ? (
-            <button className="btn small" type="button" style={{ marginTop: 10, marginRight: 8 }} disabled={busy === j.id} onClick={() => void run(j.id, () => completeJob(j.id), 'Thank you. The session is marked done.')}>{busy === j.id ? <Spinner /> : null} Session done</button>
+          {j.started || j.canCheckIn ? (
+            <div style={{ marginTop: 10 }}>
+              <label className="field"><span>{j.started ? 'Finish code (ask the customer after the training)' : 'Start code (ask the customer when you arrive)'}</span><input inputMode="numeric" maxLength={4} value={codes[j.id] ?? ''} onChange={(e) => setCodes((all) => ({ ...all, [j.id]: e.target.value.replace(/\D/g, '').slice(0, 4) }))} placeholder="4 digits" /></label>
+              <button className="btn small" type="button" style={{ marginTop: 8, marginRight: 8 }} disabled={busy === j.id || (codes[j.id] ?? '').length !== 4} onClick={() => void run(j.id, () => (j.started ? checkOutJob : checkInJob)(j.id, codes[j.id] ?? ''), j.started ? 'Thank you. The session is done.' : 'The session is live.')}>{busy === j.id ? <Spinner /> : null} {j.started ? 'Finish session' : 'Start session'}</button>
+            </div>
           ) : null}
           {j.canCancel ? (
             cancelling === j.id ? (

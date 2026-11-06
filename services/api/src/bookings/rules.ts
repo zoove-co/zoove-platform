@@ -66,3 +66,9 @@ export function formatWhen(date: Date): string {
   const p = istParts(date);
   return `${WEEKDAYS[p.weekday]}, ${p.day} ${MONTHS[p.month]} · ${formatClock(date)}`;
 }
+
+// Check-in and check-out codes (assumptions until the founders decide): a trainer can check in this long before the start
+// time; this many wrong codes lock the session's codes for CODE_LOCK_MINUTES.
+export const CHECK_IN_EARLY_MINUTES = 30;
+export const MAX_CODE_ATTEMPTS = 5;
+export const CODE_LOCK_MINUTES = 15;

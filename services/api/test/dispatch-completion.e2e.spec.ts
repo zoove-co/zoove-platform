@@ -85,7 +85,13 @@ suite('finding a coach, closing sessions, and telling people', () => {
   const instant = async (t: string, addressId: string) => (await book(t, addressId, { mode: 'instant' }).expect(201)).body.id as string;
   const alertedTo = async (bookingId: string) => (await pool.query<{ trainer_id: string }>(`select trainer_id from job_alerts where booking_id = $1`, [bookingId])).rows.map((r) => r.trainer_id).sort();
   const sorted = (...ids: string[]) => [...ids].sort();
-  const board = async (t: string) => (await http().get('/v1/trainer/jobs').set(as(t)).expect(200)).body as { open: { id: string }[]; mine: { id: string; canComplete: boolean }[] };
+  const board = async (t: string) => (await http().get('/v1/trainer/jobs').set(as(t)).expect(200)).body as { open: { id: string }[]; mine: { id: string; canCheckIn: boolean }[] };
+  // Check in and out with the session's own codes (the way the customer would hand them over).
+  const finish = async (t: string, id: string) => {
+    const c = (await pool.query(`select start_code, end_code from bookings where id = $1`, [id])).rows[0] as { start_code: string; end_code: string };
+    await http().post(`/v1/trainer/jobs/${id}/check-in`).set(as(t)).send({ code: c.start_code }).expect(200);
+    await http().post(`/v1/trainer/jobs/${id}/check-out`).set(as(t)).send({ code: c.end_code }).expect(200);
+  };
   const accept = (t: string, id: string) => http().post(`/v1/trainer/jobs/${id}/accept`).set(as(t));
   const statusOf = async (id: string) => (await pool.query<{ status: string }>(`select status from bookings where id = $1`, [id])).rows[0]!.status;
   const emailsTo = (to: string) => mail.sent.filter((m) => m.to === to);
@@ -327,8 +333,8 @@ suite('finding a coach, closing sessions, and telling people', () => {
       const id = await instant(customer, await addressFor(customer));
       await dispatch().runOnce();
       await accept(t.token, id).expect(200);
-      expect((await board(t.token)).mine.find((j) => j.id === id)?.canComplete).toBe(true);
-      await http().post(`/v1/trainer/jobs/${id}/complete`).set(as(t.token)).expect(200);
+      expect((await board(t.token)).mine.find((j) => j.id === id)?.canCheckIn).toBe(true);
+      await finish(t.token, id);
       const row = (await pool.query(`select status, starts_at, completed_at from bookings where id = $1`, [id])).rows[0];
       expect(row.status).toBe('completed');
       expect(row.starts_at).not.toBeNull();
@@ -343,20 +349,52 @@ suite('finding a coach, closing sessions, and telling people', () => {
       await dispatch().runOnce();
       await accept(t.token, id).expect(200);
 
-      await http().post(`/v1/trainer/jobs/${id}/complete`).set(as(t.token)).expect(409); // not started yet
+      const code = async (col: string) => (await pool.query(`select ${col} as c from bookings where id = $1`, [id])).rows[0].c as string;
+      await http().post(`/v1/trainer/jobs/${id}/check-in`).set(as(t.token)).send({ code: await code('start_code') }).expect(409); // far too early
+      await http().post(`/v1/trainer/jobs/${id}/check-out`).set(as(t.token)).send({ code: await code('end_code') }).expect(409); // not checked in
       await pool.query(`update bookings set starts_at = now() - interval '1 hour' where id = $1`, [id]);
-      await http().post(`/v1/trainer/jobs/${id}/complete`).set(as(stranger.token)).expect(409); // not theirs
+      await http().post(`/v1/trainer/jobs/${id}/check-in`).set(as(stranger.token)).send({ code: await code('start_code') }).expect(409); // not theirs
+      const wrong = (await code('start_code')) === '0000' ? '1111' : '0000';
+      await http().post(`/v1/trainer/jobs/${id}/check-in`).set(as(t.token)).send({ code: wrong }).expect(400);
+      const live = (await http().post(`/v1/trainer/jobs/${id}/check-in`).set(as(t.token)).send({ code: await code('start_code') }).expect(200)).body as Awaited<ReturnType<typeof board>>;
+      expect(live.mine.find((j) => j.id === id)).toMatchObject({ started: true, canCheckIn: false, canCancel: false });
+      const seen = (await http().get(`/v1/bookings/${id}`).set(as(customer)).expect(200)).body as { inProgress: boolean; startCode: string | null; endCode: string | null };
+      expect(seen).toMatchObject({ inProgress: true, startCode: null, endCode: await code('end_code') });
+      expect((await http().get('/v1/admin/sessions?filter=upcoming').set(as(owner)).expect(200)).body.find((x: { id: string }) => x.id === id)).toMatchObject({ live: true });
+      await http().post(`/v1/trainer/jobs/${id}/check-out`).set(as(t.token)).send({ code: '12' }).expect(400); // not 4 digits
       const streakBefore = (await http().get('/v1/streak').set(as(customer)).expect(200)).body.totalSessions as number;
 
       await pool.query(`delete from outbox_events where event_type = 'booking.completed'`);
-      await http().post(`/v1/trainer/jobs/${id}/complete`).set(as(t.token)).expect(200);
-      await http().post(`/v1/trainer/jobs/${id}/complete`).set(as(t.token)).expect(200); // closing twice changes nothing
+      await finish(t.token, id);
+      await http().post(`/v1/trainer/jobs/${id}/check-out`).set(as(t.token)).send({ code: await code('end_code') }).expect(200); // closing twice changes nothing
       expect(await statusOf(id)).toBe('completed');
       expect((await pool.query(`select count(*)::int as n from outbox_events where event_type = 'booking.completed' and aggregate_id = $1`, [id])).rows[0].n).toBe(1);
       expect((await http().get('/v1/streak').set(as(customer)).expect(200)).body.totalSessions).toBe(streakBefore + 1);
       const notes = (await http().get('/v1/notifications').set(as(customer)).expect(200)).body as { title: string }[];
       expect(notes.some((x) => x.title === 'Session complete')).toBe(true);
       await http().post(`/v1/bookings/${id}/cancel`).set(as(customer)).expect(409);
+
+      // Rating: the customer, once, 1 to 5.
+      const done = (await http().get(`/v1/bookings/${id}`).set(as(customer)).expect(200)).body as { canRate: boolean };
+      expect(done.canRate).toBe(true);
+      await http().post(`/v1/bookings/${id}/rating`).set(as(customer)).send({ stars: 6 }).expect(400);
+      const rated = (await http().post(`/v1/bookings/${id}/rating`).set(as(customer)).send({ stars: 5, comment: 'Great session' }).expect(201)).body as { rating: number; canRate: boolean };
+      expect(rated).toMatchObject({ rating: 5, canRate: false });
+      await http().post(`/v1/bookings/${id}/rating`).set(as(customer)).send({ stars: 1 }).expect(409);
+      expect((await pool.query(`select stars, trainer_id from session_ratings where booking_id = $1`, [id])).rows[0]).toMatchObject({ stars: 5, trainer_id: t.id });
+      expect((await pool.query(`select count(*)::int as n from outbox_events where event_type = 'booking.rated' and aggregate_id = $1`, [id])).rows[0].n).toBe(1);
+    });
+
+    it('locks the codes after five wrong tries', async () => {
+      const t = await trainer('Locker', '400050');
+      const id = await scheduled(customer, await addressFor(customer), slot(14));
+      await dispatch().runOnce();
+      await accept(t.token, id).expect(200);
+      await pool.query(`update bookings set starts_at = now() - interval '10 minutes', start_code = '4321' where id = $1`, [id]);
+      for (let i = 0; i < 5; i++) await http().post(`/v1/trainer/jobs/${id}/check-in`).set(as(t.token)).send({ code: '1111' }).expect(400);
+      await http().post(`/v1/trainer/jobs/${id}/check-in`).set(as(t.token)).send({ code: '4321' }).expect(429); // even the right one
+      await pool.query(`update bookings set code_attempt_at = now() - interval '20 minutes' where id = $1`, [id]);
+      await http().post(`/v1/trainer/jobs/${id}/check-in`).set(as(t.token)).send({ code: '4321' }).expect(200);
     });
 
     it('lets ops close a session too, and refuses one with no trainer', async () => {

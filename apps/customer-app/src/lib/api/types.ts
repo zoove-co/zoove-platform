@@ -202,7 +202,13 @@ export interface Booking {
   overdue: boolean;
   // Decided by the server (rule lives in the API, never in the app).
   canChange: boolean;
-  inProgress: boolean; // a confirmed session whose time is running now
+  inProgress: boolean; // live: the coach entered the start code
+  startedAt: string | null;
+  // Shown to the customer to hand to the coach: the start code on arrival (until the session is live), then the finish code.
+  startCode: string | null;
+  endCode: string | null;
+  rating: number | null; // 1 to 5 once the customer rated the coach
+  canRate: boolean; // a finished session not rated yet
 }
 
 export interface UpcomingSessionSummary {
@@ -437,4 +443,5 @@ export interface Api {
   // Development only: the mock implements it so the trainer-cancel flow can be tried by hand.
   dev?: { simulateTrainerCancel(id: string): Promise<void> };
   cancelBooking(id: string): Promise<Booking>;
+  rateBooking(id: string, stars: number, comment?: string): Promise<Booking>;
 }

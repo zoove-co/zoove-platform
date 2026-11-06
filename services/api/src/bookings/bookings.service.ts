@@ -47,8 +47,16 @@ export type Booking = {
   discountCode: string | null;
   paidWithCredit: boolean;
   canChange: boolean;
-  // A confirmed session whose scheduled time is running now (start until start + the service's longest length). Derived from the clock until trainers can check in.
+  // Live: the trainer entered the start code. Not derived from the clock any more.
   inProgress: boolean;
+  startedAt: string | null;
+  // The customer shows this to the trainer on arrival (until the session is live).
+  startCode: string | null;
+  // The customer shows this to the trainer when the training is over (only while the session is live).
+  endCode: string | null;
+  // 1 to 5 once the customer rated a finished session.
+  rating: number | null;
+  canRate: boolean;
 };
 
 export type TimeSlot = { id: string; startsAt: string; label: string; available: boolean };
@@ -92,13 +100,17 @@ export type Row = {
   unfilled_notified_at: Date | null;
   coach_id: string | null;
   coach_name: string | null;
+  started_at: Date | null;
+  start_code: string;
+  end_code: string;
+  rating_stars: number | null;
 };
 
 // ZV- plus the last 8 characters of the booking id. The ops list searches by the same rule.
 export const sessionCodeOf = (id: string): string => `ZV-${id.replace(/-/g, '').slice(-8).toUpperCase()}`;
 
 export const BOOKING_SELECT = `select b.id, b.mode, b.participant, b.group_size, b.recipient_name, b.recipient_phone, b.status, b.starts_at, b.address_label, b.address_area, b.total_paise, b.discount_paise, b.discount_code, b.package_purchase_id,
-                       b.request_fingerprint, b.trainer_cancelled_at, b.unfilled_notified_at, b.coach_id, coalesce(c.full_name, (select ta.first_name from trainers t join trainer_applications ta on ta.id = t.application_id where t.user_id = b.coach_id)) as coach_name,
+                       b.request_fingerprint, b.trainer_cancelled_at, b.unfilled_notified_at, b.coach_id, b.started_at, b.start_code, b.end_code, (select r.stars from session_ratings r where r.booking_id = b.id) as rating_stars, coalesce(c.full_name, (select ta.first_name from trainers t join trainer_applications ta on ta.id = t.application_id where t.user_id = b.coach_id)) as coach_name,
                        s.slug as service_slug, s.name as service_name, f.name as format_name, s.duration_max_minutes
                   from bookings b
                   join services s on s.id = b.service_id
@@ -115,10 +127,8 @@ export function canChange(status: BookingStatus, startsAt: Date | null, now: Dat
   return startsAt.getTime() - now.getTime() >= CHANGE_WINDOW_MS;
 }
 
-export function isInProgress(status: BookingStatus, startsAt: Date | null, durationMaxMinutes: number, now: Date): boolean {
-  if (status !== 'confirmed' || !startsAt) return false;
-  const start = startsAt.getTime();
-  return start <= now.getTime() && now.getTime() < start + durationMaxMinutes * 60_000;
+export function isInProgress(status: BookingStatus, startedAt: Date | null): boolean {
+  return status === 'confirmed' && startedAt !== null;
 }
 
 export function bookingFromRow(row: Row, now = new Date()): Booking {
@@ -147,7 +157,12 @@ export function bookingFromRow(row: Row, now = new Date()): Booking {
     discountCode: row.discount_code,
     paidWithCredit: row.package_purchase_id !== null,
     canChange: canChange(row.status, row.starts_at, now),
-    inProgress: isInProgress(row.status, row.starts_at, row.duration_max_minutes, now),
+    inProgress: isInProgress(row.status, row.started_at),
+    startedAt: row.started_at ? row.started_at.toISOString() : null,
+    startCode: row.status === 'confirmed' && row.started_at === null ? row.start_code : null,
+    endCode: row.status === 'confirmed' && row.started_at !== null ? row.end_code : null,
+    rating: row.rating_stars,
+    canRate: row.status === 'completed' && row.coach_id !== null && row.rating_stars === null,
   };
 }
 
@@ -322,6 +337,19 @@ export class BookingsService {
       if (isUnique(error, 'bookings_no_double_booking')) throw new DomainError('SLOT_CONFLICT', 'You already have a session at that time.');
       throw error;
     }
+    return this.get(userId, id);
+  }
+
+  // The customer rates the trainer once the session is closed (1 to 5 stars, optional short comment). One rating per session.
+  async rate(userId: string, id: string, stars: number, comment: string | null): Promise<Booking> {
+    await this.db.tx(async (client) => {
+      const row = await this.lock(client, userId, id);
+      if (row.status !== 'completed' || !row.coach_id) throw new DomainError('INVALID_STATE', 'You can rate a session once it is complete.');
+      if (row.rating_stars !== null) throw new DomainError('INVALID_STATE', 'You already rated this session.');
+      await client.query(`insert into session_ratings (booking_id, user_id, trainer_id, stars, comment) values ($1, $2, $3, $4, $5)`, [id, userId, row.coach_id, stars, comment]);
+      await this.record(client, id, 'rated', 'customer', { stars, trainerId: row.coach_id });
+      await this.publish(client, id, 'booking.rated', { bookingId: id, userId, trainerId: row.coach_id, stars });
+    });
     return this.get(userId, id);
   }
 

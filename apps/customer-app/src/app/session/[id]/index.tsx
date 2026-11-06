@@ -14,7 +14,7 @@ import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { openSupport } from '@/lib/support';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { TabFooter } from '@/components/ui/TabFooter';
-import { useBooking, useCancelBooking, useSimulateTrainerCancel } from '@/features/booking/hooks';
+import { useBooking, useCancelBooking, useRateBooking, useSimulateTrainerCancel } from '@/features/booking/hooks';
 import { api } from '@/lib/api';
 import { isActiveStatus } from '@/lib/api/status';
 import { track } from '@/lib/analytics/track';
@@ -39,6 +39,8 @@ export default function SessionDetailScreen() {
   const { data: booking, isPending, isError } = useBooking(id);
   const cancel = useCancelBooking(id);
   const simulateCancel = useSimulateTrainerCancel(id);
+  const rate = useRateBooking(id);
+  const [stars, setStars] = useState(0);
   const [confirming, setConfirming] = useState(false);
 
   if (isPending) {
@@ -117,6 +119,49 @@ export default function SessionDetailScreen() {
             <DetailRow icon="pricetag-outline" text={t('session.code', { code: booking.sessionCode })} />
           </View>
         </View>
+
+        {booking.startCode || booking.endCode ? (
+          <View style={styles.codeCard}>
+            <AppText variant="bodyStrong">{booking.endCode ? t('session.endCodeTitle') : t('session.startCodeTitle')}</AppText>
+            <AppText variant="heading" style={styles.code}>
+              {(booking.endCode ?? booking.startCode ?? '').split('').join(' ')}
+            </AppText>
+            <AppText variant="caption" color={colors.muted} style={styles.note}>
+              {booking.endCode ? t('session.endCodeBody') : t('session.startCodeBody')}
+            </AppText>
+          </View>
+        ) : null}
+
+        {booking.canRate || booking.rating !== null ? (
+          <View style={styles.codeCard}>
+            <AppText variant="bodyStrong">{booking.rating !== null ? t('session.rateThanks') : t('session.rateTitle')}</AppText>
+            <View style={styles.stars}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <Pressable
+                  key={n}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('session.rateStarsLabel', { count: n })}
+                  disabled={booking.rating !== null}
+                  onPress={() => setStars(n)}>
+                  <Icon name={n <= (booking.rating ?? stars) ? 'star' : 'star-outline'} size={34} color={colors.purple} />
+                </Pressable>
+              ))}
+            </View>
+            {booking.rating === null ? (
+              <>
+                <AppText variant="caption" color={colors.muted} style={styles.note}>
+                  {t('session.rateBody')}
+                </AppText>
+                <PrimaryButton label={t('session.rateSubmit')} disabled={stars === 0} loading={rate.isPending} onPress={() => rate.mutate({ stars })} />
+                {rate.isError ? (
+                  <AppText variant="caption" color={colors.danger} style={styles.note}>
+                    {t('session.rateError')}
+                  </AppText>
+                ) : null}
+              </>
+            ) : null}
+          </View>
+        ) : null}
 
         {booking.overdue ? (
           <View style={styles.banner}>
@@ -310,6 +355,17 @@ const styles = StyleSheet.create({
     borderWidth: 0.8,
     borderColor: colors.line,
   },
+  codeCard: {
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: 18,
+    borderRadius: radius.lg,
+    backgroundColor: colors.lavender,
+    borderWidth: 0.8,
+    borderColor: colors.purple,
+  },
+  code: { fontSize: 40, lineHeight: 48, letterSpacing: 6, color: colors.purple },
+  stars: { flexDirection: 'row', gap: 6 },
   detailRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   detailText: { flex: 1 },
   actions: { gap: spacing.sm },

@@ -63,7 +63,7 @@ export class CustomerService {
     const done = bookings.rows.filter((row) => row.status === 'completed' && row.starts_at && row.starts_at.getTime() >= weekStart && row.starts_at.getTime() < weekStart + WEEK_MS).length;
     const activeRows = bookings.rows.filter((row) => ACTIVE.has(row.status));
     // A session that is on right now comes first, then the soonest.
-    const next = activeRows.find((row) => isInProgress(row.status, row.starts_at, row.duration_max_minutes, now)) ?? activeRows[0];
+    const next = activeRows.find((row) => isInProgress(row.status, row.started_at)) ?? activeRows[0];
     const upcoming = next ? bookingFromRow(next, now) : null;
     const goal = (await this.db.query<{ d: number | null }>(`select target_days_per_week as d from customer_profiles where user_id = $1`, [userId])).rows[0]?.d ?? WEEKLY_GOAL;
 

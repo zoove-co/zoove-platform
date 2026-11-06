@@ -212,6 +212,7 @@ export const httpApi: Api = {
   getBooking: (id) => call<Booking>('GET', `/v1/bookings/${encodeURIComponent(id)}`),
   listBookings: () => call<Booking[]>('GET', '/v1/bookings'),
   rescheduleBooking: (id, startsAt) => call<Booking>('POST', `/v1/bookings/${encodeURIComponent(id)}/reschedule`, { startsAt }),
+  rateBooking: (id, stars, comment) => call<Booking>('POST', `/v1/bookings/${encodeURIComponent(id)}/rating`, comment ? { stars, comment } : { stars }),
   cancelBooking: (id) => call<Booking>('POST', `/v1/bookings/${encodeURIComponent(id)}/cancel`),
 
   listPastCoaches: () => call<PastCoach[]>('GET', '/v1/coaches/past'),

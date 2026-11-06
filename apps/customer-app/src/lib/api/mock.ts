@@ -271,7 +271,7 @@ function pickCoach(preferredId: string | undefined, startsAt: string | null, bus
   return COACHES.find((item) => coachAvailable(item.id, startsAt, busy)) ?? null;
 }
 
-type BookingRecord = Omit<Booking, 'canChange' | 'inProgress' | 'sessionCode' | 'trainerCancelled' | 'overdue'> & {
+type BookingRecord = Omit<Booking, 'canChange' | 'inProgress' | 'sessionCode' | 'trainerCancelled' | 'overdue' | 'startedAt' | 'startCode' | 'endCode' | 'rating' | 'canRate'> & {
   addressId: string | null;
   preferredCoachId?: string;
   // Coaches who cancelled this booking, so a replacement is never the same person.
@@ -423,6 +423,8 @@ function isChangeable(record: BookingRecord): boolean {
   return new Date(record.startsAt).getTime() - Date.now() >= CHANGE_WINDOW_MS;
 }
 
+const mockRatings = new Map<string, number>();
+
 const toBooking = (record: BookingRecord): Booking => {
   const { addressId: _a, preferredCoachId: _p, cancelledCoachIds: _c, ...rest } = record;
   void _a;
@@ -432,7 +434,15 @@ const toBooking = (record: BookingRecord): Booking => {
   const inProgress = record.status === 'confirmed' && start !== null && start <= Date.now() && Date.now() < start + 60 * 60_000;
   const sessionCode = `ZV-${record.id.replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase()}`;
   const overdue = (record.status === 'matching' || record.status === 'rematching') && start !== null && start <= Date.now();
-  return { ...rest, sessionCode, trainerCancelled: record.status === 'rematching' && record.cancelledCoachIds.length > 0, overdue, canChange: isChangeable(record), inProgress };
+  const rating = mockRatings.get(record.id) ?? null;
+  return {
+    ...rest, sessionCode, trainerCancelled: record.status === 'rematching' && record.cancelledCoachIds.length > 0, overdue, canChange: isChangeable(record), inProgress,
+    startedAt: inProgress ? new Date(start ?? Date.now()).toISOString() : null,
+    startCode: record.status === 'confirmed' && !inProgress ? '4821' : null,
+    endCode: inProgress ? '7350' : null,
+    rating,
+    canRate: record.status === 'completed' && record.coach !== null && rating === null,
+  };
 };
 
 // ---------------------------------------------------------------------------
@@ -1044,6 +1054,14 @@ export const mockApi: Api = {
       }
     }
     notify('Session rescheduled', `${record.serviceName} is now on ${record.whenLabel}.`, id);
+    return toBooking(record);
+  },
+
+  async rateBooking(id, stars) {
+    await wait(300);
+    const record = findRecord(id);
+    if (record.status !== 'completed') throw new ApiError('INVALID_STATE');
+    mockRatings.set(id, stars);
     return toBooking(record);
   },
 

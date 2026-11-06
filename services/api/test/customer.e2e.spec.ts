@@ -64,11 +64,11 @@ suite('home, notifications, streak', () => {
     expect(Number.isInteger(home.body.scheduled.pricePaise)).toBe(true);
   });
 
-  it('a confirmed session is "in progress" only while its time is running, and Home puts it first', async () => {
+  it('a confirmed session is "in progress" once the trainer has checked in, and Home puts it first', async () => {
     const address = await addressFor(token);
     const later = await book(token, address, slot(5)).expect(201);
     const running = await book(token, address, slot(6)).expect(201);
-    await pool.query(`update bookings set status = 'confirmed', starts_at = now() - interval '10 minutes' where id = $1`, [running.body.id]);
+    await pool.query(`update bookings set status = 'confirmed', starts_at = now() - interval '10 minutes', started_at = now() - interval '9 minutes' where id = $1`, [running.body.id]);
 
     const home = await http().get('/v1/home').set(as(token)).expect(200);
     expect(home.body.upcomingSession).toMatchObject({ id: running.body.id, inProgress: true });
@@ -76,7 +76,7 @@ suite('home, notifications, streak', () => {
     expect(list.body.find((b: { id: string }) => b.id === running.body.id).inProgress).toBe(true);
     expect(list.body.find((b: { id: string }) => b.id === later.body.id).inProgress).toBe(false);
 
-    await pool.query(`update bookings set starts_at = now() - interval '5 hours' where id = $1`, [running.body.id]);
+    await pool.query(`update bookings set started_at = null where id = $1`, [running.body.id]);
     const after = await http().get('/v1/bookings').set(as(token)).expect(200);
     expect(after.body.find((b: { id: string }) => b.id === running.body.id).inProgress).toBe(false);
   });

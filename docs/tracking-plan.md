@@ -64,7 +64,9 @@ They only leave once the CleverTap keys are set in Render. Catalog: `services/ap
 | coach_cancelled | The trainer cancelled | same as booking_confirmed |
 | session_overdue | Start time passed with no trainer | same as booking_confirmed |
 | session_unfilled | Instant session nobody took within the limit (customer offered a date or cancel) | same as booking_confirmed |
-| session_completed | Trainer or ops closed the session. Use this for "10 days after the last session" and streak journeys | same as booking_confirmed |
+| session_started | Trainer entered the start (check-in) code: the session is live | same as booking_confirmed |
+| session_rated | Customer rated the trainer | same as booking_confirmed, plus stars (1 to 5) |
+| session_completed | Trainer entered the finish code, or ops closed the session. Use this for "10 days after the last session" and streak journeys | same as booking_confirmed |
 | package_ordered, package_paid | Package ordered / marked paid | purchase_id, package_id, sessions_count, amount_paise |
 | reward_granted | Referral reward made | reward_side |
 | party_requested | Party request sent | request_id, occasion, guests, service_slug |
