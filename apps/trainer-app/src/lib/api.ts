@@ -200,11 +200,19 @@ export const removeDocument = (id: string) => call<ApplicationView>(`/v1/trainer
 
 export type PickedFile = { uri: string; name: string; mimeType: string };
 
-export function uploadDocument(kind: DocumentKind, file: PickedFile): Promise<ApplicationView> {
+export async function uploadDocument(kind: DocumentKind, file: PickedFile): Promise<ApplicationView> {
   const form = new FormData();
   form.append('kind', kind); // before the file, so the server reads it first
-  // React Native's FormData takes this object shape for a file on the phone.
-  form.append('file', { uri: file.uri, name: file.name, type: file.mimeType } as unknown as Blob);
+  // Read the file into a Blob first. Newer Expo versions use a fetch that does not understand the old
+  // { uri, name, type } shortcut, and a Blob works with both kinds of fetch.
+  let blob: Blob;
+  try {
+    blob = await (await fetch(file.uri)).blob();
+  } catch {
+    throw new ApiError('INTERNAL', 'Could not read this file from your phone. Please pick it again.', 0);
+  }
+  const typed = blob.type === file.mimeType ? blob : new Blob([blob], { type: file.mimeType });
+  form.append('file', typed, file.name);
   return call<ApplicationView>('/v1/trainer-application/documents', { form, timeoutMs: UPLOAD_TIMEOUT_MS });
 }
 
