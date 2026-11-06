@@ -359,3 +359,19 @@ export const saveDispatchSettings = (alertAll: boolean) => api<DispatchSettings>
 export const completeSession = (id: string) => api<SessionDetail>(`/v1/admin/sessions/${id}/complete`, { method: 'POST', json: {} });
 export const recordTrainerNoShow = (id: string, note: string) => api<SessionDetail>(`/v1/admin/sessions/${id}/no-show`, { method: 'POST', json: { note } });
 export const moveSession = (id: string, startsAt: string, reason: string) => api<SessionDetail>(`/v1/admin/sessions/${id}/reschedule`, { method: 'POST', json: { startsAt, reason } });
+
+// ---- Customers (read-only) ----
+export type CustomerRow = {
+  id: string; name: string | null; email: string | null; phone: string; status: string; joinedAt: string; lastLoginAt: string | null;
+  sessionsDone: number; sessionsUpcoming: number; spentPaise: number;
+};
+export type CustomerDetail = CustomerRow & {
+  addresses: { id: string; label: string; line1: string; line2: string | null; locality: string | null; city: string; pincode: string | null; isDefault: boolean }[];
+  bookings: { id: string; sessionCode: string; serviceName: string; formatName: string; mode: string; status: string; startsAt: string | null; trainerName: string | null; totalPaise: number; rating: number | null; createdAt: string }[];
+  packages: { id: string; name: string; status: string; creditsTotal: number; creditsUsed: number; expiresAt: string | null; totalPaise: number }[];
+  referralCode: string | null;
+  referredBy: string | null;
+  ratingsGiven: number;
+};
+export const listCustomers = (q: string) => api<{ customers: CustomerRow[]; total: number }>(`/v1/admin/customers${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ''}`);
+export const getCustomer = (id: string) => api<CustomerDetail>(`/v1/admin/customers/${id}`);

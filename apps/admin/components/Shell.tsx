@@ -14,7 +14,6 @@ const THEME_KEY = 'zoove.admin.theme';
 
 // Planned sections. They are shown so the team can see where the panel is going; none of them open yet.
 const SOON: [string, ReactNode][] = [
-  ['Customers', Icons.customers],
   ['Complaints', Icons.complaints],
 ];
 
@@ -106,7 +105,8 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
   const onSessions = path.startsWith('/sessions');
   const onOfferings = path.startsWith('/offerings');
   const onRewards = path.startsWith('/rewards');
-  const other = onTeam || onCalc || onDiscounts || onParties || onPackages || onSessions || onOfferings || onRewards;
+  const onCustomers = path.startsWith('/customers');
+  const other = onCustomers || onTeam || onCalc || onDiscounts || onParties || onPackages || onSessions || onOfferings || onRewards;
   // Sessions waiting for a trainer, so a cancellation is noticed without opening the page.
   const [waiting, setWaiting] = useState(0);
   const [overdue, setOverdue] = useState(0);
@@ -132,6 +132,12 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
               {Icons.users}
               Trainers
               {pending ? <span className="badge">{pending}</span> : null}
+            </Link>
+          ) : null}
+          {can(me, 'customers.view') ? (
+            <Link href="/customers" aria-current={onCustomers ? 'page' : undefined}>
+              {Icons.customers}
+              Customers
             </Link>
           ) : null}
           {SOON.map(([label, icon]) => (

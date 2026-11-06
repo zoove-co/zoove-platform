@@ -139,3 +139,8 @@ Trainers apply through a web page now and through the trainer app later. Both us
 
 ## Trainer app uses the same application as the Join Zoove page
 Decision: the trainer app (Expo) and apps/trainer-web both use the same /v1/trainer-application and /v1/trainer/jobs endpoints and the same email-code sign-in. Both stay. A trainer can start on one and continue on the other. The app has no status logic of its own.
+
+## Admin Customers page (read-only)
+Decision: Admin > Customers lists everyone with the customer role (search by name, email or phone, newest 100) and opens one customer: contact details, addresses, packages, the latest 50 sessions with trainer, status, rating and amount, referral code. It is read-only for now (no edits, no blocking). It needs the `customers.view` permission (owners have it). Opening a customer writes an audit_log row `customer.view`, like opening a KYC document. API: GET /v1/admin/customers?q= and GET /v1/admin/customers/:id. Notes, blocking a customer and refunds are not built; they wait for the complaints work and Pratik's rules.
+- Document upload from the phone: the trainer app sends the file as the raw request body to POST /v1/trainer-application/documents/raw?kind=. The Join Zoove web page keeps multipart. Multipart from Expo Go reached the API as unreadable bytes.
+- Early finish: the customer's finish code is shown as soon as the session is live, and the server accepts it at any time after check-in. A session finished early is paid in full for now (open question: pro-rata price or payout).

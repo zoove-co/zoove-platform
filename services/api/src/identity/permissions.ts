@@ -26,7 +26,7 @@ export const PERMISSIONS: PermissionInfo[] = [
   { key: 'trainers.documents', group: 'Trainers', label: 'View KYC documents', hint: 'Open Aadhaar, PAN and selfie. Every view is recorded.', soon: false },
   { key: 'trainers.decide', group: 'Trainers', label: 'Approve, reject or ask for changes', hint: 'Decide on trainer applications.', soon: false },
   { key: 'trainers.status', group: 'Trainers', label: 'Pause, suspend, revoke, resume or edit trainers', hint: 'Change the status of an approved trainer, or correct their profile details. Changes are recorded.', soon: false },
-  { key: 'customers.view', group: 'Customers', label: 'View customers', hint: 'See customer profiles and bookings.', soon: true },
+  { key: 'customers.view', group: 'Customers', label: 'View customers', hint: 'Search customers and see their profile, addresses, sessions and packages. Opening a customer is recorded.', soon: false },
   { key: 'complaints.customers', group: 'Complaints', label: 'Handle customer complaints', hint: 'Review and resolve customer complaints.', soon: true },
   { key: 'complaints.trainers', group: 'Complaints', label: 'Handle trainer complaints', hint: 'Review and resolve trainer complaints.', soon: true },
   { key: 'discounts.manage', group: 'Tools', label: 'Discount codes', hint: 'Create and switch off discount codes (goodwill, emergencies, referrals). Every code is recorded with who made it.', soon: false },
