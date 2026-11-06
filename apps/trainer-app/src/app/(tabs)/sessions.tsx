@@ -86,14 +86,8 @@ export default function Sessions() {
           {job.started ? (
             <View style={{ marginTop: 10, gap: 10 }}>
               <LiveTimer endsAt={job.endsAt} big />
-              {job.timeUp ? (
-                <>
-                  <TextField label="Finish code" placeholder="4 digits" keyboardType="number-pad" maxLength={4} value={codes[job.id] ?? ''} onChangeText={(v) => setCode(job.id, v)} hint="Time is over. Ask the customer for the finish code in their app." />
-                  <Button label="Finish session" small loading={busy === job.id} disabled={(codes[job.id] ?? '').length !== 4} onPress={() => void run(job.id, () => checkOutJob(job.id, codes[job.id] ?? ''), 'Thank you. The session is done.')} />
-                </>
-              ) : (
-                <AppText variant="caption" color={colors.muted}>The finish code opens when the timer ends. Train well.</AppText>
-              )}
+              <TextField label="Finish code" placeholder="4 digits" keyboardType="number-pad" maxLength={4} value={codes[job.id] ?? ''} onChangeText={(v) => setCode(job.id, v)} hint={job.timeUp ? 'Time is over. Ask the customer for the finish code in their app.' : 'Finishing early? The customer can give you the finish code from their app at any time.'} />
+              <Button label="Finish session" small loading={busy === job.id} disabled={(codes[job.id] ?? '').length !== 4} onPress={() => void run(job.id, () => checkOutJob(job.id, codes[job.id] ?? ''), 'Thank you. The session is done.')} />
             </View>
           ) : job.canCheckIn ? (
             <View style={{ marginTop: 10, gap: 10 }}>

@@ -164,7 +164,7 @@ export function bookingFromRow(row: Row, now = new Date()): Booking {
     startedAt: row.started_at ? row.started_at.toISOString() : null,
     endsAt: row.ends_at ? row.ends_at.toISOString() : null,
     startCode: row.status === 'confirmed' && row.started_at === null ? row.start_code : null,
-    endCode: row.status === 'confirmed' && row.started_at !== null && (row.ends_at === null || row.ends_at.getTime() <= now.getTime()) ? row.end_code : null,
+    endCode: row.status === 'confirmed' && row.started_at !== null ? row.end_code : null,
     rating: row.rating_stars,
     canRate: row.status === 'completed' && row.coach_id !== null && row.rating_stars === null,
   };

@@ -360,9 +360,8 @@ suite('finding a coach, closing sessions, and telling people', () => {
       const live = (await http().post(`/v1/trainer/jobs/${id}/check-in`).set(as(t.token)).send({ code: await code('start_code') }).expect(200)).body as Awaited<ReturnType<typeof board>>;
       expect(live.mine.find((j) => j.id === id)).toMatchObject({ started: true, canCheckIn: false, canCancel: false });
       const seen = (await http().get(`/v1/bookings/${id}`).set(as(customer)).expect(200)).body as { inProgress: boolean; startCode: string | null; endCode: string | null };
-      expect(seen).toMatchObject({ inProgress: true, startCode: null, endCode: null }); // the finish code opens when the timer ends
+      expect(seen).toMatchObject({ inProgress: true, startCode: null, endCode: await code('end_code') }); // the finish code is there from the start, so the customer can finish early
       expect((await pool.query(`select ends_at - started_at as len from bookings where id = $1`, [id])).rows[0].len).toMatchObject({ hours: 1 });
-      await http().post(`/v1/trainer/jobs/${id}/check-out`).set(as(t.token)).send({ code: await code('end_code') }).expect(409); // timer still running
       await pool.query(`update bookings set ends_at = now() - interval '1 minute' where id = $1`, [id]);
       expect(((await http().get(`/v1/bookings/${id}`).set(as(customer)).expect(200)).body as { endCode: string }).endCode).toBe(await code('end_code'));
       expect(await app.get(CompletionSweepService).timeUp()).toBeGreaterThanOrEqual(1);

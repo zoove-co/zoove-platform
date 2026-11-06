@@ -272,7 +272,6 @@ export class SessionsAdminService {
         if (row.starts_at && row.starts_at.getTime() - Date.now() > CHECK_IN_EARLY_MINUTES * 60_000) throw new DomainError('INVALID_STATE', `You can check in from ${CHECK_IN_EARLY_MINUTES} minutes before the start time.`);
       } else {
         if (!row.started_at) throw new DomainError('INVALID_STATE', 'Check in with the start code first.');
-        if (row.ends_at && row.ends_at.getTime() > Date.now()) throw new DomainError('INVALID_STATE', 'The session time is not over yet. The finish code opens when the timer ends.');
       }
       const lockedUntil = row.code_attempt_at ? row.code_attempt_at.getTime() + CODE_LOCK_MINUTES * 60_000 : 0;
       if (row.code_attempts >= MAX_CODE_ATTEMPTS && lockedUntil > Date.now()) return 'locked';
