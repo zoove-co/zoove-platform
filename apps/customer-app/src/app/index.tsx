@@ -90,7 +90,7 @@ function Welcome() {
       : null;
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={styles.screen} behavior="padding">
       <View style={[styles.top, { paddingTop: insets.top + spacing.xl }]}>
         <Animated.View
           style={[

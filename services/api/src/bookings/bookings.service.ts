@@ -50,6 +50,8 @@ export type Booking = {
   // Live: the trainer entered the start code. Not derived from the clock any more.
   inProgress: boolean;
   startedAt: string | null;
+  // When the session's timer ends (set at check-in). The finish code appears once it has passed.
+  endsAt: string | null;
   // The customer shows this to the trainer on arrival (until the session is live).
   startCode: string | null;
   // The customer shows this to the trainer when the training is over (only while the session is live).
@@ -101,6 +103,7 @@ export type Row = {
   coach_id: string | null;
   coach_name: string | null;
   started_at: Date | null;
+  ends_at: Date | null;
   start_code: string;
   end_code: string;
   rating_stars: number | null;
@@ -110,7 +113,7 @@ export type Row = {
 export const sessionCodeOf = (id: string): string => `ZV-${id.replace(/-/g, '').slice(-8).toUpperCase()}`;
 
 export const BOOKING_SELECT = `select b.id, b.mode, b.participant, b.group_size, b.recipient_name, b.recipient_phone, b.status, b.starts_at, b.address_label, b.address_area, b.total_paise, b.discount_paise, b.discount_code, b.package_purchase_id,
-                       b.request_fingerprint, b.trainer_cancelled_at, b.unfilled_notified_at, b.coach_id, b.started_at, b.start_code, b.end_code, (select r.stars from session_ratings r where r.booking_id = b.id) as rating_stars, coalesce(c.full_name, (select ta.first_name from trainers t join trainer_applications ta on ta.id = t.application_id where t.user_id = b.coach_id)) as coach_name,
+                       b.request_fingerprint, b.trainer_cancelled_at, b.unfilled_notified_at, b.coach_id, b.started_at, b.ends_at, b.start_code, b.end_code, (select r.stars from session_ratings r where r.booking_id = b.id) as rating_stars, coalesce(c.full_name, (select ta.first_name from trainers t join trainer_applications ta on ta.id = t.application_id where t.user_id = b.coach_id)) as coach_name,
                        s.slug as service_slug, s.name as service_name, f.name as format_name, s.duration_max_minutes
                   from bookings b
                   join services s on s.id = b.service_id
@@ -159,8 +162,9 @@ export function bookingFromRow(row: Row, now = new Date()): Booking {
     canChange: canChange(row.status, row.starts_at, now),
     inProgress: isInProgress(row.status, row.started_at),
     startedAt: row.started_at ? row.started_at.toISOString() : null,
+    endsAt: row.ends_at ? row.ends_at.toISOString() : null,
     startCode: row.status === 'confirmed' && row.started_at === null ? row.start_code : null,
-    endCode: row.status === 'confirmed' && row.started_at !== null ? row.end_code : null,
+    endCode: row.status === 'confirmed' && row.started_at !== null && (row.ends_at === null || row.ends_at.getTime() <= now.getTime()) ? row.end_code : null,
     rating: row.rating_stars,
     canRate: row.status === 'completed' && row.coach_id !== null && row.rating_stars === null,
   };

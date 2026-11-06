@@ -338,6 +338,18 @@ suite('trainer onboarding', () => {
     expect(mine.body.status).toBe('approved');
   });
 
+  it('lets ops correct a trainer\'s details, records what changed, and keeps login details out of reach', async () => {
+    const path = `/v1/admin/trainer-applications/${applicationId}/profile`;
+    await http().patch(path).set(as(trainerToken)).send({ bio: 'Not allowed' }).expect(403);
+    await http().patch(path).set(as(adminToken)).send({ email: 'new@example.com' }).expect(400); // login identity is not editable here
+    await http().patch(path).set(as(adminToken)).send({ addressPincode: '12' }).expect(400);
+    const edited = await http().patch(path).set(as(adminToken)).send({ firstName: 'Ashaa', addressPincode: '400050', experienceYears: 7, bio: 'Corrected by ops' }).expect(200);
+    expect(edited.body.form).toMatchObject({ firstName: 'Ashaa', addressPincode: '400050', experienceYears: 7, bio: 'Corrected by ops' });
+    expect((await pool.query(`select count(*)::int as n from audit_log where action = 'trainer.profile_edited' and entity_id = $1`, [applicationId])).rows[0].n).toBe(1);
+    await http().patch(path).set(as(adminToken)).send({ firstName: 'Ashaa' }).expect(200); // nothing changed: nothing recorded
+    expect((await pool.query(`select count(*)::int as n from audit_log where action = 'trainer.profile_edited' and entity_id = $1`, [applicationId])).rows[0].n).toBe(1);
+  });
+
   it('pauses, suspends, revokes and resumes an approved trainer; reasons are required and stay internal', async () => {
     const path = `/v1/admin/trainer-applications/${applicationId}/trainer-status`;
     await http().post(path).set(as(adminToken)).send({ status: 'paused' }).expect(400);

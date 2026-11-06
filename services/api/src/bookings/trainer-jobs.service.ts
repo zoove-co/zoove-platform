@@ -16,14 +16,14 @@ export type OpenJob = {
   nearness: 'same_pincode' | 'near_you' | 'elsewhere' | null;
 };
 // A job the trainer already holds. The full address and the customer's first name are shown only here, never on an open job.
-export type MyJob = OpenJob & { customerFirstName: string; addressLabel: string; addressLine: string; pincode: string | null; canCancel: boolean; canCheckIn: boolean; started: boolean; startedAt: string | null; note: string };
+export type MyJob = OpenJob & { customerFirstName: string; addressLabel: string; addressLine: string; pincode: string | null; canCancel: boolean; canCheckIn: boolean; started: boolean; startedAt: string | null; endsAt: string | null; timeUp: boolean; note: string };
 // A session this trainer finished, newest first (the last 30).
 export type DoneJob = OpenJob & { customerFirstName: string; completedAt: string | null; note: string };
 export type JobBoard = { acceptingJobs: boolean; open: OpenJob[]; mine: MyJob[]; done: DoneJob[]; doneCount: number };
 
 type Row = {
   id: string; mode: string; participant: string; group_size: number | null; starts_at: Date | null; address_area: string | null; address_pincode: string | null;
-  address_label: string; address_line: string; service_name: string; format_name: string; full_name: string | null; note?: string | null; completed_at?: Date | null; started_at?: Date | null; cluster_name: string | null; near?: 'same_pincode' | 'near_you' | 'elsewhere' | null;
+  address_label: string; address_line: string; service_name: string; format_name: string; full_name: string | null; note?: string | null; completed_at?: Date | null; started_at?: Date | null; ends_at?: Date | null; cluster_name: string | null; near?: 'same_pincode' | 'near_you' | 'elsewhere' | null;
 };
 const COLS = `b.id, b.mode, b.participant, b.group_size, b.starts_at, b.address_area, b.address_pincode, b.address_label, b.address_line, s.name as service_name, f.name as format_name, u.full_name,
   (select c.name from cluster_pincodes cp join clusters c on c.id = cp.cluster_id where cp.pincode = b.address_pincode limit 1) as cluster_name`;
@@ -67,7 +67,7 @@ export class TrainerJobsService {
             and (b.starts_at is null or not ${trainerBusySql('$1::uuid', 'b.starts_at', 's.duration_max_minutes')})
           order by b.starts_at nulls first, b.created_at limit 100`, [userId]),
       this.db.query<Row>(
-        `select ${COLS}, b.started_at, n.note ${FROM} left join trainer_session_notes n on n.booking_id = b.id and n.trainer_id = $1::uuid
+        `select ${COLS}, b.started_at, b.ends_at, n.note ${FROM} left join trainer_session_notes n on n.booking_id = b.id and n.trainer_id = $1::uuid
           where b.coach_id = $1::uuid and b.status = 'confirmed' and (b.starts_at is null or b.starts_at >= now() - interval '7 days')
           order by b.starts_at nulls first, b.created_at limit 100`, [userId]),
       this.db.query<Row>(
@@ -84,7 +84,7 @@ export class TrainerJobsService {
         ...toOpen(r), customerFirstName: r.full_name?.trim().split(/\s+/)[0] || 'Customer', addressLabel: r.address_label, addressLine: r.address_line, pincode: r.address_pincode,
         canCancel: !r.started_at && (r.starts_at === null || r.starts_at.getTime() > now.getTime()),
         canCheckIn: !r.started_at && (r.starts_at === null || r.starts_at.getTime() - now.getTime() <= CHECK_IN_EARLY_MINUTES * 60_000),
-        started: r.started_at != null, startedAt: r.started_at ? r.started_at.toISOString() : null, note: r.note ?? '',
+        started: r.started_at != null, startedAt: r.started_at ? r.started_at.toISOString() : null, endsAt: r.ends_at ? r.ends_at.toISOString() : null, timeUp: r.started_at != null && (r.ends_at == null || r.ends_at.getTime() <= now.getTime()), note: r.note ?? '',
       })),
       done: done.rows.map((r) => ({ ...toOpen(r), customerFirstName: r.full_name?.trim().split(/\s+/)[0] || 'Customer', completedAt: r.completed_at ? r.completed_at.toISOString() : null, note: r.note ?? '' })),
       doneCount: Number(doneCount.rows[0]?.n ?? 0),

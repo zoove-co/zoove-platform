@@ -11,6 +11,7 @@ import { AppText } from '@/components/ui/AppText';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { clockText, useCountdown } from '@/lib/useCountdown';
 import { openSupport } from '@/lib/support';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { TabFooter } from '@/components/ui/TabFooter';
@@ -41,6 +42,7 @@ export default function SessionDetailScreen() {
   const simulateCancel = useSimulateTrainerCancel(id);
   const rate = useRateBooking(id);
   const [stars, setStars] = useState(0);
+  const left = useCountdown(booking?.inProgress ? booking.endsAt : null);
   const [confirming, setConfirming] = useState(false);
 
   if (isPending) {
@@ -109,7 +111,7 @@ export default function SessionDetailScreen() {
             <Icon name="fitness-outline" size={32} color={colors.white} />
           </LinearGradient>
           <View style={styles.cardText}>
-            <StatusChip label={booking.inProgress ? t('session.statusLive') : statusLabel} active={active} live={booking.inProgress} />
+            <StatusChip label={booking.inProgress ? t('session.statusLive') : statusLabel} active={active} live={booking.inProgress} endsAt={booking.endsAt} />
             <AppText variant="heading">
               {booking.formatName} · {participantLabel(booking.participant, t)}
             </AppText>
@@ -119,6 +121,18 @@ export default function SessionDetailScreen() {
             <DetailRow icon="pricetag-outline" text={t('session.code', { code: booking.sessionCode })} />
           </View>
         </View>
+
+        {booking.inProgress && left !== null && left > 0 ? (
+          <View style={styles.codeCard}>
+            <AppText variant="bodyStrong">{t('session.timeLeft')}</AppText>
+            <AppText variant="heading" style={styles.code}>
+              {clockText(left)}
+            </AppText>
+            <AppText variant="caption" color={colors.muted} style={styles.note}>
+              {t('session.timerBody')}
+            </AppText>
+          </View>
+        ) : null}
 
         {booking.startCode || booking.endCode ? (
           <View style={styles.codeCard}>

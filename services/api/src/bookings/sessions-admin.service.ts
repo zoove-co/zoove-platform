@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import { v7 as uuidv7 } from 'uuid';
 
 import { DomainError } from '../common/domain-error';
 import { notifyCustomer } from '../customer/notify';
 import { queueTrainerAlert } from '../notifications/trainer-alerts';
+import { APP_CONFIG, type Env } from '../config/env';
 import { DatabaseService } from '../database/database.service';
 import { PackagesService } from '../packages/packages.service';
 import { ALERT_ALL_KEY, alertAllSwitch } from './dispatch.service';
@@ -16,7 +17,7 @@ export type SessionFilter = 'needs_trainer' | 'upcoming' | 'all';
 export type AdminSession = {
   id: string; sessionCode: string; status: BookingStatus; mode: string; participant: string; groupSize: number | null; serviceName: string; formatName: string;
   startsAt: string | null; whenLabel: string; startPassed: boolean; area: string | null; customerName: string; customerContact: string;
-  trainerId: string | null; trainerName: string | null; trainerCancelCount: number; trainerCancelledAt: string | null; canMarkNoShow: boolean; live: boolean; startedAt: string | null; rating: number | null; totalPaise: number; paidWithCredit: boolean; discountCode: string | null; createdAt: string;
+  trainerId: string | null; trainerName: string | null; trainerCancelCount: number; trainerCancelledAt: string | null; canMarkNoShow: boolean; live: boolean; startedAt: string | null; endsAt: string | null; rating: number | null; totalPaise: number; paidWithCredit: boolean; discountCode: string | null; createdAt: string;
 };
 export type SessionEvent = { type: string; actor: string; payload: Record<string, unknown>; createdAt: string };
 export type AdminSessionDetail = AdminSession & { addressLabel: string; addressLine: string; pincode: string | null; recipient: { name: string; phone: string } | null; events: SessionEvent[] };
@@ -27,11 +28,11 @@ export type AvailableTrainer = { id: string; name: string; sameDay: number; acce
 type ListRow = {
   id: string; status: BookingStatus; mode: string; participant: string; group_size: number | null; service_name: string; format_name: string; starts_at: Date | null;
   address_area: string | null; customer_name: string | null; email: string | null; phone_e164: string | null; coach_id: string | null; trainer_name: string | null;
-  trainer_cancel_count: number; trainer_cancelled_at: Date | null; total_paise: number; package_purchase_id: string | null; discount_code: string | null; created_at: Date; started_at: Date | null; rating_stars: number | null;
+  trainer_cancel_count: number; trainer_cancelled_at: Date | null; total_paise: number; package_purchase_id: string | null; discount_code: string | null; created_at: Date; started_at: Date | null; ends_at: Date | null; rating_stars: number | null;
 };
 
 const COLS = `b.id, b.status, b.mode, b.participant, b.group_size, b.starts_at, b.address_area, b.coach_id, b.trainer_cancel_count, b.trainer_cancelled_at, b.total_paise,
-              b.package_purchase_id, b.discount_code, b.created_at, b.started_at, (select r.stars from session_ratings r where r.booking_id = b.id) as rating_stars, s.name as service_name, f.name as format_name, u.full_name as customer_name, u.email, u.phone_e164,
+              b.package_purchase_id, b.discount_code, b.created_at, b.started_at, b.ends_at, (select r.stars from session_ratings r where r.booking_id = b.id) as rating_stars, s.name as service_name, f.name as format_name, u.full_name as customer_name, u.email, u.phone_e164,
               coalesce(c.full_name, (select trim(concat_ws(' ', ta.first_name, ta.last_name)) from trainers t join trainer_applications ta on ta.id = t.application_id where t.user_id = b.coach_id)) as trainer_name`;
 const FROM = `from bookings b join services s on s.id = b.service_id join service_formats f on f.id = b.format_id join users u on u.id = b.user_id left join users c on c.id = b.coach_id`;
 
@@ -41,7 +42,7 @@ function toSession(r: ListRow, now = new Date()): AdminSession {
     startsAt: r.starts_at ? r.starts_at.toISOString() : null, whenLabel: r.starts_at ? formatWhen(r.starts_at) : r.mode === 'instant' ? 'As soon as possible' : 'To be scheduled',
     startPassed: r.starts_at !== null && r.starts_at.getTime() < now.getTime() && (r.status === 'matching' || r.status === 'rematching'),
     area: r.address_area, customerName: r.customer_name ?? 'Customer', customerContact: r.email ?? r.phone_e164 ?? '',
-    live: r.status === 'confirmed' && r.started_at !== null, startedAt: r.started_at ? r.started_at.toISOString() : null, rating: r.rating_stars,
+    live: r.status === 'confirmed' && r.started_at !== null, startedAt: r.started_at ? r.started_at.toISOString() : null, endsAt: r.ends_at ? r.ends_at.toISOString() : null, rating: r.rating_stars,
     canMarkNoShow: r.status === 'confirmed' && r.coach_id !== null && r.started_at === null && (r.starts_at === null || r.starts_at.getTime() <= now.getTime()),
     trainerId: r.coach_id, trainerName: r.trainer_name, trainerCancelCount: r.trainer_cancel_count, trainerCancelledAt: r.trainer_cancelled_at ? r.trainer_cancelled_at.toISOString() : null,
     totalPaise: r.total_paise, paidWithCredit: r.package_purchase_id !== null, discountCode: r.discount_code, createdAt: r.created_at.toISOString(),
@@ -52,7 +53,7 @@ function toSession(r: ListRow, now = new Date()): AdminSession {
 // There is no trainer app yet, so ops record a trainer's cancellation for them (the trainer's own endpoint will call the same method).
 @Injectable()
 export class SessionsAdminService {
-  constructor(private readonly db: DatabaseService, private readonly packages: PackagesService) {}
+  constructor(private readonly db: DatabaseService, private readonly packages: PackagesService, @Inject(APP_CONFIG) private readonly config: Env) {}
 
   async getDispatchSettings(): Promise<{ alertAll: boolean }> {
     return { alertAll: await alertAllSwitch(this.db) };
@@ -135,8 +136,8 @@ export class SessionsAdminService {
   }
 
   private async lock(client: PoolClient, id: string) {
-    const r = await client.query<{ id: string; user_id: string; status: BookingStatus; mode: string; starts_at: Date | null; coach_id: string | null; service_name: string; package_purchase_id: string | null; address_area: string | null; minutes: number; started_at: Date | null; start_code: string; end_code: string; code_attempts: number; code_attempt_at: Date | null }>(
-      `select b.id, b.user_id, b.status, b.mode, b.starts_at, b.coach_id, b.package_purchase_id, b.address_area, b.started_at, b.start_code, b.end_code, b.code_attempts, b.code_attempt_at, s.name as service_name, s.duration_max_minutes as minutes from bookings b join services s on s.id = b.service_id where b.id = $1 for update of b`, [id]);
+    const r = await client.query<{ id: string; user_id: string; status: BookingStatus; mode: string; starts_at: Date | null; coach_id: string | null; service_name: string; package_purchase_id: string | null; address_area: string | null; minutes: number; started_at: Date | null; ends_at: Date | null; start_code: string; end_code: string; code_attempts: number; code_attempt_at: Date | null }>(
+      `select b.id, b.user_id, b.status, b.mode, b.starts_at, b.coach_id, b.package_purchase_id, b.address_area, b.started_at, b.ends_at, b.start_code, b.end_code, b.code_attempts, b.code_attempt_at, s.name as service_name, s.duration_max_minutes as minutes from bookings b join services s on s.id = b.service_id where b.id = $1 for update of b`, [id]);
     const row = r.rows[0];
     if (!row) throw new DomainError('NOT_FOUND', 'We could not find that session.');
     return row;
@@ -269,7 +270,10 @@ export class SessionsAdminService {
       if (phase === 'start') {
         if (row.started_at) return 'ok'; // entering it twice changes nothing
         if (row.starts_at && row.starts_at.getTime() - Date.now() > CHECK_IN_EARLY_MINUTES * 60_000) throw new DomainError('INVALID_STATE', `You can check in from ${CHECK_IN_EARLY_MINUTES} minutes before the start time.`);
-      } else if (!row.started_at) throw new DomainError('INVALID_STATE', 'Check in with the start code first.');
+      } else {
+        if (!row.started_at) throw new DomainError('INVALID_STATE', 'Check in with the start code first.');
+        if (row.ends_at && row.ends_at.getTime() > Date.now()) throw new DomainError('INVALID_STATE', 'The session time is not over yet. The finish code opens when the timer ends.');
+      }
       const lockedUntil = row.code_attempt_at ? row.code_attempt_at.getTime() + CODE_LOCK_MINUTES * 60_000 : 0;
       if (row.code_attempts >= MAX_CODE_ATTEMPTS && lockedUntil > Date.now()) return 'locked';
       const attempts = row.code_attempts >= MAX_CODE_ATTEMPTS ? 0 : row.code_attempts; // the lock has run out
@@ -279,10 +283,11 @@ export class SessionsAdminService {
       }
       await client.query(`update bookings set code_attempts = 0, code_attempt_at = null where id = $1`, [id]);
       if (phase === 'start') {
-        await client.query(`update bookings set started_at = now(), starts_at = coalesce(starts_at, now()) where id = $1`, [id]);
+        const minutes = this.config.SESSION_LENGTH_OVERRIDE_MINUTES ?? row.minutes;
+        await client.query(`update bookings set started_at = now(), ends_at = now() + make_interval(mins => $2), starts_at = coalesce(starts_at, now()) where id = $1`, [id, minutes]);
         await client.query(`insert into booking_events (id, booking_id, type, actor, payload) values ($1, $2, 'started', 'trainer', $3)`, [uuidv7(), id, JSON.stringify({ trainerId })]);
         await client.query(`insert into outbox_events (id, aggregate_type, aggregate_id, event_type, payload) values ($1, 'booking', $2, 'booking.started', $3)`, [uuidv7(), id, JSON.stringify({ bookingId: id, userId: row.user_id, trainerId })]);
-        await notifyCustomer(client, row.user_id, 'Your session has started', `Your ${row.service_name} session (session ${sessionCodeOf(id)}) is on. Enjoy! When you finish, show your finish code to your coach.`, id);
+        await notifyCustomer(client, row.user_id, 'Your session has started', `Your ${row.service_name} session (session ${sessionCodeOf(id)}) is on. Enjoy! The timer is running. When it ends, your finish code appears in the app.`, id);
       }
       return 'ok';
     });

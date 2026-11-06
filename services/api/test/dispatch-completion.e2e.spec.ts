@@ -90,6 +90,7 @@ suite('finding a coach, closing sessions, and telling people', () => {
   const finish = async (t: string, id: string) => {
     const c = (await pool.query(`select start_code, end_code from bookings where id = $1`, [id])).rows[0] as { start_code: string; end_code: string };
     await http().post(`/v1/trainer/jobs/${id}/check-in`).set(as(t)).send({ code: c.start_code }).expect(200);
+    await pool.query(`update bookings set ends_at = now() - interval '1 minute' where id = $1`, [id]); // the timer ran out
     await http().post(`/v1/trainer/jobs/${id}/check-out`).set(as(t)).send({ code: c.end_code }).expect(200);
   };
   const accept = (t: string, id: string) => http().post(`/v1/trainer/jobs/${id}/accept`).set(as(t));
@@ -359,7 +360,13 @@ suite('finding a coach, closing sessions, and telling people', () => {
       const live = (await http().post(`/v1/trainer/jobs/${id}/check-in`).set(as(t.token)).send({ code: await code('start_code') }).expect(200)).body as Awaited<ReturnType<typeof board>>;
       expect(live.mine.find((j) => j.id === id)).toMatchObject({ started: true, canCheckIn: false, canCancel: false });
       const seen = (await http().get(`/v1/bookings/${id}`).set(as(customer)).expect(200)).body as { inProgress: boolean; startCode: string | null; endCode: string | null };
-      expect(seen).toMatchObject({ inProgress: true, startCode: null, endCode: await code('end_code') });
+      expect(seen).toMatchObject({ inProgress: true, startCode: null, endCode: null }); // the finish code opens when the timer ends
+      expect((await pool.query(`select ends_at - started_at as len from bookings where id = $1`, [id])).rows[0].len).toMatchObject({ hours: 1 });
+      await http().post(`/v1/trainer/jobs/${id}/check-out`).set(as(t.token)).send({ code: await code('end_code') }).expect(409); // timer still running
+      await pool.query(`update bookings set ends_at = now() - interval '1 minute' where id = $1`, [id]);
+      expect(((await http().get(`/v1/bookings/${id}`).set(as(customer)).expect(200)).body as { endCode: string }).endCode).toBe(await code('end_code'));
+      expect(await app.get(CompletionSweepService).timeUp()).toBeGreaterThanOrEqual(1);
+      expect(await app.get(CompletionSweepService).timeUp()).toBe(0); // told once
       expect((await http().get('/v1/admin/sessions?filter=upcoming').set(as(owner)).expect(200)).body.find((x: { id: string }) => x.id === id)).toMatchObject({ live: true });
       await http().post(`/v1/trainer/jobs/${id}/check-out`).set(as(t.token)).send({ code: '12' }).expect(400); // not 4 digits
       const streakBefore = (await http().get('/v1/streak').set(as(customer)).expect(200)).body.totalSessions as number;

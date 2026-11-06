@@ -25,7 +25,7 @@ export const PERMISSIONS: PermissionInfo[] = [
   { key: 'trainers.view', group: 'Trainers', label: 'View trainer applications', hint: 'See the list and each application, without documents.', soon: false },
   { key: 'trainers.documents', group: 'Trainers', label: 'View KYC documents', hint: 'Open Aadhaar, PAN and selfie. Every view is recorded.', soon: false },
   { key: 'trainers.decide', group: 'Trainers', label: 'Approve, reject or ask for changes', hint: 'Decide on trainer applications.', soon: false },
-  { key: 'trainers.status', group: 'Trainers', label: 'Pause, suspend, revoke or resume trainers', hint: 'Change the status of an approved trainer. A reason is recorded.', soon: false },
+  { key: 'trainers.status', group: 'Trainers', label: 'Pause, suspend, revoke, resume or edit trainers', hint: 'Change the status of an approved trainer, or correct their profile details. Changes are recorded.', soon: false },
   { key: 'customers.view', group: 'Customers', label: 'View customers', hint: 'See customer profiles and bookings.', soon: true },
   { key: 'complaints.customers', group: 'Complaints', label: 'Handle customer complaints', hint: 'Review and resolve customer complaints.', soon: true },
   { key: 'complaints.trainers', group: 'Complaints', label: 'Handle trainer complaints', hint: 'Review and resolve trainer complaints.', soon: true },

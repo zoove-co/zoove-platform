@@ -204,6 +204,7 @@ export interface Booking {
   canChange: boolean;
   inProgress: boolean; // live: the coach entered the start code
   startedAt: string | null;
+  endsAt: string | null; // when the session timer ends (set when the coach starts it)
   // Shown to the customer to hand to the coach: the start code on arrival (until the session is live), then the finish code.
   startCode: string | null;
   endCode: string | null;

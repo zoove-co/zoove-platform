@@ -7,6 +7,16 @@ import { DatabaseService } from '../database/database.service';
 import { SIGNED_LINK_SECONDS } from './rules';
 import { TrainerApplicationsService, type ApplicationStatus, type TrainerStatus } from './trainer-applications.service';
 
+// What ops may correct on a trainer's profile. Not the sign-in email or phone (those are the trainer's login) and not the ID numbers.
+export type ProfileEdit = {
+  firstName?: string; lastName?: string; dateOfBirth?: string; gender?: string; addressLine?: string; addressArea?: string; addressPincode?: string;
+  specialties?: string[]; experienceYears?: number; languages?: string[]; bio?: string;
+};
+const PROFILE_COLUMNS: Record<keyof ProfileEdit, string> = {
+  firstName: 'first_name', lastName: 'last_name', dateOfBirth: 'date_of_birth', gender: 'gender', addressLine: 'address_line', addressArea: 'address_area', addressPincode: 'address_pincode',
+  specialties: 'specialties', experienceYears: 'experience_years', languages: 'languages', bio: 'bio',
+};
+
 export type AdminListItem = {
   id: string;
   name: string;
@@ -181,6 +191,40 @@ export class AdminTrainerApplicationsService {
       await this.applications.event(client, applicationId, 'changes_requested', 'admin', adminId, { note, documentIds });
       await this.applications.publish(client, applicationId, 'trainer.application_changes_requested', {});
     });
+  }
+
+  // Ops correct a trainer's details (any application that was submitted). Every change is written to the history and the audit log
+  // with the old and new values of the fields that changed.
+  async updateProfile(adminId: string, applicationId: string, edit: ProfileEdit): Promise<ReturnType<AdminTrainerApplicationsService['detail']>> {
+    if (edit.specialties !== undefined) await this.applications.assertKnownServices(edit.specialties);
+    await this.db.tx(async (client) => {
+      const found = await client.query<Record<string, unknown>>(
+        `select first_name, last_name, to_char(date_of_birth, 'YYYY-MM-DD') as date_of_birth, gender, address_line, address_area, address_pincode, specialties, experience_years, languages, bio
+           from trainer_applications where id = $1 and status <> 'draft' for update`, [applicationId]);
+      const before = found.rows[0];
+      if (!before) throw new DomainError('NOT_FOUND', 'Application not found.');
+      const sets: string[] = [];
+      const params: unknown[] = [applicationId];
+      const changed: Record<string, { from: unknown; to: unknown }> = {};
+      for (const key of Object.keys(PROFILE_COLUMNS) as (keyof ProfileEdit)[]) {
+        const value = edit[key];
+        if (value === undefined) continue;
+        const column = PROFILE_COLUMNS[key];
+        const next = key === 'bio' && value === '' ? null : value;
+        if (JSON.stringify(before[column]) === JSON.stringify(next)) continue;
+        params.push(next);
+        sets.push(`${column} = $${params.length}`);
+        changed[key] = { from: before[column] ?? null, to: next };
+      }
+      if (sets.length === 0) return;
+      await client.query(`update trainer_applications set ${sets.join(', ')} where id = $1`, params);
+      await this.applications.event(client, applicationId, 'profile_edited', 'admin', adminId, { changed: Object.keys(changed) });
+      await client.query(
+        `insert into audit_log (id, actor_user_id, action, entity_type, entity_id, before, after) values ($1, $2, 'trainer.profile_edited', 'trainer_application', $3, $4, $5)`,
+        [uuidv7(), adminId, applicationId, JSON.stringify(Object.fromEntries(Object.entries(changed).map(([k, v]) => [k, v.from]))), JSON.stringify(Object.fromEntries(Object.entries(changed).map(([k, v]) => [k, v.to])))],
+      );
+    });
+    return this.detail(applicationId);
   }
 
   // Pause, suspend, revoke or resume an approved trainer. The reason is internal: it goes in the history and the audit log, never to the trainer.

@@ -1,3 +1,4 @@
+import { SessionClockWatcher } from '@/components/session/SessionClockWatcher';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -8,6 +9,8 @@ import { colors, fonts } from '@/theme';
 export default function TabsLayout() {
   const { t } = useTranslation();
   return (
+    <>
+    <SessionClockWatcher />
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -48,5 +51,6 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
+    </>
   );
 }

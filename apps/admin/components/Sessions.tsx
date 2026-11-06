@@ -23,6 +23,21 @@ const clock = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number) as 
 const todayIst = () => new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10);
 const PEOPLE: Record<string, string> = { personal: 'Personal', duo: 'Duo', loved_one: 'Loved one', group: 'Group' };
 
+// "Live · 41:12" while a session's timer runs, "Live · time over" after (ticks every second).
+function LiveLabel({ endsAt }: { endsAt: string | null }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  if (!endsAt) return <>Live</>;
+  const left = Math.max(0, Math.ceil((new Date(endsAt).getTime() - now) / 1000));
+  if (left === 0) return <>Live · time over</>;
+  const h = Math.floor(left / 3600), m = Math.floor((left % 3600) / 60), sec = left % 60;
+  const two = (n: number) => String(n).padStart(2, '0');
+  return <>Live · {h > 0 ? `${h}:` : ''}{two(m)}:{two(sec)}</>;
+}
+
 export function Sessions({ signOut, expired }: { signOut: () => void; expired: () => void }) {
   const me = useMe();
   const [filter, setFilter] = useState<SessionFilter>('needs_trainer');
@@ -144,7 +159,7 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
                   <td>{s.customerName}<div className="sub muted small">{s.area ?? ''}</div></td>
                   <td>{s.whenLabel}{s.startPassed ? <div className="sub small" style={{ color: 'var(--red)', fontWeight: 600 }}>Overdue: start time has passed</div> : null}</td>
                   <td>
-                    <span className={`pill ${s.live ? 'in_review' : STATUS_PILL[s.status]}`}>{s.live ? 'Live' : STATUS_LABEL[s.status]}</span>{s.rating !== null ? <span className="sub muted small">{` ${'★'.repeat(s.rating)}`}</span> : null}
+                    <span className={`pill ${s.live ? 'in_review' : STATUS_PILL[s.status]}`}>{s.live ? <LiveLabel endsAt={s.endsAt} /> : STATUS_LABEL[s.status]}</span>{s.rating !== null ? <span className="sub muted small">{` ${'★'.repeat(s.rating)}`}</span> : null}
                     {s.trainerCancelledAt && s.status === 'rematching' ? <div className="sub muted small">Trainer cancelled {stamp(s.trainerCancelledAt)}</div> : null}
                     {s.trainerName && s.status === 'confirmed' ? <div className="sub muted small">{s.trainerName}</div> : null}
                   </td>
@@ -159,7 +174,7 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
       {open ? (
         <div className="modal" role="dialog" aria-modal="true" aria-label={`Session ${open.sessionCode}`}>
           <div className="sheet wide">
-            <h2>Session {open.sessionCode} <span className={`pill ${open.live ? 'in_review' : STATUS_PILL[open.status]}`}>{open.live ? 'Live' : STATUS_LABEL[open.status]}</span>{open.rating !== null ? <span className="sub muted small">{` Rated ${open.rating}/5`}</span> : null}</h2>
+            <h2>Session {open.sessionCode} <span className={`pill ${open.live ? 'in_review' : STATUS_PILL[open.status]}`}>{open.live ? <LiveLabel endsAt={open.endsAt} /> : STATUS_LABEL[open.status]}</span>{open.rating !== null ? <span className="sub muted small">{` Rated ${open.rating}/5`}</span> : null}</h2>
             <dl className="kv">
               <dt>Service</dt><dd>{open.serviceName} · {open.formatName} · {PEOPLE[open.participant] ?? open.participant}{open.groupSize ? ` of ${open.groupSize}` : ''}</dd>
               <dt>When</dt><dd>{open.whenLabel}{open.mode === 'instant' ? ' (instant)' : ''}</dd>

@@ -42,6 +42,8 @@ const schema = z
     // Link used inside emails to open the admin panel and the trainer status page.
     ADMIN_URL: z.string().default('http://localhost:3002'),
     TRAINER_SITE_URL: z.string().default('http://localhost:3001'),
+    // For demos and tests only: every session lasts this many minutes after check-in (instead of the service's length). Leave unset in real use.
+    SESSION_LENGTH_OVERRIDE_MINUTES: z.coerce.number().int().min(1).max(180).optional(),
     EMAIL_WORKER_ENABLED: z
       .string()
       .optional()

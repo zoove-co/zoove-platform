@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
-import { ApiError, KIND_LABEL, STATUS_LABEL, approve, nice, documentLink, getApplication, reject, requestChanges, setTrainerStatus, startReview, type TrainerStatus, type Detail as DetailData } from '@/lib/api';
+import { ApiError, KIND_LABEL, STATUS_LABEL, approve, editTrainerProfile, nice, documentLink, getApplication, reject, requestChanges, setTrainerStatus, startReview, type TrainerStatus, type Detail as DetailData } from '@/lib/api';
 import { can, useMe } from './me';
 import { Shell } from './Shell';
 import { Banner, Field, Icons, Spinner, avatarTone, initials } from './ui';
@@ -29,6 +29,7 @@ const EVENT_LABEL: Record<string, string> = {
   trainer_suspended: 'Trainer suspended',
   trainer_revoked: 'Trainer revoked',
   trainer_resumed: 'Trainer resumed',
+  profile_edited: 'Details corrected by ops',
 };
 
 export function Detail({ signOut, expired }: { signOut: () => void; expired: () => void }) {
@@ -47,6 +48,40 @@ export function Detail({ signOut, expired }: { signOut: () => void; expired: () 
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [docError, setDocError] = useState<string | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const set = (key: string) => (e: { target: { value: string } }) => setDraft((d) => ({ ...d, [key]: e.target.value }));
+  const list = (v: string | undefined) => (v ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+
+  function startEdit(form: DetailData['form']) {
+    setDraft({
+      firstName: form.firstName ?? '', lastName: form.lastName ?? '', dateOfBirth: form.dateOfBirth ?? '', gender: form.gender ?? '', addressLine: form.addressLine ?? '', addressArea: form.addressArea ?? '',
+      addressPincode: form.addressPincode ?? '', specialties: form.specialties.join(', '), experienceYears: form.experienceYears === null ? '' : String(form.experienceYears), languages: form.languages.join(', '), bio: form.bio ?? '',
+    });
+    setFieldError(null);
+    setEditing(true);
+  }
+
+  async function saveEdit() {
+    const edit: Record<string, unknown> = {};
+    for (const key of ['firstName', 'lastName', 'dateOfBirth', 'gender', 'addressLine', 'addressArea', 'addressPincode'] as const) if ((draft[key] ?? '') !== '') edit[key] = draft[key];
+    edit.specialties = list(draft.specialties);
+    edit.languages = list(draft.languages);
+    if ((draft.experienceYears ?? '') !== '') edit.experienceYears = Number(draft.experienceYears);
+    edit.bio = draft.bio ?? '';
+    setBusy(true);
+    setFieldError(null);
+    try {
+      await editTrainerProfile(id, edit);
+      setEditing(false);
+      await load();
+    } catch (err) {
+      const message = handle(err);
+      if (message) setFieldError(message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const handle = useCallback(
     (err: unknown): string => {
@@ -149,8 +184,29 @@ export function Detail({ signOut, expired }: { signOut: () => void; expired: () 
       <div className="grid2">
         <div>
           <div className="card">
-            <h2>Details</h2>
-            <dl className="kv">
+            <h2>Details {canStatus && !editing ? <button className="btn small ghost" type="button" style={{ marginLeft: 10 }} onClick={() => startEdit(f)}>Edit details</button> : null}</h2>
+            {editing ? (
+              <div>
+                {fieldError ? <Banner tone="bad">{fieldError}</Banner> : null}
+                <Field label="First name"><input value={draft.firstName ?? ''} maxLength={60} onChange={set('firstName')} /></Field>
+                <Field label="Last name"><input value={draft.lastName ?? ''} maxLength={60} onChange={set('lastName')} /></Field>
+                <Field label="Date of birth" hint="YYYY-MM-DD"><input value={draft.dateOfBirth ?? ''} maxLength={10} onChange={set('dateOfBirth')} /></Field>
+                <Field label="Gender"><select value={draft.gender ?? ''} onChange={set('gender')}><option value="">—</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option><option value="prefer_not_to_say">Prefer not to say</option></select></Field>
+                <Field label="Address"><input value={draft.addressLine ?? ''} maxLength={200} onChange={set('addressLine')} /></Field>
+                <Field label="Area"><input value={draft.addressArea ?? ''} maxLength={120} onChange={set('addressArea')} /></Field>
+                <Field label="Pincode" hint="Jobs are offered to trainers by this pincode."><input value={draft.addressPincode ?? ''} inputMode="numeric" maxLength={6} onChange={set('addressPincode')} /></Field>
+                <Field label="Services they teach" hint="Service slugs, separated by commas (for example: yoga, pilates)."><input value={draft.specialties ?? ''} onChange={set('specialties')} /></Field>
+                <Field label="Experience (years)"><input value={draft.experienceYears ?? ''} inputMode="numeric" maxLength={2} onChange={set('experienceYears')} /></Field>
+                <Field label="Languages" hint="Separated by commas."><input value={draft.languages ?? ''} onChange={set('languages')} /></Field>
+                <Field label="About"><textarea value={draft.bio ?? ''} maxLength={1000} rows={4} onChange={set('bio')} /></Field>
+                <p className="muted small">Sign-in email and mobile, and ID numbers, cannot be changed here. Every change is recorded.</p>
+                <div className="row" style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn" type="button" disabled={busy} onClick={() => void saveEdit()}>{busy ? <Spinner /> : null} Save changes</button>
+                  <button className="btn ghost" type="button" disabled={busy} onClick={() => setEditing(false)}>Cancel</button>
+                </div>
+              </div>
+            ) : null}
+            <dl className="kv" style={editing ? { display: 'none' } : undefined}>
               <dt>Mobile (not verified)</dt><dd>{data.phone ?? '—'}</dd>
               <dt>Email (verified)</dt><dd>{f.email ?? '—'}</dd>
               <dt>Date of birth</dt><dd>{f.dateOfBirth ?? '—'}</dd>

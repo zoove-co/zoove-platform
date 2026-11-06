@@ -1,17 +1,22 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
+import { clockText, useCountdown } from '@/lib/useCountdown';
 import { colors, fonts } from '@/theme';
 
-type Props = { label: string; active: boolean; live?: boolean };
+type Props = { label: string; active: boolean; live?: boolean; endsAt?: string | null };
 
 // The small status pill. A session that is on right now gets a green dot and green text.
-export function StatusChip({ label, active, live = false }: Props) {
+export function StatusChip({ label, active, live = false, endsAt = null }: Props) {
+  const { t } = useTranslation();
+  const left = useCountdown(live ? endsAt : null);
+  const text = live && left !== null ? `${label} · ${left === 0 ? t('session.timeOver') : clockText(left)}` : label;
   return (
     <View style={[styles.chip, live ? styles.live : !active && styles.inactive]}>
       {live ? <View style={styles.dot} /> : null}
       <AppText variant="micro" color={live ? colors.success : active ? colors.purple : colors.muted} style={styles.text}>
-        {label}
+        {text}
       </AppText>
     </View>
   );

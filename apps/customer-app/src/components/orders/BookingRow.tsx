@@ -43,7 +43,7 @@ export function BookingRow({ booking, onPress }: Props) {
           {booking.whenLabel} · {booking.areaLabel}
         </AppText>
         <View style={styles.meta}>
-          <StatusChip label={booking.inProgress ? t('session.statusLive') : statusLabel} active={active} live={booking.inProgress} />
+          <StatusChip label={booking.inProgress ? t('session.statusLive') : statusLabel} active={active} live={booking.inProgress} endsAt={booking.endsAt} />
           <AppText variant="caption" color={colors.muted}>
             {formatInr(booking.totalPaise)}
           </AppText>

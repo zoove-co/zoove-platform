@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 
@@ -19,6 +19,22 @@ const rejectSchema = z.object({ reason: z.string().trim().min(3).max(500) });
 const trainerStatusSchema = z
   .object({ status: z.enum(['active', 'paused', 'suspended', 'revoked']), reason: z.string().trim().max(500).optional() })
   .refine((value) => value.status === 'active' || (value.reason !== undefined && value.reason.length >= 3), { message: 'Please give a reason.', path: ['reason'] });
+const text = (max: number) => z.string().trim().min(1).max(max);
+const profileSchema = z
+  .object({
+    firstName: text(60).optional(),
+    lastName: text(60).optional(),
+    dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD').refine((v) => !Number.isNaN(Date.parse(v)), 'Not a real date').optional(),
+    gender: z.enum(['female', 'male', 'other', 'prefer_not_to_say']).optional(),
+    addressLine: text(200).optional(),
+    addressArea: text(120).optional(),
+    addressPincode: z.string().trim().regex(/^[1-9][0-9]{5}$/, 'Enter a 6-digit pincode').optional(),
+    specialties: z.array(z.string().trim().min(1).max(40)).max(10).optional(),
+    experienceYears: z.number().int().min(0).max(60).optional(),
+    languages: z.array(z.string().trim().min(1).max(30)).max(10).optional(),
+    bio: z.string().trim().max(1000).optional(),
+  })
+  .strict();
 const changesSchema = z.object({ note: z.string().trim().min(3).max(500), documentIds: z.array(z.uuid()).max(20).default([]) });
 
 @ApiTags('admin-trainers')
@@ -92,5 +108,12 @@ export class AdminTrainerApplicationsController {
   @ApiOperation({ summary: 'Pause, suspend, revoke or resume an approved trainer. A reason is needed except when resuming.' })
   trainerStatus(@CurrentUser() admin: AuthUser, @Param('id', new ZodValidationPipe(idSchema)) id: string, @Body(new ZodValidationPipe(trainerStatusSchema)) body: z.infer<typeof trainerStatusSchema>) {
     return this.admin.setTrainerStatus(admin.id, id, body.status, body.reason);
+  }
+
+  @Patch(':id/profile')
+  @RequirePermission('trainers.status')
+  @ApiOperation({ summary: 'Correct a trainer\'s details (name, birth date, gender, address, services, experience, languages, bio). Recorded in the history.' })
+  editProfile(@CurrentUser() admin: AuthUser, @Param('id', new ZodValidationPipe(idSchema)) id: string, @Body(new ZodValidationPipe(profileSchema)) body: z.infer<typeof profileSchema>) {
+    return this.admin.updateProfile(admin.id, id, body);
   }
 }

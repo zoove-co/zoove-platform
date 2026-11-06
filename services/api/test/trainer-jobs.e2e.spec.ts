@@ -257,6 +257,7 @@ suite('trainer jobs: who is free, assigning, open jobs, accepting and cancelling
       const before = (await board(t1)).doneCount;
       const codes = (await pool.query(`select start_code, end_code from bookings where id = $1`, [id])).rows[0] as { start_code: string; end_code: string };
       await http().post(`/v1/trainer/jobs/${id}/check-in`).set(as(t1)).send({ code: codes.start_code }).expect(200);
+      await pool.query(`update bookings set ends_at = now() - interval '1 minute' where id = $1`, [id]);
       const done = (await http().post(`/v1/trainer/jobs/${id}/check-out`).set(as(t1)).send({ code: codes.end_code }).expect(200)).body as Awaited<ReturnType<typeof board>>;
       expect(done.mine.find((j) => j.id === id)).toBeUndefined();
       expect(done.done[0]).toMatchObject({ id, note: 'Bring a mat next time' });

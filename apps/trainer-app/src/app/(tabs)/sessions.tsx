@@ -9,6 +9,7 @@ import { Chip } from '@/components/ui/Chip';
 import { Screen } from '@/components/ui/Screen';
 import { TextField } from '@/components/ui/TextField';
 import { cancelJob, checkInJob, checkOutJob, errorMessage, type JobBoard } from '@/lib/api';
+import { LiveTimer } from '@/features/jobs/LiveTimer';
 import { SessionNote } from '@/features/jobs/SessionNote';
 import { useJobs, useSetBoard, whoFor } from '@/lib/useJobs';
 import { colors } from '@/theme';
@@ -75,6 +76,7 @@ export default function Sessions() {
       )) : mine.map((job) => (
         <Card key={job.id}>
           <AppText variant="heading">{job.whenLabel}</AppText>
+          {job.started ? <LiveTimer endsAt={job.endsAt} /> : null}
           <AppText variant="body">{`${job.serviceName} · ${job.formatName} · ${whoFor(job)}`}</AppText>
           <AppText variant="body" color={colors.muted}>{`${job.customerFirstName} · ${job.addressLabel}: ${job.addressLine}${job.pincode ? `, ${job.pincode}` : ''}`}</AppText>
           <AppText variant="caption" color={colors.muted}>{`Session ${job.sessionCode}`}</AppText>
@@ -83,9 +85,15 @@ export default function Sessions() {
 
           {job.started ? (
             <View style={{ marginTop: 10, gap: 10 }}>
-              <Banner tone="good">This session is live.</Banner>
-              <TextField label="Finish code" placeholder="4 digits" keyboardType="number-pad" maxLength={4} value={codes[job.id] ?? ''} onChangeText={(v) => setCode(job.id, v)} hint="After the training, ask the customer for the finish code in their app." />
-              <Button label="Finish session" small loading={busy === job.id} disabled={(codes[job.id] ?? '').length !== 4} onPress={() => void run(job.id, () => checkOutJob(job.id, codes[job.id] ?? ''), 'Thank you. The session is done.')} />
+              <LiveTimer endsAt={job.endsAt} big />
+              {job.timeUp ? (
+                <>
+                  <TextField label="Finish code" placeholder="4 digits" keyboardType="number-pad" maxLength={4} value={codes[job.id] ?? ''} onChangeText={(v) => setCode(job.id, v)} hint="Time is over. Ask the customer for the finish code in their app." />
+                  <Button label="Finish session" small loading={busy === job.id} disabled={(codes[job.id] ?? '').length !== 4} onPress={() => void run(job.id, () => checkOutJob(job.id, codes[job.id] ?? ''), 'Thank you. The session is done.')} />
+                </>
+              ) : (
+                <AppText variant="caption" color={colors.muted}>The finish code opens when the timer ends. Train well.</AppText>
+              )}
             </View>
           ) : job.canCheckIn ? (
             <View style={{ marginTop: 10, gap: 10 }}>

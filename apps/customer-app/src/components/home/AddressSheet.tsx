@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { AddressForm } from '@/components/booking/AddressForm';
 import { AppText } from '@/components/ui/AppText';
@@ -32,7 +32,7 @@ export function AddressSheet({ visible, onClose }: Props) {
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={close}>
-      <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.overlay} behavior="padding">
         <Pressable accessibilityLabel={t('location.close')} style={styles.backdrop} onPress={close} />
         <View style={styles.sheet}>
           <View style={styles.header}>

@@ -245,6 +245,8 @@ export const getApplication = (id: string) => api<Detail>(`/v1/admin/trainer-app
 export const documentLink = (id: string, documentId: string) => api<{ url: string; expiresInSeconds: number }>(`/v1/admin/trainer-applications/${id}/documents/${documentId}/url`);
 export const setTrainerStatus = (id: string, status: TrainerStatus, reason?: string) =>
   api<unknown>(`/v1/admin/trainer-applications/${id}/trainer-status`, { method: 'POST', json: reason ? { status, reason } : { status } });
+export type ProfileEdit = Partial<{ firstName: string; lastName: string; dateOfBirth: string; gender: string; addressLine: string; addressArea: string; addressPincode: string; specialties: string[]; experienceYears: number; languages: string[]; bio: string }>;
+export const editTrainerProfile = (id: string, edit: ProfileEdit) => api<Detail>(`/v1/admin/trainer-applications/${id}/profile`, { method: 'PATCH', json: edit });
 export const startReview = (id: string) => api<unknown>(`/v1/admin/trainer-applications/${id}/start-review`, { method: 'POST', json: {} });
 export const approve = (id: string, note?: string) => api<unknown>(`/v1/admin/trainer-applications/${id}/approve`, { method: 'POST', json: note ? { note } : {} });
 export const reject = (id: string, reason: string) => api<unknown>(`/v1/admin/trainer-applications/${id}/reject`, { method: 'POST', json: { reason } });
@@ -336,7 +338,7 @@ export type SessionStatus = 'matching' | 'confirmed' | 'rematching' | 'completed
 export type AdminSession = {
   id: string; sessionCode: string; status: SessionStatus; mode: string; participant: string; groupSize: number | null; serviceName: string; formatName: string;
   startsAt: string | null; whenLabel: string; startPassed: boolean; area: string | null; customerName: string; customerContact: string;
-  trainerId: string | null; trainerName: string | null; trainerCancelCount: number; trainerCancelledAt: string | null; canMarkNoShow: boolean; live: boolean; startedAt: string | null; rating: number | null; totalPaise: number; paidWithCredit: boolean; discountCode: string | null; createdAt: string;
+  trainerId: string | null; trainerName: string | null; trainerCancelCount: number; trainerCancelledAt: string | null; canMarkNoShow: boolean; live: boolean; startedAt: string | null; endsAt: string | null; rating: number | null; totalPaise: number; paidWithCredit: boolean; discountCode: string | null; createdAt: string;
 };
 export type SessionDetail = AdminSession & {
   addressLabel: string; addressLine: string; pincode: string | null; recipient: { name: string; phone: string } | null;

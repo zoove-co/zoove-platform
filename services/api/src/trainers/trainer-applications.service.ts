@@ -420,7 +420,7 @@ export class TrainerApplicationsService {
     return this.storage.signedGetUrl(key, SIGNED_LINK_SECONDS);
   }
 
-  private async assertKnownServices(slugs: string[]): Promise<void> {
+  async assertKnownServices(slugs: string[]): Promise<void> {
     if (slugs.length === 0) return;
     const known = await this.db.query<{ slug: string }>(`select slug from services where is_active and slug = any($1)`, [slugs]);
     const ok = new Set(known.rows.map((row) => row.slug));
