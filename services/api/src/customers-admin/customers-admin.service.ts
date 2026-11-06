@@ -6,7 +6,7 @@ import { sessionCodeOf } from '../bookings/bookings.service';
 import { DatabaseService } from '../database/database.service';
 
 export type CustomerRow = {
-  id: string; name: string | null; email: string | null; phone: string; status: string; joinedAt: string; lastLoginAt: string | null;
+  id: string; name: string | null; email: string | null; phone: string | null; status: string; joinedAt: string; lastLoginAt: string | null;
   sessionsDone: number; sessionsUpcoming: number; spentPaise: number;
 };
 
@@ -19,7 +19,7 @@ export type CustomerDetail = CustomerRow & {
   ratingsGiven: number;
 };
 
-type ListDbRow = { id: string; full_name: string | null; email: string | null; phone_e164: string; status: string; created_at: Date; last_login_at: Date | null; done: string; upcoming: string; spent: string | null };
+type ListDbRow = { id: string; full_name: string | null; email: string | null; phone_e164: string | null; status: string; created_at: Date; last_login_at: Date | null; done: string; upcoming: string; spent: string | null };
 
 const LIST_LIMIT = 100;
 
@@ -30,10 +30,11 @@ export class CustomersAdminService {
   async list(q: string | undefined): Promise<{ customers: CustomerRow[]; total: number }> {
     const term = q?.trim() ?? '';
     const like = `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-    const where = `exists (select 1 from user_roles r where r.user_id = u.id and r.role = 'customer')
-                   and ($1 = '' or u.full_name ilike $2 or u.email ilike $2 or u.phone_e164 like $2)`;
+    // A customer is anyone with the customer role or any booking (someone who also works on the team can book too).
+    const where = `(exists (select 1 from user_roles r where r.user_id = u.id and r.role = 'customer') or exists (select 1 from bookings x where x.user_id = u.id))
+                   and ($1 = '' or u.full_name ilike $2 or u.email ilike $2 or u.phone_e164 like $2 or u.verified_email ilike $2)`;
     const rows = await this.db.query<ListDbRow>(
-      `select u.id, u.full_name, u.email, u.phone_e164, u.status, u.created_at, u.last_login_at,
+      `select u.id, u.full_name, coalesce(u.email, u.verified_email) as email, u.phone_e164, u.status, u.created_at, u.last_login_at,
               (select count(*) from bookings b where b.user_id = u.id and b.status = 'completed') as done,
               (select count(*) from bookings b where b.user_id = u.id and b.status in ('matching', 'confirmed', 'rematching')) as upcoming,
               (select coalesce(sum(b.total_paise), 0) from bookings b where b.user_id = u.id and b.status = 'completed') as spent
@@ -46,11 +47,11 @@ export class CustomersAdminService {
 
   async detail(adminId: string, id: string): Promise<CustomerDetail> {
     const found = await this.db.query<ListDbRow>(
-      `select u.id, u.full_name, u.email, u.phone_e164, u.status, u.created_at, u.last_login_at,
+      `select u.id, u.full_name, coalesce(u.email, u.verified_email) as email, u.phone_e164, u.status, u.created_at, u.last_login_at,
               (select count(*) from bookings b where b.user_id = u.id and b.status = 'completed') as done,
               (select count(*) from bookings b where b.user_id = u.id and b.status in ('matching', 'confirmed', 'rematching')) as upcoming,
               (select coalesce(sum(b.total_paise), 0) from bookings b where b.user_id = u.id and b.status = 'completed') as spent
-         from users u where u.id = $1 and exists (select 1 from user_roles r where r.user_id = u.id and r.role = 'customer')`,
+         from users u where u.id = $1 and (exists (select 1 from user_roles r where r.user_id = u.id and r.role = 'customer') or exists (select 1 from bookings x where x.user_id = u.id))`,
       [id],
     );
     const row = found.rows[0];

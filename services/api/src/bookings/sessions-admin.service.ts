@@ -80,14 +80,15 @@ export class SessionsAdminService {
     return { needsTrainer: Number(r.needs), trainerCancelled: Number(r.cancelled), overdue: Number(r.overdue) };
   }
 
-  async list(filter: SessionFilter, q?: string): Promise<AdminSession[]> {
+  async list(filter: SessionFilter, q?: string, customerId?: string): Promise<AdminSession[]> {
     const where = filter === 'needs_trainer' ? `b.status in ('matching', 'rematching')` : filter === 'upcoming' ? `b.status = 'confirmed' and (b.starts_at is null or b.starts_at >= now() - interval '3 hours')` : 'true';
     const order = filter === 'needs_trainer' ? `(b.starts_at is not null and b.starts_at <= now()) desc, (b.status = 'rematching') desc, b.starts_at nulls first, b.created_at` : filter === 'upcoming' ? `b.starts_at nulls first` : `b.created_at desc`;
     const term = q?.trim().replace(/^zv-/i, '') ?? '';
     const r = await this.db.query<ListRow>(
       `select ${COLS} ${FROM} where ${where} and ($1 = '' or upper(right(replace(b.id::text, '-', ''), 8)) = upper($1) or u.email ilike $2 or u.full_name ilike $2)
+        and ($3::uuid is null or b.user_id = $3::uuid)
         order by ${order} limit 300`,
-      [term, `%${term.replace(/[%_]/g, '')}%`],
+      [term, `%${term.replace(/[%_]/g, '')}%`, customerId ?? null],
     );
     const now = new Date();
     return r.rows.map((row) => toSession(row, now));

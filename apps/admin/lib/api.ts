@@ -346,7 +346,7 @@ export type SessionDetail = AdminSession & {
 };
 export type SessionFilter = 'needs_trainer' | 'upcoming' | 'all';
 export const sessionSummary = () => api<{ needsTrainer: number; trainerCancelled: number; overdue: number }>('/v1/admin/sessions/summary');
-export const listSessions = (filter: SessionFilter, q: string) => api<AdminSession[]>(`/v1/admin/sessions?filter=${filter}${q.trim() ? `&q=${encodeURIComponent(q.trim())}` : ''}`);
+export const listSessions = (filter: SessionFilter, q: string, customerId?: string) => api<AdminSession[]>(`/v1/admin/sessions?filter=${filter}${q.trim() ? `&q=${encodeURIComponent(q.trim())}` : ''}${customerId ? `&customerId=${customerId}` : ''}`);
 export const getSession = (id: string) => api<SessionDetail>(`/v1/admin/sessions/${id}`);
 // Trainers who are free for this session (not busy at its time, did not drop it). sameDay = sessions they already have that day.
 export type AvailableTrainer = { id: string; name: string; sameDay: number; acceptingJobs: boolean };
@@ -362,7 +362,7 @@ export const moveSession = (id: string, startsAt: string, reason: string) => api
 
 // ---- Customers (read-only) ----
 export type CustomerRow = {
-  id: string; name: string | null; email: string | null; phone: string; status: string; joinedAt: string; lastLoginAt: string | null;
+  id: string; name: string | null; email: string | null; phone: string | null; status: string; joinedAt: string; lastLoginAt: string | null;
   sessionsDone: number; sessionsUpcoming: number; spentPaise: number;
 };
 export type CustomerDetail = CustomerRow & {

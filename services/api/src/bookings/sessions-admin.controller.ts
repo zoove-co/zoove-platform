@@ -9,7 +9,7 @@ import { Roles, RolesGuard } from '../identity/roles.guard';
 import { SessionsAdminService } from './sessions-admin.service';
 
 const idSchema = z.uuid();
-const listSchema = z.object({ filter: z.enum(['needs_trainer', 'upcoming', 'all']).default('needs_trainer'), q: z.string().trim().max(80).optional() });
+const listSchema = z.object({ filter: z.enum(['needs_trainer', 'upcoming', 'all']).default('needs_trainer'), q: z.string().trim().max(80).optional(), customerId: z.uuid().optional() });
 const cancelSchema = z.object({ reason: z.string().trim().min(3).max(300) });
 const noShowSchema = z.object({ note: z.string().trim().min(3).max(300) });
 const moveSchema = z.object({ startsAt: z.iso.datetime({ offset: true }), reason: z.string().trim().min(3).max(300) });
@@ -38,7 +38,7 @@ export class SessionsAdminController {
   trainers() { return this.sessions.trainers(); }
 
   @Get()
-  list(@Query(new ZodValidationPipe(listSchema)) query: z.infer<typeof listSchema>) { return this.sessions.list(query.filter, query.q); }
+  list(@Query(new ZodValidationPipe(listSchema)) query: z.infer<typeof listSchema>) { return this.sessions.list(query.filter, query.q, query.customerId); }
 
   @Get(':id/available-trainers')
   available(@Param('id', new ZodValidationPipe(idSchema)) id: string) { return this.sessions.availableTrainers(id); }

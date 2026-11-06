@@ -42,6 +42,8 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
   const me = useMe();
   const [filter, setFilter] = useState<SessionFilter>('needs_trainer');
   const [query, setQuery] = useState('');
+  // Set when the page is opened from a customer's row: only that customer's sessions, past, live and coming up.
+  const [customer, setCustomer] = useState<{ id: string; name: string } | null>(null);
   const [rows, setRows] = useState<AdminSession[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<SessionDetail | null>(null);
@@ -63,8 +65,8 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
   }, [expired]);
 
   const load = useCallback(async () => {
-    try { setRows(await listSessions(filter, query)); setError(null); } catch (err) { setError(handle(err) || null); }
-  }, [filter, query, handle]);
+    try { setRows(await listSessions(filter, query, customer?.id)); setError(null); } catch (err) { setError(handle(err) || null); }
+  }, [filter, query, customer, handle]);
 
   useEffect(() => {
     if (!can(me, 'sessions.manage')) return;
@@ -78,8 +80,11 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
 
   // The email link opens this page with ?code=ZV-XXXXXXXX: search for that session across all sessions.
   useEffect(() => {
-    const code = new URLSearchParams(window.location.search).get('code');
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
     if (code) { setQuery(code); setFilter('all'); }
+    const customerId = params.get('customer');
+    if (customerId && /^[0-9a-f-]{36}$/i.test(customerId)) { setCustomer({ id: customerId, name: params.get('name') ?? 'this customer' }); setFilter('all'); }
   }, []);
   useEffect(() => {
     if (!can(me, 'sessions.manage')) return;
@@ -145,6 +150,12 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
         {FILTERS.map(([key, label]) => <button key={key} type="button" className="chipbtn" aria-pressed={filter === key} onClick={() => setFilter(key)}>{label}</button>)}
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by session code, name or email" aria-label="Search sessions" style={{ flex: '1 1 220px', maxWidth: 360 }} />
       </div>
+      {customer ? (
+        <div style={{ marginBottom: 14, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span className="pill in_review">Sessions of {customer.name}</span>
+          <button type="button" className="chipbtn" onClick={() => { setCustomer(null); window.history.replaceState(null, '', '/sessions'); }}>Show all customers</button>
+        </div>
+      ) : null}
       {error ? <Banner tone="bad">{error}</Banner> : null}
       {!rows && !error ? <div className="center" style={{ padding: 40 }}><Spinner /></div> : null}
       {rows && rows.length === 0 ? <Banner tone="info">{filter === 'needs_trainer' ? 'Every session has a trainer.' : 'No sessions found.'}</Banner> : null}

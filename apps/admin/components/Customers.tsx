@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
 import { ApiError, getCustomer, listCustomers, type CustomerDetail, type CustomerRow } from '@/lib/api';
@@ -78,10 +79,13 @@ export function Customers({ signOut, expired }: { signOut: () => void; expired: 
               {rows.map((c) => (
                 <tr key={c.id}>
                   <td><b>{c.name ?? 'No name yet'}</b>{c.status !== 'active' ? <div className="sub small" style={{ color: 'var(--red)', fontWeight: 600 }}>{c.status}</div> : null}</td>
-                  <td>{c.phone}<div className="sub muted small">{c.email ?? 'No email'}</div></td>
+                  <td>{c.phone ?? '—'}<div className="sub muted small">{c.email ?? 'No email'}</div></td>
                   <td>{c.sessionsDone} done{c.sessionsUpcoming ? ` · ${c.sessionsUpcoming} coming up` : ''}<div className="sub muted small">{rupees(c.spentPaise)} spent</div></td>
                   <td>{day(c.joinedAt)}<div className="sub muted small">{c.lastLoginAt ? `Last seen ${day(c.lastLoginAt)}` : 'Never signed in'}</div></td>
-                  <td><button className="btn ghost" type="button" disabled={opening === c.id} onClick={() => void show(c.id)}>{opening === c.id ? <Spinner /> : null} Open</button></td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <Link className="btn ghost" href={`/sessions?customer=${c.id}&name=${encodeURIComponent(c.name ?? c.email ?? c.phone ?? 'this customer')}`}>Sessions</Link>{' '}
+                    <button className="btn ghost" type="button" disabled={opening === c.id} onClick={() => void show(c.id)}>{opening === c.id ? <Spinner /> : null} Open</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -94,7 +98,7 @@ export function Customers({ signOut, expired }: { signOut: () => void; expired: 
           <div className="sheet wide" onClick={(event) => event.stopPropagation()}>
             <h2>{open.name ?? 'No name yet'}</h2>
             <dl className="kv">
-              <dt>Phone</dt><dd>{open.phone}</dd>
+              <dt>Phone</dt><dd>{open.phone ?? '—'}</dd>
               <dt>Email</dt><dd>{open.email ?? '—'}</dd>
               <dt>Joined</dt><dd>{day(open.joinedAt)}{open.lastLoginAt ? ` · last seen ${stamp(open.lastLoginAt)}` : ''}</dd>
               <dt>Sessions</dt><dd>{open.sessionsDone} done{open.sessionsUpcoming ? ` · ${open.sessionsUpcoming} coming up` : ''} · {rupees(open.spentPaise)} spent</dd>

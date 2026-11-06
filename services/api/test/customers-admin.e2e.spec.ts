@@ -91,4 +91,12 @@ suite('admin customers', () => {
     expect(audit.rows[0].actor_user_id).toBe(ownerId);
     await http().get('/v1/admin/customers/not-an-id').set(as(ownerToken)).expect(400);
   });
+
+  it('filters the sessions list to one customer', async () => {
+    const mine = await http().get('/v1/admin/sessions').query({ filter: 'all', customerId: anitaId }).set(as(ownerToken)).expect(200);
+    expect(mine.body).toEqual([]); // Anita has not booked
+    const everyone = await http().get('/v1/admin/sessions').query({ filter: 'all' }).set(as(ownerToken)).expect(200);
+    expect(Array.isArray(everyone.body)).toBe(true);
+    await http().get('/v1/admin/sessions').query({ filter: 'all', customerId: 'nope' }).set(as(ownerToken)).expect(400);
+  });
 });
