@@ -375,3 +375,11 @@ export type CustomerDetail = CustomerRow & {
 };
 export const listCustomers = (q: string) => api<{ customers: CustomerRow[]; total: number }>(`/v1/admin/customers${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ''}`);
 export const getCustomer = (id: string) => api<CustomerDetail>(`/v1/admin/customers/${id}`);
+
+export type AdminArea = { id: string; slug: string; name: string; city: string; status: 'active' | 'locked'; rolloutStage: number; activatedAt: string | null; pincodes: string[]; trainerCount: number };
+export const listAreas = () => api<AdminArea[]>('/v1/admin/areas');
+export const createArea = (input: { name: string; city: string; pincodes: string[]; active: boolean }) => api<{ id: string }>('/v1/admin/areas', { method: 'POST', json: input });
+export const renameArea = (id: string, name: string) => api<AdminArea[]>(`/v1/admin/areas/${id}`, { method: 'POST', json: { name } });
+export const setAreaActive = (id: string, active: boolean) => api<AdminArea[]>(`/v1/admin/areas/${id}/status`, { method: 'PUT', json: { active } });
+export const addAreaPincode = (id: string, pincode: string) => api<AdminArea[]>(`/v1/admin/areas/${id}/pincodes`, { method: 'POST', json: { pincode } });
+export const removeAreaPincode = (id: string, pincode: string) => api<AdminArea[]>(`/v1/admin/areas/${id}/pincodes/${pincode}`, { method: 'DELETE' });

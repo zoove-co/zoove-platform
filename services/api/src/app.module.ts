@@ -8,6 +8,7 @@ import { APP_CONFIG, type Env } from './config/env';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AddressesModule } from './addresses/addresses.module';
 import { BookingsModule } from './bookings/bookings.module';
+import { AreasAdminModule } from './areas-admin/areas-admin.module';
 import { CustomersAdminModule } from './customers-admin/customers-admin.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { CustomerModule } from './customer/customer.module';
@@ -53,6 +54,7 @@ import { TrainersModule } from './trainers/trainers.module';
     ReferralModule,
     BookingsModule,
     CustomersAdminModule,
+    AreasAdminModule,
     CustomerModule,
     TrainersModule,
     TeamModule,

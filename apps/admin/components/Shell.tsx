@@ -104,9 +104,10 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
   const onPackages = path.startsWith('/packages');
   const onSessions = path.startsWith('/sessions');
   const onOfferings = path.startsWith('/offerings');
+  const onAreas = path.startsWith('/areas');
   const onRewards = path.startsWith('/rewards');
   const onCustomers = path.startsWith('/customers');
-  const other = onCustomers || onTeam || onCalc || onDiscounts || onParties || onPackages || onSessions || onOfferings || onRewards;
+  const other = onCustomers || onTeam || onCalc || onDiscounts || onParties || onPackages || onSessions || onOfferings || onAreas || onRewards;
   // Sessions waiting for a trainer, so a cancellation is noticed without opening the page.
   const [waiting, setWaiting] = useState(0);
   const [overdue, setOverdue] = useState(0);
@@ -158,6 +159,12 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
             <Link href="/offerings" aria-current={onOfferings ? 'page' : undefined}>
               {Icons.card}
               Offerings
+            </Link>
+          ) : null}
+          {can(me, 'catalog.manage') ? (
+            <Link href="/areas" aria-current={onAreas ? 'page' : undefined}>
+              {Icons.pin}
+              Areas
             </Link>
           ) : null}
           {can(me, 'parties.manage') ? (

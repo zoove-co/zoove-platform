@@ -32,7 +32,7 @@ export const PERMISSIONS: PermissionInfo[] = [
   { key: 'discounts.manage', group: 'Tools', label: 'Discount codes', hint: 'Create and switch off discount codes (goodwill, emergencies, referrals). Every code is recorded with who made it.', soon: false },
   { key: 'packages.manage', group: 'Tools', label: 'Packages and package orders', hint: 'Edit session packages and mark package orders as paid. Every change is recorded.', soon: false },
   { key: 'parties.manage', group: 'Tools', label: 'Party requests', hint: 'See party requests, call the customer and mark them confirmed.', soon: false },
-  { key: 'catalog.manage', group: 'Tools', label: 'Offerings and prices', hint: 'Edit services, styles, session prices and the Duo, Loved one and Group prices. Every change is recorded.', soon: false },
+  { key: 'catalog.manage', group: 'Tools', label: 'Offerings, prices and areas', hint: 'Edit services, styles, session prices and the Duo, Loved one and Group prices, and choose which areas and pincodes are open for booking. Every change is recorded.', soon: false },
   { key: 'rewards.manage', group: 'Tools', label: 'Rewards', hint: 'Set what a referral earns and see the rewards given out. Every change is recorded.', soon: false },
   { key: 'sessions.manage', group: 'Tools', label: 'Sessions', hint: 'See sessions, record a trainer cancelling and assign a trainer. Every change is recorded.', soon: false },
   { key: 'tools.economics', group: 'Tools', label: 'Session economics calculator', hint: 'Use the pricing and trainer payout calculator.', soon: false },
