@@ -30,7 +30,7 @@ export class ExpoPushChannel implements MessageChannel {
     const response = await this.http(ENDPOINT, {
       method: 'POST',
       headers,
-      body: JSON.stringify(devices.rows.map((d) => ({ to: d.token, title: message.title, body: message.body, sound: 'default', data: { bookingId: message.bookingId } }))),
+      body: JSON.stringify(devices.rows.map((d) => ({ to: d.token, title: message.title, body: message.body, sound: 'default', priority: 'high', channelId: 'default', data: { bookingId: message.bookingId } }))),
       signal: AbortSignal.timeout(15_000),
     });
     if (!response.ok) throw new Error(`push service answered ${response.status}`);
