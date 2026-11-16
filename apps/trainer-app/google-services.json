@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "606925425776",
+    "project_id": "zoove-in",
+    "storage_bucket": "zoove-in.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:606925425776:android:77f246eef875d73302b8b5",
+        "android_client_info": {
+          "package_name": "co.zoove.trainer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDgD-OLAWsXlfAxZu9ntjaz8thF0wNCHNg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
