@@ -16,6 +16,7 @@
     },
     "android": {
       "package": "co.zoove.customer",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#4B18F8",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
