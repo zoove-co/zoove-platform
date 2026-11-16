@@ -1,6 +1,7 @@
 {
   "name": "zoove-platform",
   "private": true,
+  "packageManager": "pnpm@10.34.6",
   "version": "0.0.0",
   "description": "Zoove platform monorepo: customer app, trainer app, admin, API, shared packages, database migrations.",
   "engines": {
