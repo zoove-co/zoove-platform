@@ -33,6 +33,8 @@
       "expo-secure-store",
       ["expo-image-picker", { "cameraPermission": "Zoove uses your camera to photograph your ID documents and take your selfie for KYC.", "photosPermission": "Zoove uses your photos so you can choose pictures of your ID documents and certificates." }]
     ],
-    "experiments": { "typedRoutes": true, "reactCompiler": true }
+    "experiments": { "typedRoutes": true, "reactCompiler": true },
+    "extra": { "eas": { "projectId": "6a43e988-9bdd-436d-84b6-f2f2f5c6b795" } },
+    "owner": "riteshsharma555"
   }
 }
