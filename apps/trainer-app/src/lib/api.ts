@@ -230,7 +230,7 @@ export const getJobs = () => call<JobBoard>('/v1/trainer/jobs');
 export type EarnPeriod = { sessions: number; earnedPaise: number };
 export type EarnSlice = { name: string; sessions: number; earnedPaise: number };
 export type Insights = {
-  payoutPerSessionPaise: number | null;
+  payouts: { personal: number | null; duo: number | null; loved_one: number | null; group: number | null };
   earningsKnown: boolean;
   periods: { today: EarnPeriod; week: EarnPeriod; month: EarnPeriod; lifetime: EarnPeriod };
   weekly: { label: string; start: string; sessions: number; earnedPaise: number }[];

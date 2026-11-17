@@ -393,8 +393,10 @@ export const getAttention = () => api<Attention>('/v1/admin/attention');
 // ---- Trainer earnings and analytics ----
 export type EarnPeriod = { sessions: number; earnedPaise: number; valuePaise?: number };
 export type EarnSlice = { name: string; sessions: number; earnedPaise: number };
+// What a trainer earns for one completed session, by kind of session (null = not set). The same for every trainer.
+export type TrainerPayouts = { personal: number | null; duo: number | null; loved_one: number | null; group: number | null };
 export type TrainerInsights = {
-  payoutPerSessionPaise: number | null; earningsKnown: boolean;
+  payouts: TrainerPayouts; earningsKnown: boolean;
   periods: { today: EarnPeriod; week: EarnPeriod; month: EarnPeriod; lifetime: EarnPeriod };
   weekly: { label: string; start: string; sessions: number; earnedPaise: number }[];
   monthly: { label: string; month: string; sessions: number; earnedPaise: number }[];
@@ -407,5 +409,5 @@ export type TrainerSessionItem = {
 };
 export type TrainerPerformance = { insights: TrainerInsights; live: TrainerSessionItem[]; upcoming: TrainerSessionItem[]; past: TrainerSessionItem[] };
 export const getTrainerPerformance = (applicationId: string) => api<TrainerPerformance>(`/v1/admin/trainers/${applicationId}/performance`);
-export const getTrainerPayout = () => api<{ payoutPerSessionPaise: number | null }>('/v1/admin/trainer-payout');
-export const setTrainerPayout = (paise: number | null) => api<{ payoutPerSessionPaise: number | null; filledIn: number }>('/v1/admin/trainer-payout', { method: 'PUT', json: { paise } });
+export const getTrainerPayout = () => api<{ payouts: TrainerPayouts }>('/v1/admin/trainer-payout');
+export const setTrainerPayout = (payouts: TrainerPayouts) => api<{ payouts: TrainerPayouts; filledIn: number }>('/v1/admin/trainer-payout', { method: 'PUT', json: { payouts } });

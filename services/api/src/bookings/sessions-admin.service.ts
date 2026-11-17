@@ -140,8 +140,8 @@ export class SessionsAdminService {
   }
 
   private async lock(client: PoolClient, id: string) {
-    const r = await client.query<{ id: string; user_id: string; status: BookingStatus; mode: string; starts_at: Date | null; coach_id: string | null; service_name: string; package_purchase_id: string | null; address_area: string | null; minutes: number; started_at: Date | null; ends_at: Date | null; start_code: string; end_code: string; code_attempts: number; code_attempt_at: Date | null }>(
-      `select b.id, b.user_id, b.status, b.mode, b.starts_at, b.coach_id, b.package_purchase_id, b.address_area, b.started_at, b.ends_at, b.start_code, b.end_code, b.code_attempts, b.code_attempt_at, s.name as service_name, s.duration_max_minutes as minutes from bookings b join services s on s.id = b.service_id where b.id = $1 for update of b`, [id]);
+    const r = await client.query<{ id: string; user_id: string; status: BookingStatus; mode: string; participant: string; starts_at: Date | null; coach_id: string | null; service_name: string; package_purchase_id: string | null; address_area: string | null; minutes: number; started_at: Date | null; ends_at: Date | null; start_code: string; end_code: string; code_attempts: number; code_attempt_at: Date | null }>(
+      `select b.id, b.user_id, b.status, b.mode, b.participant, b.starts_at, b.coach_id, b.package_purchase_id, b.address_area, b.started_at, b.ends_at, b.start_code, b.end_code, b.code_attempts, b.code_attempt_at, s.name as service_name, s.duration_max_minutes as minutes from bookings b join services s on s.id = b.service_id where b.id = $1 for update of b`, [id]);
     const row = r.rows[0];
     if (!row) throw new DomainError('NOT_FOUND', 'We could not find that session.');
     return row;
@@ -252,8 +252,8 @@ export class SessionsAdminService {
       if (row.status !== 'confirmed' || !row.coach_id) throw new DomainError('INVALID_STATE', 'Only a session that has a trainer on it can be marked as done.');
       if (onlyCoachId && row.coach_id !== onlyCoachId) throw new DomainError('INVALID_STATE', 'This session is not yours.');
       if (!row.started_at && row.starts_at && row.starts_at.getTime() > Date.now()) throw new DomainError('INVALID_STATE', 'This session has not started yet.');
-      // The trainer's flat payout as it is now, saved on the session so a later change never rewrites it (null while no amount is set).
-      const payout = await payoutSnapshot(client);
+      // The trainer's payout for this kind of session as it is now, saved on the session so a later change never rewrites it (null while no amount is set).
+      const payout = await payoutSnapshot(client, row.participant);
       await client.query(`update bookings set status = 'completed', completed_at = now(), completed_by = $2, starts_at = coalesce(starts_at, now()), trainer_payout_paise = $3 where id = $1`, [id, actorUserId, payout]);
       await client.query(`insert into booking_events (id, booking_id, type, actor, payload) values ($1, $2, 'completed', $3, $4)`, [uuidv7(), id, actor, JSON.stringify({ trainerId: row.coach_id, byUserId: actorUserId })]);
       await client.query(`insert into outbox_events (id, aggregate_type, aggregate_id, event_type, payload) values ($1, 'booking', $2, 'booking.completed', $3)`, [

@@ -1,15 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { ApiError, getTrainerPerformance, setTrainerPayout, type EarnSlice, type TrainerPerformance as Data, type TrainerSessionItem } from '@/lib/api';
+import { ApiError, getTrainerPerformance, setTrainerPayout, type TrainerPayouts, type EarnSlice, type TrainerPerformance as Data, type TrainerSessionItem } from '@/lib/api';
 import { can, useMe } from './me';
 import { Banner, CallLink, Spinner } from './ui';
 
 const rupees = (paise: number) => `₹${(paise / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 const stamp = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' });
 const PEOPLE: Record<string, string> = { personal: 'Personal', duo: 'Duo', loved_one: 'Loved one', group: 'Group' };
+const PAYOUT_KINDS: [keyof TrainerPayouts, string][] = [['personal', 'Personal'], ['duo', 'Duo'], ['loved_one', 'Loved one (Family)'], ['group', 'Group']];
 
 type Tab = 'live' | 'upcoming' | 'past';
 
@@ -58,7 +59,8 @@ export function TrainerPerformance({ applicationId, phone, expired }: { applicat
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('upcoming');
   const [chart, setChart] = useState<'weekly' | 'monthly'>('weekly');
-  const [amount, setAmount] = useState('');
+  const [amounts, setAmounts] = useState<Record<keyof TrainerPayouts, string>>({ personal: '', duo: '', loved_one: '', group: '' });
+  const filled = useRef(false);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -67,7 +69,12 @@ export function TrainerPerformance({ applicationId, phone, expired }: { applicat
       const result = await getTrainerPerformance(applicationId);
       setData(result);
       setError(null);
-      setAmount((current) => current || (result.insights.payoutPerSessionPaise !== null ? String(result.insights.payoutPerSessionPaise / 100) : ''));
+      // Fill the boxes from the saved amounts once, so what an owner is typing is never overwritten by a refresh.
+      if (!filled.current) {
+        filled.current = true;
+        const pick = (v: number | null) => (v === null ? '' : String(v / 100));
+        setAmounts({ personal: pick(result.insights.payouts.personal), duo: pick(result.insights.payouts.duo), loved_one: pick(result.insights.payouts.loved_one), group: pick(result.insights.payouts.group) });
+      }
       setTab((current) => (current === 'upcoming' && result.live.length > 0 && result.upcoming.length === 0 ? 'live' : current));
     } catch (err) {
       if (err instanceof ApiError && err.code === 'SESSION_EXPIRED') return expired();
@@ -77,11 +84,16 @@ export function TrainerPerformance({ applicationId, phone, expired }: { applicat
   useEffect(() => { void load(); }, [load]);
 
   async function savePayout() {
-    const rupeesTyped = Number(amount);
-    if (!Number.isFinite(rupeesTyped) || rupeesTyped < 0 || rupeesTyped > 10000) { setError('Enter an amount between ₹0 and ₹10,000.'); return; }
+    const toPaise = (text: string): number | null | 'bad' => {
+      if (text.trim() === '') return null;
+      const n = Number(text);
+      return Number.isFinite(n) && n >= 0 && n <= 10000 ? Math.round(n * 100) : 'bad';
+    };
+    const next = { personal: toPaise(amounts.personal), duo: toPaise(amounts.duo), loved_one: toPaise(amounts.loved_one), group: toPaise(amounts.group) };
+    if (Object.values(next).includes('bad')) { setError('Enter amounts between ₹0 and ₹10,000, or leave a box empty.'); return; }
     setSaving(true); setNotice(null);
     try {
-      const r = await setTrainerPayout(Math.round(rupeesTyped * 100));
+      const r = await setTrainerPayout(next as TrainerPayouts);
       setNotice(r.filledIn > 0 ? `Saved. ${r.filledIn} finished session${r.filledIn === 1 ? '' : 's'} that had no amount now carry it.` : 'Saved. It applies to sessions finished from now on.');
       setError(null);
       await load();
@@ -131,12 +143,21 @@ export function TrainerPerformance({ applicationId, phone, expired }: { applicat
 
       {me?.isOwner ? (
         <div className="panel" style={{ padding: 14, margin: '6px 0 16px' }}>
-          <strong>Payout per completed session</strong>
-          <p className="muted small" style={{ margin: '4px 0 10px' }}>One flat amount for every trainer. Each session keeps the amount that applied when it was finished, so changing it never rewrites past earnings. Sessions finished before any amount was set get the first amount you save.</p>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <span>₹</span>
-            <input type="number" inputMode="decimal" min="0" max="10000" step="1" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="Payout per completed session in rupees" style={{ width: 140 }} />
-            <button className="btn" type="button" disabled={saving || amount.trim() === ''} onClick={() => void savePayout()}>{saving ? <Spinner /> : null} Save</button>
+          <strong>What a trainer earns per completed session</strong>
+          <p className="muted small" style={{ margin: '4px 0 10px' }}>One amount for each kind of session, the same for every trainer and for instant or scheduled. Each session keeps the amount that applied when it was finished, so changing it never rewrites past earnings. Finished sessions that have no amount yet get the amount for their kind when you save it. A kind left empty earns nothing until you set it.</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, alignItems: 'end' }}>
+            {PAYOUT_KINDS.map(([key, label]) => (
+              <label key={key} className="small" style={{ display: 'grid', gap: 4 }}>
+                {label}
+                <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <span>₹</span>
+                  <input type="number" inputMode="decimal" min="0" max="10000" step="1" value={amounts[key]} onChange={(e) => setAmounts((cur) => ({ ...cur, [key]: e.target.value }))} aria-label={`Payout for ${label} in rupees`} style={{ width: '100%', minWidth: 0 }} />
+                </span>
+              </label>
+            ))}
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <button className="btn" type="button" disabled={saving} onClick={() => void savePayout()}>{saving ? <Spinner /> : null} Save</button>
           </div>
           {notice ? <p className="small" style={{ margin: '8px 0 0', color: 'var(--green)' }}>{notice}</p> : null}
         </div>

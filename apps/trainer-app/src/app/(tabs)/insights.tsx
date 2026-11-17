@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
@@ -13,7 +13,7 @@ const CHART_HEIGHT = 120;
 
 // One bar that grows into place when it first shows and again when its value changes.
 function Bar({ value, max, label, top, current }: { value: number; max: number; label: string; top: string; current: boolean }) {
-  const grow = useRef(new Animated.Value(0)).current;
+  const [grow] = useState(() => new Animated.Value(0));
   const target = value > 0 ? Math.max(6, Math.round((value / max) * CHART_HEIGHT)) : 3;
   useEffect(() => {
     Animated.timing(grow, { toValue: target, duration: 520, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
@@ -59,7 +59,7 @@ function Chart({ data, known }: { data: Insights; known: boolean }) {
 function Breakdown({ title, rows, known }: { title: string; rows: EarnSlice[]; known: boolean }) {
   const metric = (r: EarnSlice) => (known ? r.earnedPaise : r.sessions);
   const total = rows.reduce((sum, r) => sum + metric(r), 0) || 1;
-  const grow = useRef(new Animated.Value(0)).current;
+  const [grow] = useState(() => new Animated.Value(0));
   useEffect(() => {
     Animated.timing(grow, { toValue: 1, duration: 600, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
   }, [grow]);
@@ -89,6 +89,12 @@ export default function Earnings() {
   const data = q.data;
   const known = data?.earningsKnown ?? false;
   const p = data?.periods;
+  // "Personal ₹1,200 · Duo ₹1,560": what each kind of session pays, for the kinds that have an amount.
+  const perSession = data
+    ? ([['Personal', data.payouts.personal], ['Duo', data.payouts.duo], ['Family', data.payouts.loved_one], ['Group', data.payouts.group]] as [string, number | null][])
+        .filter((row): row is [string, number] => row[1] !== null)
+        .map(([label, paise]) => `${label} ${rupees(paise)}`)
+    : [];
   const tile = (label: string, period: { sessions: number; earnedPaise: number } | undefined) => (
     <Card soft style={{ flex: 1 }}>
       <AppText variant="eyebrow" color={colors.supportingPurple}>{label}</AppText>
@@ -113,8 +119,8 @@ export default function Earnings() {
             <AppText variant="body" color="rgba(255,255,255,0.85)">
               {known ? `${p.month.sessions} session${p.month.sessions === 1 ? '' : 's'} this month · ${rupees(p.week.earnedPaise)} this week` : 'Your earnings will show here once Zoove sets the payout for each session. Your session counts are below.'}
             </AppText>
-            {known && data.payoutPerSessionPaise !== null ? (
-              <View style={styles.heroChip}><AppText variant="bodyStrong" color={colors.white}>{`${rupees(data.payoutPerSessionPaise)} per completed session`}</AppText></View>
+            {known && perSession.length > 0 ? (
+              <View style={styles.heroChip}><AppText variant="bodyStrong" color={colors.white}>{perSession.join(' · ')}</AppText></View>
             ) : null}
           </View>
 

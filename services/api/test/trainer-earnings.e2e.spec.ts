@@ -30,9 +30,11 @@ suite('trainer earnings, analytics and the links between customer, session and t
     return (await http().post('/v1/auth/email-otp/verify').send({ email, code: CODE, audience: 'admin' }).expect(200)).body.token as string;
   }
   // One finished session for the trainer: book, assign, close.
-  async function finishedSession(): Promise<string> {
+  const pay = (personal: number | null, duo: number | null = null, loved_one: number | null = null, group: number | null = null) => ({ payouts: { personal, duo, loved_one, group } });
+  async function finishedSession(participant?: string): Promise<string> {
     const address = (await http().post('/v1/addresses').set(as(me)).send({ label: 'Home', line: `D-${(n += 1)}, Test Heights`, area: 'Bandra West', pincode: '400050' }).expect(201)).body.id as string;
     const id = (await http().post('/v1/bookings').set(as(me)).send({ serviceSlug: 'yoga', formatSlug: 'power-yoga', mode: 'instant', addressId: address, idempotencyKey: key() }).expect(201)).body.id as string;
+    if (participant) await pool.query(`update bookings set participant = $2 where id = $1`, [id, participant]);
     await http().post(`/v1/admin/sessions/${id}/assign`).set(as(owner)).send({ trainerId }).expect(200);
     await http().post(`/v1/admin/sessions/${id}/complete`).set(as(owner)).send({}).expect(200);
     return id;
@@ -58,22 +60,37 @@ suite('trainer earnings, analytics and the links between customer, session and t
     owner = await adminToken('owner-earn@zoove.test', true, []);
   });
 
-  it('shows no earnings until an owner sets the flat amount, then fills in sessions already finished', async () => {
+  it('shows no earnings until an owner sets the amounts, then fills in sessions already finished', async () => {
     await finishedSession();
     const before = (await http().get('/v1/trainer/insights').set(as(trainerToken)).expect(200)).body;
     expect(before.earningsKnown).toBe(false);
     expect(before.periods.lifetime).toEqual({ sessions: 1, earnedPaise: 0 });
-    const set = (await http().put('/v1/admin/trainer-payout').set(as(owner)).send({ paise: 80000 }).expect(200)).body;
-    expect(set).toEqual({ payoutPerSessionPaise: 80000, filledIn: 1 });
+    const set = (await http().put('/v1/admin/trainer-payout').set(as(owner)).send(pay(80000)).expect(200)).body;
+    expect(set).toEqual({ ...pay(80000), filledIn: 1 });
     const after = (await http().get('/v1/trainer/insights').set(as(trainerToken)).expect(200)).body;
     expect(after.earningsKnown).toBe(true);
     expect(after.periods.lifetime).toEqual({ sessions: 1, earnedPaise: 80000 });
   });
 
+  it('pays by kind of session: each kind has its own amount, and a kind with no amount earns nothing yet', async () => {
+    await http().put('/v1/admin/trainer-payout').set(as(owner)).send(pay(120000, 156000)).expect(200);
+    await finishedSession(); // personal
+    await finishedSession('duo');
+    await finishedSession('group'); // no amount set for group
+    const mine = (await http().get('/v1/trainer/insights').set(as(trainerToken)).expect(200)).body;
+    expect(mine.payouts).toEqual({ personal: 120000, duo: 156000, loved_one: null, group: null });
+    expect(mine.periods.lifetime).toEqual({ sessions: 3, earnedPaise: 276000 });
+    // Setting the group amount later fills in the group session that had none, and leaves the others alone.
+    const set = (await http().put('/v1/admin/trainer-payout').set(as(owner)).send(pay(999, 999, 999, 250000)).expect(200)).body;
+    expect(set.filledIn).toBe(1);
+    const after = (await http().get('/v1/trainer/insights').set(as(trainerToken)).expect(200)).body;
+    expect(after.periods.lifetime).toEqual({ sessions: 3, earnedPaise: 526000 });
+  });
+
   it('keeps each session at the amount that applied when it was closed', async () => {
-    await http().put('/v1/admin/trainer-payout').set(as(owner)).send({ paise: 80000 }).expect(200);
+    await http().put('/v1/admin/trainer-payout').set(as(owner)).send(pay(80000)).expect(200);
     await finishedSession();
-    await http().put('/v1/admin/trainer-payout').set(as(owner)).send({ paise: 90000 }).expect(200);
+    await http().put('/v1/admin/trainer-payout').set(as(owner)).send(pay(90000)).expect(200);
     await finishedSession();
     const mine = (await http().get('/v1/trainer/insights').set(as(trainerToken)).expect(200)).body;
     expect(mine.periods.lifetime).toEqual({ sessions: 2, earnedPaise: 170000 });
@@ -92,7 +109,7 @@ suite('trainer earnings, analytics and the links between customer, session and t
   });
 
   it('gives ops one trainer page: figures, what customers paid, and live, upcoming and past sessions with links', async () => {
-    await http().put('/v1/admin/trainer-payout').set(as(owner)).send({ paise: 80000 }).expect(200);
+    await http().put('/v1/admin/trainer-payout').set(as(owner)).send(pay(80000)).expect(200);
     const done = await finishedSession();
     const workAddress = (await http().post('/v1/addresses').set(as(me)).send({ label: 'Work', line: 'E-9, Tower', area: 'Bandra West', pincode: '400050' }).expect(201)).body.id as string;
     const open = (await http().post('/v1/bookings').set(as(me)).send({ serviceSlug: 'yoga', formatSlug: 'power-yoga', mode: 'instant', addressId: workAddress, idempotencyKey: key() }).expect(201)).body.id as string;
@@ -112,11 +129,11 @@ suite('trainer earnings, analytics and the links between customer, session and t
 
   it('lets only owners change the amount, and refuses silly amounts', async () => {
     const viewer = await adminToken('viewer-earn@zoove.test', false, ['trainers.view']);
-    await http().put('/v1/admin/trainer-payout').set(as(viewer)).send({ paise: 70000 }).expect(403);
-    expect((await http().get('/v1/admin/trainer-payout').set(as(viewer)).expect(200)).body).toEqual({ payoutPerSessionPaise: null });
-    await http().put('/v1/admin/trainer-payout').set(as(owner)).send({ paise: -5 }).expect(400);
-    await http().put('/v1/admin/trainer-payout').set(as(owner)).send({ paise: 99999999 }).expect(400);
-    await http().put('/v1/admin/trainer-payout').set(as(owner)).send({ paise: 12.5 }).expect(400);
+    await http().put('/v1/admin/trainer-payout').set(as(viewer)).send(pay(70000)).expect(403);
+    expect((await http().get('/v1/admin/trainer-payout').set(as(viewer)).expect(200)).body).toEqual(pay(null));
+    await http().put('/v1/admin/trainer-payout').set(as(owner)).send(pay(-5)).expect(400);
+    await http().put('/v1/admin/trainer-payout').set(as(owner)).send(pay(99999999)).expect(400);
+    await http().put('/v1/admin/trainer-payout').set(as(owner)).send(pay(12.5)).expect(400);
     const noAccess = await adminToken('none-earn@zoove.test', false, ['customers.view']);
     await http().get(`/v1/admin/trainers/${applicationId}/performance`).set(as(noAccess)).expect(403);
   });

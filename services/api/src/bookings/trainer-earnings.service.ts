@@ -9,16 +9,32 @@ import { formatWhen } from './rules';
 export const PAYOUT_KEY = 'trainer_payout_paise';
 export const MAX_PAYOUT_PAISE = 1_000_000; // Rs 10,000 a session: a typo guard, not a business rule
 
-// The amount to save on a session as it is closed (null while no amount is set). Runs inside the completing transaction.
-export async function payoutSnapshot(client: PoolClient): Promise<number | null> {
-  const r = await client.query<{ v: number | null }>(`select case when jsonb_typeof(value) = 'number' then (value #>> '{}')::int end as v from app_settings where key = $1`, [PAYOUT_KEY]);
-  return r.rows[0]?.v ?? null;
+// The trainer's payout depends on the kind of session, not on instant or scheduled (Pratik's revised sheet: Individual, Duo, Family and
+// Group each have their own payout, and a scheduled session pays the same base payout as an instant one). Not set = null.
+export const PAYOUT_TYPES = ['personal', 'duo', 'loved_one', 'group'] as const;
+export type PayoutType = (typeof PAYOUT_TYPES)[number];
+export type Payouts = Record<PayoutType, number | null>;
+type Queryable = { query: (text: string, params?: unknown[]) => Promise<{ rows: { value?: unknown }[] }> };
+
+function parsePayouts(value: unknown): Payouts {
+  const o = value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  const pick = (k: PayoutType): number | null => (typeof o[k] === 'number' && Number.isInteger(o[k]) && (o[k] as number) >= 0 ? (o[k] as number) : null);
+  return { personal: pick('personal'), duo: pick('duo'), loved_one: pick('loved_one'), group: pick('group') };
+}
+export async function readPayouts(db: Queryable): Promise<Payouts> {
+  const r = await db.query(`select value from app_settings where key = $1`, [PAYOUT_KEY]);
+  return parsePayouts(r.rows[0]?.value);
+}
+
+// The amount to save on a session as it is closed (null while no amount is set for its type). Runs inside the completing transaction.
+export async function payoutSnapshot(client: PoolClient, participant: string): Promise<number | null> {
+  return (await readPayouts(client))[participant as PayoutType] ?? null;
 }
 
 export type Period = { sessions: number; earnedPaise: number; valuePaise?: number };
 export type Slice = { name: string; sessions: number; earnedPaise: number };
 export type Insights = {
-  payoutPerSessionPaise: number | null;
+  payouts: Payouts;
   earningsKnown: boolean;
   periods: { today: Period; week: Period; month: Period; lifetime: Period };
   weekly: { label: string; start: string; sessions: number; earnedPaise: number }[];
@@ -49,36 +65,40 @@ const NOW_IST = `(now() at time zone 'Asia/Kolkata')`;
 export class TrainerEarningsService {
   constructor(private readonly db: DatabaseService) {}
 
-  async getPayout(): Promise<{ payoutPerSessionPaise: number | null }> {
-    const r = await this.db.query<{ v: number | null }>(`select case when jsonb_typeof(value) = 'number' then (value #>> '{}')::int end as v from app_settings where key = $1`, [PAYOUT_KEY]);
-    return { payoutPerSessionPaise: r.rows[0]?.v ?? null };
+  async getPayout(): Promise<{ payouts: Payouts }> {
+    return { payouts: await readPayouts(this.db) };
   }
 
-  // An owner sets the flat amount. Sessions already completed with no amount saved get this one (once); sessions that already
-  // have an amount keep theirs. Passing null clears the setting for future sessions only.
-  async setPayout(adminId: string, paise: number | null): Promise<{ payoutPerSessionPaise: number | null; filledIn: number }> {
-    if (paise !== null && (!Number.isInteger(paise) || paise < 0 || paise > MAX_PAYOUT_PAISE)) throw new DomainError('INVALID_REQUEST', 'Enter an amount between Rs 0 and Rs 10,000.');
+  // An owner sets the amount for each kind of session. Sessions already completed with no amount saved get the amount for their kind
+  // (once); sessions that already have an amount keep theirs. A kind left empty has no payout for future sessions.
+  async setPayout(adminId: string, payouts: Payouts): Promise<{ payouts: Payouts; filledIn: number }> {
+    for (const t of PAYOUT_TYPES) {
+      const v = payouts[t];
+      if (v !== null && (!Number.isInteger(v) || v < 0 || v > MAX_PAYOUT_PAISE)) throw new DomainError('INVALID_REQUEST', 'Enter amounts between Rs 0 and Rs 10,000.');
+    }
     let filledIn = 0;
     await this.db.tx(async (client) => {
       await client.query(
         `insert into app_settings (key, value, updated_by, updated_at) values ($1, $2::jsonb, $3, now())
          on conflict (key) do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now()`,
-        [PAYOUT_KEY, JSON.stringify(paise), adminId],
+        [PAYOUT_KEY, JSON.stringify(payouts), adminId],
       );
-      if (paise !== null) {
-        const r = await client.query(`update bookings set trainer_payout_paise = $1 where status = 'completed' and coach_id is not null and trainer_payout_paise is null`, [paise]);
-        filledIn = r.rowCount ?? 0;
+      for (const t of PAYOUT_TYPES) {
+        const v = payouts[t];
+        if (v === null) continue;
+        const r = await client.query(`update bookings set trainer_payout_paise = $1 where status = 'completed' and coach_id is not null and trainer_payout_paise is null and participant = $2`, [v, t]);
+        filledIn += r.rowCount ?? 0;
       }
-      await client.query(`insert into audit_log (actor_user_id, action, entity_type, entity_id, after) values ($1, 'settings.trainer_payout', 'app_settings', null, $2)`, [adminId, JSON.stringify({ paise, filledIn })]);
+      await client.query(`insert into audit_log (actor_user_id, action, entity_type, entity_id, after) values ($1, 'settings.trainer_payout', 'app_settings', null, $2)`, [adminId, JSON.stringify({ payouts, filledIn })]);
     });
-    return { payoutPerSessionPaise: paise, filledIn };
+    return { payouts, filledIn };
   }
 
   // Earnings and breakdowns for one trainer. `withValue` adds what the customers paid, for ops only (the trainer never sees it).
   async insights(trainerUserId: string, withValue: boolean): Promise<Insights> {
     const id = [trainerUserId];
-    const [setting, periods, weekly, monthly, service, participant, mode, upcoming, rating, known] = await Promise.all([
-      this.getPayout(),
+    const [payouts, periods, weekly, monthly, service, participant, mode, upcoming, rating, known] = await Promise.all([
+      readPayouts(this.db),
       this.db.query<Record<string, string>>(
         `${DONE}
          select count(*) filter (where at_ist >= date_trunc('day', ${NOW_IST})) as t_n, coalesce(sum(earned) filter (where at_ist >= date_trunc('day', ${NOW_IST})), 0) as t_e, coalesce(sum(total_paise) filter (where at_ist >= date_trunc('day', ${NOW_IST})), 0) as t_v,
@@ -109,8 +129,8 @@ export class TrainerEarningsService {
     const dayName = (ymd: string) => new Date(`${ymd}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' });
     const slices = (rows: { k: string; n: string; e: string }[], labels?: Record<string, string>): Slice[] => rows.map((r) => ({ name: labels?.[r.k] ?? r.k, sessions: Number(r.n), earnedPaise: Number(r.e) }));
     return {
-      payoutPerSessionPaise: setting.payoutPerSessionPaise,
-      earningsKnown: setting.payoutPerSessionPaise !== null || known.rows[0]!.any,
+      payouts,
+      earningsKnown: PAYOUT_TYPES.some((t) => payouts[t] !== null) || known.rows[0]!.any,
       periods: { today: period('t'), week: period('w'), month: period('m'), lifetime: period('l') },
       weekly: weekly.rows.map((r) => ({ label: dayName(r.start), start: r.start, sessions: Number(r.n), earnedPaise: Number(r.e) })),
       monthly: monthly.rows.map((r) => ({ label: monthName(r.month), month: r.month, sessions: Number(r.n), earnedPaise: Number(r.e) })),

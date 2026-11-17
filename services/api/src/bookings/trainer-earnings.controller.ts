@@ -11,7 +11,8 @@ import { Roles, RolesGuard } from '../identity/roles.guard';
 import { TrainerEarningsService } from './trainer-earnings.service';
 
 const idSchema = z.uuid();
-const payoutSchema = z.object({ paise: z.number().int().min(0).max(1_000_000).nullable() });
+const amount = z.number().int().min(0).max(1_000_000).nullable();
+const payoutSchema = z.object({ payouts: z.object({ personal: amount, duo: amount, loved_one: amount, group: amount }) });
 
 @ApiTags('admin-trainer-earnings')
 @ApiBearerAuth()
@@ -23,13 +24,13 @@ export class AdminTrainerEarningsController {
 
   @Get('trainer-payout')
   @RequirePermission('trainers.view')
-  @ApiOperation({ summary: 'The flat amount a trainer earns per completed session (null = not set)' })
+  @ApiOperation({ summary: 'What a trainer earns per completed session, by kind of session (null = not set)' })
   payout() { return this.earnings.getPayout(); }
 
   @Put('trainer-payout')
   @RequirePermission('owner')
-  @ApiOperation({ summary: 'Owners only: set the flat amount per completed session' })
-  setPayout(@CurrentUser() user: AuthUser, @Body(new ZodValidationPipe(payoutSchema)) body: z.infer<typeof payoutSchema>) { return this.earnings.setPayout(user.id, body.paise); }
+  @ApiOperation({ summary: 'Owners only: set what a trainer earns per completed session, for each kind of session' })
+  setPayout(@CurrentUser() user: AuthUser, @Body(new ZodValidationPipe(payoutSchema)) body: z.infer<typeof payoutSchema>) { return this.earnings.setPayout(user.id, body.payouts); }
 
   @Get('trainers/:applicationId/performance')
   @RequirePermission('trainers.view')
