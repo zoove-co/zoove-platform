@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ApiError, getRewards, saveReward, switchOffReward, type IssuedReward, type RewardRule, type RewardSide, type RewardsOverview } from '@/lib/api';
 import { can, useMe } from './me';
 import { Shell } from './Shell';
-import { Banner, Field, Spinner } from './ui';
+import { Banner, Field, PageLoader, Spinner } from './ui';
 
 const SIDE_TITLE: Record<RewardSide, string> = { referrer: 'The customer who shares their code', friend: 'The friend who joins with the code' };
 const SIDE_HINT: Record<RewardSide, string> = { referrer: 'Given when their friend makes a first booking.', friend: 'Given when they make their first booking.' };
@@ -83,7 +83,7 @@ export function Rewards({ signOut, expired }: { signOut: () => void; expired: ()
       </div>
       {error ? <Banner tone="bad">{error}</Banner> : null}
       {saved && !error ? <Banner tone="good">{saved}.</Banner> : null}
-      {!data && !error ? <div className="center" style={{ padding: 40 }}><Spinner /></div> : null}
+      {!data && !error ? <PageLoader /> : null}
 
       {data && drafts ? (
         <>

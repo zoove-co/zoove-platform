@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ApiError, getCustomer, listCustomers, type CustomerDetail, type CustomerRow } from '@/lib/api';
 import { can, useMe } from './me';
 import { Shell } from './Shell';
-import { Banner, CallLink, Spinner } from './ui';
+import { Banner, CallLink, PageLoader, Spinner } from './ui';
 
 const rupees = (paise: number) => `₹${(paise / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 const day = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
@@ -79,7 +79,7 @@ export function Customers({ signOut, expired }: { signOut: () => void; expired: 
         {rows ? <span className="muted small">{total > rows.length ? `Showing the newest ${rows.length} of ${total}` : `${total} customer${total === 1 ? '' : 's'}`}</span> : null}
       </div>
       {error ? <Banner tone="bad">{error}</Banner> : null}
-      {!rows && !error ? <div className="center" style={{ padding: 40 }}><Spinner /></div> : null}
+      {!rows && !error ? <PageLoader /> : null}
       {rows && rows.length === 0 ? <Banner tone="info">{query ? 'No customer matches that search.' : 'No customers yet. They appear here after they sign in to the app.'}</Banner> : null}
       {rows && rows.length > 0 ? (
         <div className="panel tablewrap">

@@ -9,7 +9,7 @@ import {
 } from '@/lib/api';
 import { can, useMe } from './me';
 import { Shell } from './Shell';
-import { Banner, CallLink, Spinner } from './ui';
+import { Banner, CallLink, PageLoader, Spinner } from './ui';
 
 const rupees = (paise: number) => `₹${(paise / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 const stamp = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' });
@@ -165,7 +165,7 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
         </div>
       ) : null}
       {error ? <Banner tone="bad">{error}</Banner> : null}
-      {!rows && !error ? <div className="center" style={{ padding: 40 }}><Spinner /></div> : null}
+      {!rows && !error ? <PageLoader /> : null}
       {rows && rows.length === 0 ? <Banner tone="info">{filter === 'needs_trainer' ? 'Every session has a trainer.' : 'No sessions found.'}</Banner> : null}
       {rows && rows.length > 0 ? (
         <div className="panel tablewrap">

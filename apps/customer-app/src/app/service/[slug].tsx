@@ -4,11 +4,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { OptionRow } from '@/components/service/OptionRow';
 import { AppText } from '@/components/ui/AppText';
+import { FitnessLoader } from '@/components/ui/FitnessLoader';
 import { Icon } from '@/components/ui/Icon';
 import { InfoPill } from '@/components/ui/InfoPill';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
@@ -30,7 +31,7 @@ export default function ServiceDetailScreen() {
   if (isPending) {
     return (
       <SafeAreaView style={styles.center}>
-        <ActivityIndicator color={colors.purple} />
+        <FitnessLoader fill={false} />
       </SafeAreaView>
     );
   }

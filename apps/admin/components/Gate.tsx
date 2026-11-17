@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { ApiError, getMe, hasSession, signOut, type Me } from '@/lib/api';
 import { MeProvider } from './me';
 import { SignIn } from './SignIn';
-import { Spinner, Wordmark } from './ui';
+import { PageLoader, Wordmark } from './ui';
 
 type Ctx = { signOut: () => void; expired: () => void };
 
@@ -38,7 +38,7 @@ export function Gate({ children }: { children: (ctx: Ctx) => ReactNode }) {
   const out = useCallback(() => void signOut().then(() => { setNotice(undefined); setMe(null); setState('signin'); }), []);
   const expired = useCallback(() => void signOut().then(() => { setNotice('Your session ended. Please sign in again.'); setState('signin'); }), []);
 
-  if (state === 'loading') return <div className="center" style={{ padding: 60 }}><Spinner /></div>;
+  if (state === 'loading') return <PageLoader />;
   if (state === 'forbidden') {
     return (
       <div className="auth">

@@ -241,6 +241,20 @@ export const en = {
     otpGeneric: 'Something went wrong. Please try again.',
     devHint: 'Dev build with the fake API: the code is 123456.',
   },
+  loader: {
+    line1: 'Warming up…',
+    line2: 'Racking the weights…',
+    line3: 'Almost there…',
+  },
+  restDay: {
+    unreachableTitle: 'Zoove is on a quick rest day',
+    unreachableBody: "We can't reach Zoove right now. If your internet is fine, it's on our side and our team is already on it.",
+    crashTitle: 'That one tripped us up',
+    crashBody: 'Zoove hit an unexpected problem. Trying again usually fixes it.',
+    hint: "We'll keep checking and bring you back as soon as we're up.",
+    artLabel: 'A dumbbell having a rest',
+    retry: 'Try again',
+  },
   errors: {
     network: 'No connection. Please check your internet and try again.',
     tryAgain: 'Something went wrong. Please try again.',

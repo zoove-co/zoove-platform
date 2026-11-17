@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ApiError, cancelOrder, grantPackageException, listAdminPackages, listPackageOrders, markOrderPaid, packageExceptions, savePackage, type AdminPackage, type PackageException, type PackageOrder } from '@/lib/api';
 import { can, useMe } from './me';
 import { Shell } from './Shell';
-import { Banner, Field, Spinner } from './ui';
+import { Banner, Field, PageLoader, Spinner } from './ui';
 
 const rupees = (paise: number) => `₹${(paise / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 const day = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
@@ -116,7 +116,7 @@ export function Packages({ signOut, expired }: { signOut: () => void; expired: (
         <button type="button" className="chipbtn" aria-pressed={tab === 'packages'} onClick={() => setTab('packages')}>Package list</button>
       </div>
       {error ? <Banner tone="bad">{error}</Banner> : null}
-      {!orders && !error ? <div className="center" style={{ padding: 40 }}><Spinner /></div> : null}
+      {!orders && !error ? <PageLoader /> : null}
 
       {tab === 'orders' && orders ? (
         orders.length === 0 ? <Banner tone="info">No package orders yet.</Banner> : (

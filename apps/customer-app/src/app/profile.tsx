@@ -2,10 +2,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, KeyboardAvoidingView, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/AppText';
+import { FitnessLoader } from '@/components/ui/FitnessLoader';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { TextField } from '@/components/ui/TextField';
@@ -24,7 +25,7 @@ export default function ProfileScreen() {
       <ScreenHeader title={t('profile.title')} />
       {isPending ? (
         <View style={styles.center}>
-          <ActivityIndicator color={colors.purple} />
+          <FitnessLoader fill={false} />
         </View>
       ) : isError || !profile ? (
         <View style={styles.center}>

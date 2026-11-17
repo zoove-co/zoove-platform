@@ -1,5 +1,5 @@
 import { Redirect } from 'expo-router';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
 import { Banner } from '@/components/ui/Banner';
@@ -8,6 +8,7 @@ import { ApiError, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { destinationFor, useApplication } from '@/lib/useApplication';
 import { colors } from '@/theme';
+import { FitnessLoader } from '@/components/ui/FitnessLoader';
 
 // The front door. It sends a trainer where their application says they belong: still filling it in, waiting for review, or approved.
 export default function Index() {
@@ -35,7 +36,7 @@ function Gate({ onSignOut }: { onSignOut: () => void }) {
   }
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
-      <ActivityIndicator color={colors.purple} />
+      <FitnessLoader fill={false} />
     </View>
   );
 }

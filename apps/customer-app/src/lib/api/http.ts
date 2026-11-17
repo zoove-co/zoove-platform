@@ -1,4 +1,5 @@
 import { API_URL } from '@/lib/config';
+import { noteReply } from '@/lib/outage';
 
 import {
   ApiError,
@@ -72,6 +73,7 @@ async function send<T>(method: string, path: string, body: unknown, bearer: stri
       signal: controller.signal,
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
+    noteReply(response.status);
     const text = await response.text();
     let json: unknown = null;
     try {
@@ -85,6 +87,7 @@ async function send<T>(method: string, path: string, body: unknown, bearer: stri
     return { status: response.status, data: null, error: new ApiError(code, failure?.message) };
   } catch {
     // No connection, DNS failure, or no answer within the time limit.
+    noteReply(0);
     return { status: 0, data: null, error: new ApiError('NETWORK') };
   } finally {
     clearTimeout(timer);

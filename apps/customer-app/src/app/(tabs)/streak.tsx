@@ -2,11 +2,12 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BookingRow } from '@/components/orders/BookingRow';
 import { AppText } from '@/components/ui/AppText';
+import { FitnessLoader } from '@/components/ui/FitnessLoader';
 import { Icon } from '@/components/ui/Icon';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { useMyPackages, useStreak } from '@/features/booking/hooks';
@@ -34,7 +35,7 @@ export default function StreakScreen() {
   if (isPending) {
     return (
       <SafeAreaView style={[styles.screen, styles.center]} edges={['top']}>
-        <ActivityIndicator color={colors.purple} />
+        <FitnessLoader fill={false} />
       </SafeAreaView>
     );
   }

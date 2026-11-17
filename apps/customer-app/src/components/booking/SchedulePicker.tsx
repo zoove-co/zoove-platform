@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { AppText } from '@/components/ui/AppText';
+import { FitnessLoader } from '@/components/ui/FitnessLoader';
 import { StepHeading } from '@/components/ui/StepHeading';
 import { useSlots } from '@/features/booking/hooks';
 import { nextDays } from '@/lib/dates';
@@ -66,7 +67,7 @@ export function SchedulePicker({
         detail={t('booking.slotDetail')}
       />
       {isPending ? (
-        <ActivityIndicator color={colors.purple} />
+        <FitnessLoader size="small" fill={false} />
       ) : (
         <View style={styles.slotGrid}>
           {slots?.map((slot) => {

@@ -1,8 +1,9 @@
 import { Image } from 'expo-image';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { AppText } from '@/components/ui/AppText';
+import { FitnessLoader } from '@/components/ui/FitnessLoader';
 import { InfoPill } from '@/components/ui/InfoPill';
 import { StepHeading } from '@/components/ui/StepHeading';
 import type { ServiceDetail, ServiceSummary } from '@/lib/api';
@@ -82,7 +83,7 @@ export function StylePicker({ services, serviceSlug, onServiceChange, detail, fo
           </View>
         </View>
       ) : (
-        <ActivityIndicator color={colors.purple} />
+        <FitnessLoader size="small" fill={false} />
       )}
     </View>
   );

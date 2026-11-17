@@ -1,10 +1,11 @@
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/AppText';
+import { FitnessLoader } from '@/components/ui/FitnessLoader';
 import { Icon } from '@/components/ui/Icon';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
@@ -36,7 +37,7 @@ export default function NotificationsScreen() {
       <ScreenHeader title={t('notifications.title')} />
       {isPending ? (
         <View style={styles.center}>
-          <ActivityIndicator color={colors.purple} />
+          <FitnessLoader fill={false} />
         </View>
       ) : isError ? (
         <View style={styles.center}>

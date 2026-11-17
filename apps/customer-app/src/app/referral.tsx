@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { ScrollView, Share, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/AppText';
+import { FitnessLoader } from '@/components/ui/FitnessLoader';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { TextField } from '@/components/ui/TextField';
@@ -50,7 +51,7 @@ export default function ReferralScreen() {
             {t('referral.codeLabel').toUpperCase()}
           </AppText>
           {isPending ? (
-            <ActivityIndicator color={colors.purple} />
+            <FitnessLoader fill={false} />
           ) : (
             <AppText variant="screenTitle" selectable>
               {code}

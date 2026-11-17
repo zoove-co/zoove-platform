@@ -13,12 +13,15 @@ import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-
 import { router, Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
+import { OutageOverlay } from '@/components/OutageOverlay';
+import { RestDay } from '@/components/ui/RestDay';
 import { track } from '@/lib/analytics/track';
 import { useAuth } from '@/lib/auth/useAuth';
-import { initMonitoring, withMonitoring } from '@/lib/monitoring';
+import { initMonitoring, reportError, withMonitoring } from '@/lib/monitoring';
+import { useOutage } from '@/lib/outage';
 import { bookingIdFrom, onNotificationTapped, registerForPush } from '@/lib/push';
 import { colors } from '@/theme';
 
@@ -54,6 +57,14 @@ function RootLayout() {
   useEffect(() => {
     if (authStatus === 'signedOut') queryClient.clear();
   }, [authStatus, queryClient]);
+
+  // When Zoove becomes reachable again, whatever failed in the meantime loads again.
+  const down = useOutage((state) => state.down);
+  const wasDown = useRef(false);
+  useEffect(() => {
+    if (wasDown.current && !down) void queryClient.invalidateQueries();
+    wasDown.current = down;
+  }, [down, queryClient]);
 
   const ready = (fontsLoaded || Boolean(fontError)) && authStatus !== 'loading';
 
@@ -110,8 +121,17 @@ function RootLayout() {
           <Stack.Screen name="soon" />
         </Stack.Protected>
       </Stack>
+      <OutageOverlay />
     </QueryClientProvider>
   );
+}
+
+// A screen that breaks shows this instead of a blank page. "Try again" renders it afresh.
+export function ErrorBoundary({ error, retry }: { error: Error; retry: () => Promise<void> }) {
+  useEffect(() => {
+    reportError(error, 'screen');
+  }, [error]);
+  return <RestDay kind="crash" onRetry={() => void retry()} />;
 }
 
 export default withMonitoring(RootLayout);

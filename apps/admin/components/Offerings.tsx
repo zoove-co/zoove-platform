@@ -8,7 +8,7 @@ import {
 } from '@/lib/api';
 import { can, useMe } from './me';
 import { Shell } from './Shell';
-import { Banner, Field, Spinner } from './ui';
+import { Banner, Field, PageLoader, Spinner } from './ui';
 
 const rupees = (paise: number) => `₹${(paise / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 const MODES: [BookingModeKey, string, string][] = [
@@ -121,7 +121,7 @@ export function Offerings({ signOut, expired }: { signOut: () => void; expired: 
       </div>
       {error ? <Banner tone="bad">{error}</Banner> : null}
       {saved && !error ? <Banner tone="good">{saved}.</Banner> : null}
-      {!data && !error ? <div className="center" style={{ padding: 40 }}><Spinner /></div> : null}
+      {!data && !error ? <PageLoader /> : null}
 
       {data ? (
         <>

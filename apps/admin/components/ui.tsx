@@ -16,6 +16,23 @@ export function Spinner() {
   return <span className="spinner" aria-hidden />;
 }
 
+// The wait for a whole page or panel: a barbell lifted and dropped on a loop (drawn in CSS, so it costs nothing to load).
+export function PageLoader({ label = 'Warming up…' }: { label?: string }) {
+  return (
+    <div className="fit" role="status" aria-live="polite">
+      <div className="fit-stage" aria-hidden>
+        <div className="barbell">
+          <i className="pl pl-end" /><i className="pl pl-sm" /><i className="pl pl-big" /><i className="pl pl-collar" />
+          <i className="pl-bar" />
+          <i className="pl pl-collar" /><i className="pl pl-big" /><i className="pl pl-sm" /><i className="pl pl-end" />
+        </div>
+        <div className="fit-shadow" />
+      </div>
+      <span>{label}</span>
+    </div>
+  );
+}
+
 export function Wordmark({ className = '' }: { className?: string }) {
   return (
     <span className={`wordmark ${className}`.trim()}>

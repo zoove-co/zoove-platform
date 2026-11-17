@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ApiError, createDiscountCode, disableDiscountCode, listDiscountCodes, type DiscountCode, type DiscountReason, type NewDiscountCode } from '@/lib/api';
 import { can, useMe } from './me';
 import { Shell } from './Shell';
-import { Banner, Field, Spinner } from './ui';
+import { Banner, Field, PageLoader, Spinner } from './ui';
 
 const REASONS: { value: DiscountReason; label: string }[] = [
   { value: 'goodwill', label: 'Goodwill' },
@@ -178,7 +178,7 @@ export function Discounts({ signOut, expired }: { signOut: () => void; expired: 
       {error ? <Banner tone="bad">{error}</Banner> : null}
 
       {!codes && !error ? (
-        <div className="center" style={{ padding: 40 }}><Spinner /></div>
+        <PageLoader />
       ) : codes && codes.length === 0 ? (
         <Banner tone="info">No codes yet. Press “New code” to make the first one.</Banner>
       ) : codes ? (

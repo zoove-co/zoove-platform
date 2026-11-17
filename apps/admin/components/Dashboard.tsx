@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, STATUS_LABEL, listApplications, nice, type Filter, type ListResult } from '@/lib/api';
 import { Shell } from './Shell';
 import { can, useMe } from './me';
-import { Banner, Icons, Spinner, avatarTone, initials } from './ui';
+import { Banner, Icons, PageLoader, avatarTone, initials } from './ui';
 
 type Card = { key: Filter; label: string; tone: 't-orange' | 't-amber' | 't-green' | 't-red' };
 const CARDS: Card[] = [
@@ -141,7 +141,7 @@ export function Dashboard({ signOut, expired }: { signOut: () => void; expired: 
       {error ? <Banner tone="bad">{error} We will keep trying.</Banner> : null}
 
       {loading && !data ? (
-        <div className="center" style={{ padding: 40 }}><Spinner /></div>
+        <PageLoader />
       ) : data && data.items.length === 0 ? (
         <div className="panel emptyrow">
           <b>{search ? 'No matches' : filter === 'pending' ? 'You are all caught up' : 'Nothing here yet'}</b>

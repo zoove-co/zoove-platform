@@ -8,7 +8,7 @@ import { ApiError, KIND_LABEL, STATUS_LABEL, approve, editTrainerProfile, nice, 
 import { can, useMe } from './me';
 import { Shell } from './Shell';
 import { TrainerPerformance } from './TrainerPerformance';
-import { Banner, Field, Icons, Spinner, avatarTone, initials } from './ui';
+import { Banner, Field, Icons, PageLoader, Spinner, avatarTone, initials } from './ui';
 
 type Dialog = null | 'approve' | 'reject' | 'changes' | 'status';
 
@@ -158,7 +158,7 @@ export function Detail({ signOut, expired }: { signOut: () => void; expired: () 
       </Shell>
     );
   }
-  if (!data) return <div className="center" style={{ padding: 60 }}><Spinner /></div>;
+  if (!data) return <PageLoader />;
 
   const f = data.form;
   const reviewable = data.status === 'submitted' || data.status === 'in_review';

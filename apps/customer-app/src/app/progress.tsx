@@ -1,10 +1,11 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/AppText';
+import { FitnessLoader } from '@/components/ui/FitnessLoader';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
@@ -26,7 +27,7 @@ export default function ProgressProfileScreen() {
     <SafeAreaView style={styles.screen} edges={['top']}>
       <ScreenHeader title={t('progress.title')} />
       {isPending ? (
-        <View style={styles.center}><ActivityIndicator color={colors.purple} /></View>
+        <View style={styles.center}><FitnessLoader fill={false} /></View>
       ) : isError ? (
         <View style={styles.center}>
           <AppText color={colors.danger}>{t('progress.loadError')}</AppText>

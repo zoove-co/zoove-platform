@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ApiError, listPartyRequests, setPartyStatus, type PartyRequest, type PartyStatus } from '@/lib/api';
 import { can, useMe } from './me';
 import { Shell } from './Shell';
-import { Banner, Spinner } from './ui';
+import { Banner, PageLoader, Spinner } from './ui';
 
 const STATUS_LABEL: Record<PartyStatus, string> = { new: 'New', contacted: 'Called', confirmed: 'Confirmed', cancelled: 'Cancelled' };
 const STATUS_PILL: Record<PartyStatus, string> = { new: 'changes_requested', contacted: 'in_review', confirmed: 'approved', cancelled: 'rejected' };
@@ -66,7 +66,7 @@ export function Parties({ signOut, expired }: { signOut: () => void; expired: ()
       {fresh > 0 ? <Banner tone="warn">{fresh} new {fresh === 1 ? 'request is' : 'requests are'} waiting for a call.</Banner> : null}
       {error ? <Banner tone="bad">{error}</Banner> : null}
       {!rows && !error ? (
-        <div className="center" style={{ padding: 40 }}><Spinner /></div>
+        <PageLoader />
       ) : rows && rows.length === 0 ? (
         <Banner tone="info">No party requests yet.</Banner>
       ) : rows ? (

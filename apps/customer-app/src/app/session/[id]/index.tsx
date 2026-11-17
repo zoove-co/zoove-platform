@@ -3,11 +3,12 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { formatInr } from '@zoove/shared';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { StatusChip } from '@/components/orders/StatusChip';
 import { AppText } from '@/components/ui/AppText';
+import { FitnessLoader } from '@/components/ui/FitnessLoader';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
@@ -48,7 +49,7 @@ export default function SessionDetailScreen() {
   if (isPending) {
     return (
       <SafeAreaView style={styles.center}>
-        <ActivityIndicator color={colors.purple} />
+        <FitnessLoader fill={false} />
       </SafeAreaView>
     );
   }

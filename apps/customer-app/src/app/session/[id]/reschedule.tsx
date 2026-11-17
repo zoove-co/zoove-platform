@@ -1,12 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BookingSuccess } from '@/components/booking/BookingSuccess';
 import { SchedulePicker } from '@/components/booking/SchedulePicker';
 import { AppText } from '@/components/ui/AppText';
+import { FitnessLoader } from '@/components/ui/FitnessLoader';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { TabFooter } from '@/components/ui/TabFooter';
@@ -44,7 +45,7 @@ export default function RescheduleScreen() {
   if (isPending || !booking) {
     return (
       <SafeAreaView style={styles.center}>
-        <ActivityIndicator color={colors.purple} />
+        <FitnessLoader fill={false} />
       </SafeAreaView>
     );
   }

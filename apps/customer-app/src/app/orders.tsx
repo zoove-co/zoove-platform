@@ -1,11 +1,12 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BookingRow } from '@/components/orders/BookingRow';
 import { AppText } from '@/components/ui/AppText';
+import { FitnessLoader } from '@/components/ui/FitnessLoader';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { TabFooter } from '@/components/ui/TabFooter';
@@ -68,7 +69,7 @@ export default function OrdersScreen() {
 
       {isPending ? (
         <View style={styles.center}>
-          <ActivityIndicator color={colors.purple} />
+          <FitnessLoader fill={false} />
         </View>
       ) : isError ? (
         <View style={styles.center}>

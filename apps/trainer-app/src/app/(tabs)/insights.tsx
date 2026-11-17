@@ -4,6 +4,7 @@ import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/ui/AppText';
 import { Banner } from '@/components/ui/Banner';
 import { Card } from '@/components/ui/Card';
+import { FitnessLoader } from '@/components/ui/FitnessLoader';
 import { Screen } from '@/components/ui/Screen';
 import { errorMessage, type EarnSlice, type Insights } from '@/lib/api';
 import { rupees, rupeesShort, useInsights } from '@/lib/useInsights';
@@ -110,6 +111,7 @@ export default function Earnings() {
         <AppText variant="body" color={colors.muted}>What you have earned and where it comes from.</AppText>
       </View>
       {q.isError && !data ? <Banner tone="bad">{errorMessage(q.error)}</Banner> : null}
+      {q.isPending ? <FitnessLoader fill={false} /> : null}
 
       {data && p ? (
         <>

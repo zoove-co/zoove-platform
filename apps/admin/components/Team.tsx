@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ApiError, addMember, listTeam, updateMember, type Member, type PermissionInfo } from '@/lib/api';
 import { useMe } from './me';
 import { Shell } from './Shell';
-import { Banner, Field, Spinner, avatarTone, initials } from './ui';
+import { Banner, Field, PageLoader, Spinner, avatarTone, initials } from './ui';
 
 type Draft = { name: string; email: string; jobTitle: string; reportsTo: string; isOwner: boolean; active: boolean; permissions: string[] };
 const EMPTY: Draft = { name: '', email: '', jobTitle: '', reportsTo: '', isOwner: false, active: true, permissions: [] };
@@ -123,7 +123,7 @@ export function Team({ signOut, expired }: { signOut: () => void; expired: () =>
       {error ? <Banner tone="bad">{error}</Banner> : null}
 
       {!members && !error ? (
-        <div className="center" style={{ padding: 40 }}><Spinner /></div>
+        <PageLoader />
       ) : members ? (
         <div className="panel tablewrap">
           <table className="list">

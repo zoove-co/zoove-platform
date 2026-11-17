@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AddressForm } from '@/components/booking/AddressForm';
 import { AppText } from '@/components/ui/AppText';
+import { FitnessLoader } from '@/components/ui/FitnessLoader';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Icon } from '@/components/ui/Icon';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
@@ -36,7 +37,7 @@ export default function AddressesScreen() {
       <ScreenHeader title={t('addresses.title')} />
       {isPending ? (
         <View style={styles.center}>
-          <ActivityIndicator color={colors.purple} />
+          <FitnessLoader fill={false} />
         </View>
       ) : isError ? (
         <View style={styles.center}>

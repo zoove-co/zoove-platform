@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ApiError, getTrainerPerformance, setTrainerPayout, type TrainerPayouts, type EarnSlice, type TrainerPerformance as Data, type TrainerSessionItem } from '@/lib/api';
 import { can, useMe } from './me';
-import { Banner, CallLink, Spinner } from './ui';
+import { Banner, CallLink, PageLoader, Spinner } from './ui';
 
 const rupees = (paise: number) => `₹${(paise / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 const stamp = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' });
@@ -104,7 +104,7 @@ export function TrainerPerformance({ applicationId, phone, expired }: { applicat
   }
 
   if (error && !data) return <Banner tone="bad">{error}</Banner>;
-  if (!data) return <div className="center" style={{ padding: 30 }}><Spinner /></div>;
+  if (!data) return <PageLoader />;
   const { insights: i } = data;
   const known = i.earningsKnown;
   const list: TrainerSessionItem[] = data[tab];

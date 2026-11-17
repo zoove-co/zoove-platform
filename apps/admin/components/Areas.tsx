@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { addAreaPincode, ApiError, createArea, listAreas, removeAreaPincode, renameArea, setAreaActive, type AdminArea } from '@/lib/api';
 import { Shell } from './Shell';
-import { Banner, Field, Spinner } from './ui';
+import { Banner, Field, PageLoader, Spinner } from './ui';
 
 const PIN = /^[1-9][0-9]{5}$/;
 
@@ -71,7 +71,7 @@ export function Areas({ signOut, expired }: { signOut: () => void; expired: () =
       </div>
       {error ? <Banner tone="bad">{error}</Banner> : null}
       {saved && !error ? <Banner tone="good">{saved}.</Banner> : null}
-      {!areas && !error ? <div className="center" style={{ padding: 40 }}><Spinner /></div> : null}
+      {!areas && !error ? <PageLoader /> : null}
 
       {areas ? (
         <>

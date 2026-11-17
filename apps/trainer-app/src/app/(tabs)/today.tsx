@@ -6,6 +6,7 @@ import { AppText } from '@/components/ui/AppText';
 import { Banner } from '@/components/ui/Banner';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { FitnessLoader } from '@/components/ui/FitnessLoader';
 import { Screen } from '@/components/ui/Screen';
 import { errorMessage, setAcceptingJobs } from '@/lib/api';
 import { useApplication } from '@/lib/useApplication';
@@ -48,6 +49,7 @@ export default function Today() {
       <AppText variant="screenTitle">{first ? `Hello, ${first}` : 'Hello'}</AppText>
       <AppText variant="body" color={colors.muted}>Here is your day on Zoove.</AppText>
       {jobs.isError && !jobs.data ? <Banner tone="bad">{errorMessage(jobs.error)}</Banner> : null}
+      {jobs.isPending ? <FitnessLoader fill={false} /> : null}
 
       {insights ? (
         <Pressable accessibilityRole="button" accessibilityLabel="Open my earnings" onPress={() => router.navigate('/insights')} style={({ pressed }) => ({ padding: 18, borderRadius: radius.xxl, backgroundColor: colors.purple, gap: 4, opacity: pressed ? 0.9 : 1 })}>

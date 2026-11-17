@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { ApiError, getAttention, type Attention as AttentionData } from '@/lib/api';
 import { Shell } from './Shell';
-import { Banner, Spinner } from './ui';
+import { Banner, PageLoader } from './ui';
 
 // "12 min ago", "3 h ago", "2 d ago".
 function ago(iso: string): string {
@@ -48,7 +48,7 @@ export function Attention({ signOut, expired }: { signOut: () => void; expired: 
       </div>
       {error ? <Banner tone="bad">{error}</Banner> : null}
       {!data && !error ? (
-        <div className="center" style={{ padding: 40 }}><Spinner /></div>
+        <PageLoader />
       ) : data && data.total === 0 ? (
         <Banner tone="good">All clear. Nothing needs attention right now.</Banner>
       ) : data ? (

@@ -1,5 +1,6 @@
 import { API_URL } from '@/lib/config';
 import { reportError } from '@/lib/monitoring';
+import { noteReply } from '@/lib/outage';
 
 // One client for the Zoove API. It is the same API the Join Zoove web page uses, so an application started on the web
 // is the same application here (same account, same saved answers, same documents, same status).
@@ -56,6 +57,7 @@ async function send<T>(method: string, path: string, body: BodyInit | undefined,
     const all: Record<string, string> = { Accept: 'application/json', ...headers };
     if (bearer) all.Authorization = `Bearer ${bearer}`;
     const response = await fetch(`${API_URL}${path}`, { method, headers: all, signal: controller.signal, ...(body !== undefined ? { body } : {}) });
+    noteReply(response.status);
     const text = await response.text();
     let json: unknown = null;
     try {
@@ -72,6 +74,7 @@ async function send<T>(method: string, path: string, body: BodyInit | undefined,
     return { status: response.status, data: null, error: failed };
   } catch {
     // No connection, DNS failure, or no answer within the time limit.
+    noteReply(0);
     return { status: 0, data: null, error: new ApiError('NETWORK', NETWORK_MESSAGE, 0) };
   } finally {
     clearTimeout(timer);

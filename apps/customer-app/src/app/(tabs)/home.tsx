@@ -2,7 +2,7 @@ import { formatInr } from '@zoove/shared';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AddressSheet } from '@/components/home/AddressSheet';
@@ -15,6 +15,7 @@ import { HomeHeader } from '@/components/home/HomeHeader';
 import { UpcomingDock } from '@/components/home/UpcomingDock';
 import { Wordmark } from '@/components/brand/Wordmark';
 import { AppText } from '@/components/ui/AppText';
+import { FitnessLoader } from '@/components/ui/FitnessLoader';
 import { useHomeData } from '@/features/home/useHomeData';
 import { track } from '@/lib/analytics/track';
 import { bannerImages, serviceImages } from '@/lib/images';
@@ -34,7 +35,7 @@ export default function HomeScreen() {
   if (isPending) {
     return (
       <SafeAreaView style={styles.center} edges={['top']}>
-        <ActivityIndicator color={colors.purple} />
+        <FitnessLoader fill={false} />
       </SafeAreaView>
     );
   }
