@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ApiError, getCustomer, listCustomers, type CustomerDetail, type CustomerRow } from '@/lib/api';
 import { can, useMe } from './me';
 import { Shell } from './Shell';
-import { Banner, Spinner } from './ui';
+import { Banner, CallLink, Spinner } from './ui';
 
 const rupees = (paise: number) => `₹${(paise / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 const day = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
@@ -47,6 +47,16 @@ export function Customers({ signOut, expired }: { signOut: () => void; expired: 
     try { setOpen(await getCustomer(id)); setError(null); } catch (err) { setError(handle(err)); } finally { setOpening(null); }
   }
 
+  // A link from a session or a trainer page opens the customer straight away: /customers?open=<id>
+  useEffect(() => {
+    if (!allowed) return;
+    const id = new URLSearchParams(window.location.search).get('open');
+    if (id && /^[0-9a-f-]{36}$/i.test(id)) {
+      void getCustomer(id).then((c) => setOpen(c)).catch((err) => setError(handle(err)));
+    }
+  }, [allowed, handle]);
+  const closeCustomer = () => { setOpen(null); if (window.location.search) window.history.replaceState(null, '', '/customers'); };
+
   if (!allowed) {
     return (
       <Shell signOut={signOut}>
@@ -65,7 +75,7 @@ export function Customers({ signOut, expired }: { signOut: () => void; expired: 
         </div>
       </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name, email or phone" aria-label="Search customers" style={{ flex: '1 1 260px', maxWidth: 420 }} />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name, mobile number or email" aria-label="Search customers" style={{ flex: '1 1 260px', maxWidth: 420 }} />
         {rows ? <span className="muted small">{total > rows.length ? `Showing the newest ${rows.length} of ${total}` : `${total} customer${total === 1 ? '' : 's'}`}</span> : null}
       </div>
       {error ? <Banner tone="bad">{error}</Banner> : null}
@@ -94,9 +104,13 @@ export function Customers({ signOut, expired }: { signOut: () => void; expired: 
       ) : null}
 
       {open ? (
-        <div className="modal" role="dialog" aria-modal="true" aria-label={open.name ?? 'Customer'} onClick={() => setOpen(null)}>
+        <div className="modal" role="dialog" aria-modal="true" aria-label={open.name ?? 'Customer'} onClick={closeCustomer}>
           <div className="sheet wide" onClick={(event) => event.stopPropagation()}>
             <h2>{open.name ?? 'No name yet'}</h2>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '0 0 12px' }}>
+              <CallLink phone={open.phone} label="Call customer" />
+              {can(me, 'sessions.manage') ? <Link className="btn ghost" href={`/sessions?customer=${open.id}&name=${encodeURIComponent(open.name ?? open.email ?? open.phone ?? 'this customer')}`}>All sessions</Link> : null}
+            </div>
             <dl className="kv">
               <dt>Phone</dt><dd>{open.phone ?? '—'}</dd>
               <dt>Email</dt><dd>{open.email ?? '—'}</dd>
@@ -128,9 +142,9 @@ export function Customers({ signOut, expired }: { signOut: () => void; expired: 
                   <tbody>
                     {open.bookings.map((b) => (
                       <tr key={b.id}>
-                        <td><b>{b.sessionCode}</b><div className="sub muted small">{b.serviceName} · {b.formatName}</div></td>
+                        <td>{can(me, 'sessions.manage') ? <Link className="xlink" href={`/sessions?open=${b.id}`}>{b.sessionCode}</Link> : <b>{b.sessionCode}</b>}<div className="sub muted small">{b.serviceName} · {b.formatName}</div></td>
                         <td>{b.startsAt ? stamp(b.startsAt) : b.mode === 'instant' ? 'As soon as possible' : 'To be scheduled'}</td>
-                        <td>{b.trainerName ?? '—'}</td>
+                        <td>{b.trainerName && b.trainerApplicationId && can(me, 'trainers.view') ? <Link className="xlink" href={`/applications/${b.trainerApplicationId}`}>{b.trainerName}</Link> : (b.trainerName ?? '—')}</td>
                         <td><span className={`pill ${STATUS_PILL[b.status] ?? 'submitted'}`}>{STATUS_LABEL[b.status] ?? b.status}</span>{b.rating !== null ? <span className="sub muted small">{` ${'★'.repeat(b.rating)}`}</span> : null}</td>
                         <td>{rupees(b.totalPaise)}</td>
                       </tr>
@@ -141,7 +155,7 @@ export function Customers({ signOut, expired }: { signOut: () => void; expired: 
             )}
             {open.bookings.length === 50 ? <p className="muted small">Showing the latest 50 sessions.</p> : null}
 
-            <div className="actions"><button className="btn ghost" type="button" onClick={() => setOpen(null)}>Close</button></div>
+            <div className="actions"><button className="btn ghost" type="button" onClick={closeCustomer}>Close</button></div>
           </div>
         </div>
       ) : null}

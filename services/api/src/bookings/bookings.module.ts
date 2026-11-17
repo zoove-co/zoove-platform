@@ -14,13 +14,15 @@ import { OverdueSweepService } from './overdue-sweep.service';
 import { SessionsAdminController } from './sessions-admin.controller';
 import { SessionsAdminService } from './sessions-admin.service';
 import { TrainerReminderService } from './trainer-reminder.service';
+import { AdminTrainerEarningsController, TrainerInsightsController } from './trainer-earnings.controller';
+import { TrainerEarningsService } from './trainer-earnings.service';
 import { TrainerJobsController } from './trainer-jobs.controller';
 import { TrainerJobsService } from './trainer-jobs.service';
 
 @Module({
   imports: [IdentityModule, CatalogModule, AddressesModule, DiscountsModule, PackagesModule, ReferralModule],
-  controllers: [BookingsController, SessionsAdminController, TrainerJobsController],
-  providers: [BookingsService, SessionsAdminService, OverdueSweepService, TrainerJobsService, DispatchService, CompletionSweepService, TrainerReminderService],
+  controllers: [BookingsController, SessionsAdminController, TrainerJobsController, AdminTrainerEarningsController, TrainerInsightsController],
+  providers: [BookingsService, SessionsAdminService, TrainerEarningsService, OverdueSweepService, TrainerJobsService, DispatchService, CompletionSweepService, TrainerReminderService],
   exports: [OverdueSweepService, DispatchService, CompletionSweepService, TrainerReminderService],
 })
 export class BookingsModule {}

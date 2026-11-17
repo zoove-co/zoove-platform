@@ -225,6 +225,23 @@ export type MyJob = OpenJob & { customerFirstName: string; addressLabel: string;
 export type DoneJob = OpenJob & { customerFirstName: string; completedAt: string | null; note: string };
 export type JobBoard = { acceptingJobs: boolean; open: OpenJob[]; mine: MyJob[]; done: DoneJob[]; doneCount: number };
 export const getJobs = () => call<JobBoard>('/v1/trainer/jobs');
+
+// ---- Earnings and analytics (what Zoove pays me per completed session) ----
+export type EarnPeriod = { sessions: number; earnedPaise: number };
+export type EarnSlice = { name: string; sessions: number; earnedPaise: number };
+export type Insights = {
+  payoutPerSessionPaise: number | null;
+  earningsKnown: boolean;
+  periods: { today: EarnPeriod; week: EarnPeriod; month: EarnPeriod; lifetime: EarnPeriod };
+  weekly: { label: string; start: string; sessions: number; earnedPaise: number }[];
+  monthly: { label: string; month: string; sessions: number; earnedPaise: number }[];
+  byService: EarnSlice[];
+  byParticipant: EarnSlice[];
+  byMode: EarnSlice[];
+  upcoming: number;
+  rating: { average: number | null; count: number };
+};
+export const getInsights = () => call<Insights>('/v1/trainer/insights');
 export const acceptJob = (id: string) => call<JobBoard>(`/v1/trainer/jobs/${id}/accept`, { method: 'POST', json: {} });
 // The customer shows a 4-digit start code on arrival and a finish code after the training.
 export const checkInJob = (id: string, code: string) => call<JobBoard>(`/v1/trainer/jobs/${id}/check-in`, { method: 'POST', json: { code } });

@@ -12,12 +12,13 @@ import { ALERT_ALL_KEY, alertAllSwitch } from './dispatch.service';
 import { assertBookableSlot, sessionCodeOf, type BookingStatus } from './bookings.service';
 import { CHECK_IN_EARLY_MINUTES, CODE_LOCK_MINUTES, MAX_CODE_ATTEMPTS, formatWhen } from './rules';
 import { trainerBusySql } from './trainer-clash';
+import { payoutSnapshot } from './trainer-earnings.service';
 
 export type SessionFilter = 'needs_trainer' | 'upcoming' | 'all';
 export type AdminSession = {
   id: string; sessionCode: string; status: BookingStatus; mode: string; participant: string; groupSize: number | null; serviceName: string; formatName: string;
-  startsAt: string | null; whenLabel: string; startPassed: boolean; area: string | null; customerName: string; customerContact: string;
-  trainerId: string | null; trainerName: string | null; trainerCancelCount: number; trainerCancelledAt: string | null; canMarkNoShow: boolean; live: boolean; startedAt: string | null; endsAt: string | null; rating: number | null; totalPaise: number; paidWithCredit: boolean; discountCode: string | null; createdAt: string;
+  startsAt: string | null; whenLabel: string; startPassed: boolean; area: string | null; customerId: string; customerName: string; customerContact: string; customerPhone: string | null;
+  trainerId: string | null; trainerApplicationId: string | null; trainerPhone: string | null; trainerName: string | null; trainerCancelCount: number; trainerCancelledAt: string | null; canMarkNoShow: boolean; live: boolean; startedAt: string | null; endsAt: string | null; rating: number | null; totalPaise: number; paidWithCredit: boolean; discountCode: string | null; createdAt: string;
 };
 export type SessionEvent = { type: string; actor: string; payload: Record<string, unknown>; createdAt: string };
 export type AdminSessionDetail = AdminSession & { addressLabel: string; addressLine: string; pincode: string | null; recipient: { name: string; phone: string } | null; events: SessionEvent[] };
@@ -27,12 +28,14 @@ export type AvailableTrainer = { id: string; name: string; sameDay: number; acce
 
 type ListRow = {
   id: string; status: BookingStatus; mode: string; participant: string; group_size: number | null; service_name: string; format_name: string; starts_at: Date | null;
-  address_area: string | null; customer_name: string | null; email: string | null; phone_e164: string | null; contact_phone: string | null; coach_id: string | null; trainer_name: string | null;
+  address_area: string | null; customer_id: string; customer_name: string | null; email: string | null; phone_e164: string | null; contact_phone: string | null; coach_id: string | null; trainer_name: string | null; trainer_application_id: string | null; trainer_phone: string | null;
   trainer_cancel_count: number; trainer_cancelled_at: Date | null; total_paise: number; package_purchase_id: string | null; discount_code: string | null; created_at: Date; started_at: Date | null; ends_at: Date | null; rating_stars: number | null;
 };
 
 const COLS = `b.id, b.status, b.mode, b.participant, b.group_size, b.starts_at, b.address_area, b.coach_id, b.trainer_cancel_count, b.trainer_cancelled_at, b.total_paise,
-              b.package_purchase_id, b.discount_code, b.created_at, b.started_at, b.ends_at, (select r.stars from session_ratings r where r.booking_id = b.id) as rating_stars, s.name as service_name, f.name as format_name, u.full_name as customer_name, u.email, u.phone_e164, u.contact_phone,
+              b.package_purchase_id, b.discount_code, b.created_at, b.started_at, b.ends_at, (select r.stars from session_ratings r where r.booking_id = b.id) as rating_stars, s.name as service_name, f.name as format_name, b.user_id as customer_id, u.full_name as customer_name, u.email, u.phone_e164, u.contact_phone,
+              (select t.application_id from trainers t where t.user_id = b.coach_id) as trainer_application_id,
+              (select coalesce(ta.phone_e164, tu.phone_e164) from trainers t join trainer_applications ta on ta.id = t.application_id join users tu on tu.id = t.user_id where t.user_id = b.coach_id) as trainer_phone,
               coalesce(c.full_name, (select trim(concat_ws(' ', ta.first_name, ta.last_name)) from trainers t join trainer_applications ta on ta.id = t.application_id where t.user_id = b.coach_id)) as trainer_name`;
 const FROM = `from bookings b join services s on s.id = b.service_id join service_formats f on f.id = b.format_id join users u on u.id = b.user_id left join users c on c.id = b.coach_id`;
 
@@ -41,10 +44,10 @@ function toSession(r: ListRow, now = new Date()): AdminSession {
     id: r.id, sessionCode: sessionCodeOf(r.id), status: r.status, mode: r.mode, participant: r.participant, groupSize: r.group_size, serviceName: r.service_name, formatName: r.format_name,
     startsAt: r.starts_at ? r.starts_at.toISOString() : null, whenLabel: r.starts_at ? formatWhen(r.starts_at) : r.mode === 'instant' ? 'As soon as possible' : 'To be scheduled',
     startPassed: r.starts_at !== null && r.starts_at.getTime() < now.getTime() && (r.status === 'matching' || r.status === 'rematching'),
-    area: r.address_area, customerName: r.customer_name ?? 'Customer', customerContact: [r.email, r.phone_e164 ?? r.contact_phone].filter(Boolean).join(' · '),
+    area: r.address_area, customerId: r.customer_id, customerPhone: r.phone_e164 ?? r.contact_phone, customerName: r.customer_name ?? 'Customer', customerContact: [r.email, r.phone_e164 ?? r.contact_phone].filter(Boolean).join(' · '),
     live: r.status === 'confirmed' && r.started_at !== null, startedAt: r.started_at ? r.started_at.toISOString() : null, endsAt: r.ends_at ? r.ends_at.toISOString() : null, rating: r.rating_stars,
     canMarkNoShow: r.status === 'confirmed' && r.coach_id !== null && r.started_at === null && (r.starts_at === null || r.starts_at.getTime() <= now.getTime()),
-    trainerId: r.coach_id, trainerName: r.trainer_name, trainerCancelCount: r.trainer_cancel_count, trainerCancelledAt: r.trainer_cancelled_at ? r.trainer_cancelled_at.toISOString() : null,
+    trainerId: r.coach_id, trainerApplicationId: r.trainer_application_id, trainerPhone: r.trainer_phone, trainerName: r.trainer_name, trainerCancelCount: r.trainer_cancel_count, trainerCancelledAt: r.trainer_cancelled_at ? r.trainer_cancelled_at.toISOString() : null,
     totalPaise: r.total_paise, paidWithCredit: r.package_purchase_id !== null, discountCode: r.discount_code, createdAt: r.created_at.toISOString(),
   };
 }
@@ -85,7 +88,7 @@ export class SessionsAdminService {
     const order = filter === 'needs_trainer' ? `(b.starts_at is not null and b.starts_at <= now()) desc, (b.status = 'rematching') desc, b.starts_at nulls first, b.created_at` : filter === 'upcoming' ? `b.starts_at nulls first` : `b.created_at desc`;
     const term = q?.trim().replace(/^zv-/i, '') ?? '';
     const r = await this.db.query<ListRow>(
-      `select ${COLS} ${FROM} where ${where} and ($1 = '' or upper(right(replace(b.id::text, '-', ''), 8)) = upper($1) or u.email ilike $2 or u.full_name ilike $2)
+      `select ${COLS} ${FROM} where ${where} and ($1 = '' or upper(right(replace(b.id::text, '-', ''), 8)) = upper($1) or u.email ilike $2 or u.full_name ilike $2 or u.phone_e164 like $2 or u.contact_phone like $2)
         and ($3::uuid is null or b.user_id = $3::uuid)
         order by ${order} limit 300`,
       [term, `%${term.replace(/[%_]/g, '')}%`, customerId ?? null],
@@ -249,7 +252,9 @@ export class SessionsAdminService {
       if (row.status !== 'confirmed' || !row.coach_id) throw new DomainError('INVALID_STATE', 'Only a session that has a trainer on it can be marked as done.');
       if (onlyCoachId && row.coach_id !== onlyCoachId) throw new DomainError('INVALID_STATE', 'This session is not yours.');
       if (!row.started_at && row.starts_at && row.starts_at.getTime() > Date.now()) throw new DomainError('INVALID_STATE', 'This session has not started yet.');
-      await client.query(`update bookings set status = 'completed', completed_at = now(), completed_by = $2, starts_at = coalesce(starts_at, now()) where id = $1`, [id, actorUserId]);
+      // The trainer's flat payout as it is now, saved on the session so a later change never rewrites it (null while no amount is set).
+      const payout = await payoutSnapshot(client);
+      await client.query(`update bookings set status = 'completed', completed_at = now(), completed_by = $2, starts_at = coalesce(starts_at, now()), trainer_payout_paise = $3 where id = $1`, [id, actorUserId, payout]);
       await client.query(`insert into booking_events (id, booking_id, type, actor, payload) values ($1, $2, 'completed', $3, $4)`, [uuidv7(), id, actor, JSON.stringify({ trainerId: row.coach_id, byUserId: actorUserId })]);
       await client.query(`insert into outbox_events (id, aggregate_type, aggregate_id, event_type, payload) values ($1, 'booking', $2, 'booking.completed', $3)`, [
         uuidv7(), id, JSON.stringify({ bookingId: id, userId: row.user_id, trainerId: row.coach_id, by: actor }),

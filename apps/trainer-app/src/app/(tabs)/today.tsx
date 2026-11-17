@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Switch, View } from 'react-native';
+import { Pressable, Switch, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { Banner } from '@/components/ui/Banner';
@@ -9,8 +9,9 @@ import { Card } from '@/components/ui/Card';
 import { Screen } from '@/components/ui/Screen';
 import { errorMessage, setAcceptingJobs } from '@/lib/api';
 import { useApplication } from '@/lib/useApplication';
+import { useInsights, rupees } from '@/lib/useInsights';
 import { useJobs, useSetBoard, whoFor } from '@/lib/useJobs';
-import { colors } from '@/theme';
+import { colors, radius } from '@/theme';
 
 const WEEK_MS = 7 * 86_400_000;
 
@@ -28,6 +29,7 @@ export default function Today() {
   const thisWeek = (jobs.data?.done ?? []).filter((job) => job.completedAt && jobs.dataUpdatedAt - new Date(job.completedAt).getTime() < WEEK_MS).length;
 
   const accepting = jobs.data?.acceptingJobs ?? true;
+  const insights = useInsights().data;
 
   async function toggle(on: boolean) {
     setSwitching(true);
@@ -46,6 +48,14 @@ export default function Today() {
       <AppText variant="screenTitle">{first ? `Hello, ${first}` : 'Hello'}</AppText>
       <AppText variant="body" color={colors.muted}>Here is your day on Zoove.</AppText>
       {jobs.isError && !jobs.data ? <Banner tone="bad">{errorMessage(jobs.error)}</Banner> : null}
+
+      {insights ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="Open my earnings" onPress={() => router.navigate('/insights')} style={({ pressed }) => ({ padding: 18, borderRadius: radius.xxl, backgroundColor: colors.purple, gap: 4, opacity: pressed ? 0.9 : 1 })}>
+          <AppText variant="eyebrow" color="rgba(255,255,255,0.75)">THIS MONTH</AppText>
+          <AppText variant="screenTitle" color={colors.white}>{insights.earningsKnown ? rupees(insights.periods.month.earnedPaise) : `${insights.periods.month.sessions} sessions`}</AppText>
+          <AppText variant="body" color="rgba(255,255,255,0.85)">{`${insights.periods.month.sessions} done this month · tap for your earnings`}</AppText>
+        </Pressable>
+      ) : null}
 
       <Card>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>

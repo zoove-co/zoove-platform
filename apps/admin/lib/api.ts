@@ -337,8 +337,8 @@ export const switchOffReward = (id: string) => api<RewardsOverview>(`/v1/admin/r
 export type SessionStatus = 'matching' | 'confirmed' | 'rematching' | 'completed' | 'cancelled';
 export type AdminSession = {
   id: string; sessionCode: string; status: SessionStatus; mode: string; participant: string; groupSize: number | null; serviceName: string; formatName: string;
-  startsAt: string | null; whenLabel: string; startPassed: boolean; area: string | null; customerName: string; customerContact: string;
-  trainerId: string | null; trainerName: string | null; trainerCancelCount: number; trainerCancelledAt: string | null; canMarkNoShow: boolean; live: boolean; startedAt: string | null; endsAt: string | null; rating: number | null; totalPaise: number; paidWithCredit: boolean; discountCode: string | null; createdAt: string;
+  startsAt: string | null; whenLabel: string; startPassed: boolean; area: string | null; customerId: string; customerName: string; customerContact: string; customerPhone: string | null;
+  trainerId: string | null; trainerApplicationId: string | null; trainerPhone: string | null; trainerName: string | null; trainerCancelCount: number; trainerCancelledAt: string | null; canMarkNoShow: boolean; live: boolean; startedAt: string | null; endsAt: string | null; rating: number | null; totalPaise: number; paidWithCredit: boolean; discountCode: string | null; createdAt: string;
 };
 export type SessionDetail = AdminSession & {
   addressLabel: string; addressLine: string; pincode: string | null; recipient: { name: string; phone: string } | null;
@@ -367,7 +367,7 @@ export type CustomerRow = {
 };
 export type CustomerDetail = CustomerRow & {
   addresses: { id: string; label: string; line1: string; line2: string | null; locality: string | null; city: string; pincode: string | null; isDefault: boolean }[];
-  bookings: { id: string; sessionCode: string; serviceName: string; formatName: string; mode: string; status: string; startsAt: string | null; trainerName: string | null; totalPaise: number; rating: number | null; createdAt: string }[];
+  bookings: { id: string; sessionCode: string; serviceName: string; formatName: string; mode: string; status: string; startsAt: string | null; trainerName: string | null; trainerApplicationId: string | null; totalPaise: number; rating: number | null; createdAt: string }[];
   packages: { id: string; name: string; status: string; creditsTotal: number; creditsUsed: number; expiresAt: string | null; totalPaise: number }[];
   referralCode: string | null;
   referredBy: string | null;
@@ -389,3 +389,23 @@ export type AttentionItem = { id: string; title: string; detail: string; since: 
 export type AttentionGroup = { key: string; title: string; hint: string; href: string; items: AttentionItem[] };
 export type Attention = { total: number; urgent: number; groups: AttentionGroup[]; generatedAt: string };
 export const getAttention = () => api<Attention>('/v1/admin/attention');
+
+// ---- Trainer earnings and analytics ----
+export type EarnPeriod = { sessions: number; earnedPaise: number; valuePaise?: number };
+export type EarnSlice = { name: string; sessions: number; earnedPaise: number };
+export type TrainerInsights = {
+  payoutPerSessionPaise: number | null; earningsKnown: boolean;
+  periods: { today: EarnPeriod; week: EarnPeriod; month: EarnPeriod; lifetime: EarnPeriod };
+  weekly: { label: string; start: string; sessions: number; earnedPaise: number }[];
+  monthly: { label: string; month: string; sessions: number; earnedPaise: number }[];
+  byService: EarnSlice[]; byParticipant: EarnSlice[]; byMode: EarnSlice[];
+  upcoming: number; rating: { average: number | null; count: number };
+};
+export type TrainerSessionItem = {
+  id: string; sessionCode: string; serviceName: string; formatName: string; participant: string; mode: string; status: string; startsAt: string | null; whenLabel: string; area: string | null;
+  customerId: string; customerName: string; live: boolean; totalPaise: number; earnedPaise: number | null; rating: number | null;
+};
+export type TrainerPerformance = { insights: TrainerInsights; live: TrainerSessionItem[]; upcoming: TrainerSessionItem[]; past: TrainerSessionItem[] };
+export const getTrainerPerformance = (applicationId: string) => api<TrainerPerformance>(`/v1/admin/trainers/${applicationId}/performance`);
+export const getTrainerPayout = () => api<{ payoutPerSessionPaise: number | null }>('/v1/admin/trainer-payout');
+export const setTrainerPayout = (paise: number | null) => api<{ payoutPerSessionPaise: number | null; filledIn: number }>('/v1/admin/trainer-payout', { method: 'PUT', json: { paise } });

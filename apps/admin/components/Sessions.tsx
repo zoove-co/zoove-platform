@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -8,7 +9,7 @@ import {
 } from '@/lib/api';
 import { can, useMe } from './me';
 import { Shell } from './Shell';
-import { Banner, Spinner } from './ui';
+import { Banner, CallLink, Spinner } from './ui';
 
 const rupees = (paise: number) => `₹${(paise / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 const stamp = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' });
@@ -86,6 +87,13 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
     const customerId = params.get('customer');
     if (customerId && /^[0-9a-f-]{36}$/i.test(customerId)) { setCustomer({ id: customerId, name: params.get('name') ?? 'this customer' }); setFilter('all'); }
   }, []);
+  // A link from a customer or a trainer page opens that session straight away: /sessions?open=<id>
+  useEffect(() => {
+    if (!can(me, 'sessions.manage')) return;
+    const id = new URLSearchParams(window.location.search).get('open');
+    if (id && /^[0-9a-f-]{36}$/i.test(id)) { setFilter('all'); void show(id); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me]);
   useEffect(() => {
     if (!can(me, 'sessions.manage')) return;
     const t = setTimeout(() => void load(), query ? 250 : 0);
@@ -148,7 +156,7 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
       ) : null}
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
         {FILTERS.map(([key, label]) => <button key={key} type="button" className="chipbtn" aria-pressed={filter === key} onClick={() => setFilter(key)}>{label}</button>)}
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by session code, name or email" aria-label="Search sessions" style={{ flex: '1 1 220px', maxWidth: 360 }} />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by session code, name, mobile number or email" aria-label="Search sessions" style={{ flex: '1 1 220px', maxWidth: 360 }} />
       </div>
       {customer ? (
         <div style={{ marginBottom: 14, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -167,12 +175,12 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
               {rows.map((s) => (
                 <tr key={s.id} style={s.startPassed ? { background: 'rgba(220, 38, 38, 0.07)' } : undefined}>
                   <td><b>{s.sessionCode}</b><div className="sub muted small">{s.serviceName} · {s.formatName} · {PEOPLE[s.participant] ?? s.participant}{s.groupSize ? ` of ${s.groupSize}` : ''}</div></td>
-                  <td>{s.customerName}<div className="sub muted small">{s.area ?? ''}</div></td>
+                  <td>{can(me, 'customers.view') ? <Link className="xlink" href={`/customers?open=${s.customerId}`}>{s.customerName}</Link> : s.customerName}<div className="sub muted small">{s.area ?? ''}</div></td>
                   <td>{s.whenLabel}{s.startPassed ? <div className="sub small" style={{ color: 'var(--red)', fontWeight: 600 }}>Overdue: start time has passed</div> : null}</td>
                   <td>
                     <span className={`pill ${s.live ? 'in_review' : STATUS_PILL[s.status]}`}>{s.live ? <LiveLabel endsAt={s.endsAt} /> : STATUS_LABEL[s.status]}</span>{s.rating !== null ? <span className="sub muted small">{` ${'★'.repeat(s.rating)}`}</span> : null}
                     {s.trainerCancelledAt && s.status === 'rematching' ? <div className="sub muted small">Trainer cancelled {stamp(s.trainerCancelledAt)}</div> : null}
-                    {s.trainerName && s.status === 'confirmed' ? <div className="sub muted small">{s.trainerName}</div> : null}
+                    {s.trainerName && (s.status === 'confirmed' || s.status === 'completed') ? <div className="sub muted small">{s.trainerApplicationId && can(me, 'trainers.view') ? <Link className="xlink" href={`/applications/${s.trainerApplicationId}`}>{s.trainerName}</Link> : s.trainerName}</div> : null}
                   </td>
                   <td><button className="btn ghost" type="button" onClick={() => void show(s.id)}>Open</button></td>
                 </tr>
@@ -189,12 +197,16 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
             <dl className="kv">
               <dt>Service</dt><dd>{open.serviceName} · {open.formatName} · {PEOPLE[open.participant] ?? open.participant}{open.groupSize ? ` of ${open.groupSize}` : ''}</dd>
               <dt>When</dt><dd>{open.whenLabel}{open.mode === 'instant' ? ' (instant)' : ''}</dd>
-              <dt>Customer</dt><dd>{open.customerName} · {open.customerContact}</dd>
+              <dt>Customer</dt><dd>{can(me, 'customers.view') ? <Link className="xlink" href={`/customers?open=${open.customerId}`}>{open.customerName}</Link> : open.customerName} · {open.customerContact}</dd>
               {open.recipient ? <><dt>For</dt><dd>{open.recipient.name} · {open.recipient.phone}</dd></> : null}
               <dt>Where</dt><dd>{open.addressLabel} · {open.addressLine}{open.pincode ? `, ${open.pincode}` : ''}</dd>
               <dt>Paid</dt><dd>{open.paidWithCredit ? 'With a package credit' : rupees(open.totalPaise)}{open.discountCode ? ` (code ${open.discountCode})` : ''}</dd>
-              <dt>Trainer</dt><dd>{open.trainerName ?? 'Not assigned'}{open.trainerCancelCount ? ` · cancelled ${open.trainerCancelCount} time${open.trainerCancelCount > 1 ? 's' : ''}` : ''}</dd>
+              <dt>Trainer</dt><dd>{open.trainerName && open.trainerApplicationId && can(me, 'trainers.view') ? <Link className="xlink" href={`/applications/${open.trainerApplicationId}`}>{open.trainerName}</Link> : (open.trainerName ?? 'Not assigned')}{open.trainerCancelCount ? ` · cancelled ${open.trainerCancelCount} time${open.trainerCancelCount > 1 ? 's' : ''}` : ''}</dd>
             </dl>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '0 0 12px' }}>
+              <CallLink phone={open.customerPhone} label="Call customer" />
+              {open.trainerId ? <CallLink phone={open.trainerPhone} label="Call trainer" /> : null}
+            </div>
             {open.startPassed ? <Banner tone="warn">Overdue: the start time has passed and no trainer is on this session. The customer has been told and can move it or cancel it. Call them to apologise and help them rebook. To give it a trainer, first move it to a new time with “Move to another time”.</Banner> : null}
 
             <h3 style={{ marginBottom: 6 }}>History</h3>
@@ -251,7 +263,7 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
             ) : null}
             {formError ? <Banner tone="bad">{formError}</Banner> : null}
             <div className="actions">
-              <button className="btn ghost" type="button" disabled={busy} onClick={() => setOpen(null)}>Close</button>
+              <button className="btn ghost" type="button" disabled={busy} onClick={() => { setOpen(null); if (new URLSearchParams(window.location.search).get('open')) window.history.replaceState(null, '', '/sessions'); }}>Close</button>
               {(open.status === 'matching' || open.status === 'rematching' || open.status === 'confirmed') && open.mode !== 'instant' ? (
                 moving ? (
                   <button className="btn" type="button" disabled={busy || !moveDate || moveReason.trim().length < 3} onClick={() => void act(() => moveSession(open.id, `${moveDate}T${moveTime}:00+05:30`, moveReason.trim()))}>{busy ? <Spinner /> : null} Move session</button>

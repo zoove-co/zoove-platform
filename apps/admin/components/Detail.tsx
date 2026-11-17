@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ApiError, KIND_LABEL, STATUS_LABEL, approve, editTrainerProfile, nice, documentLink, getApplication, reject, requestChanges, setTrainerStatus, startReview, type TrainerStatus, type Detail as DetailData } from '@/lib/api';
 import { can, useMe } from './me';
 import { Shell } from './Shell';
+import { TrainerPerformance } from './TrainerPerformance';
 import { Banner, Field, Icons, Spinner, avatarTone, initials } from './ui';
 
 type Dialog = null | 'approve' | 'reject' | 'changes' | 'status';
@@ -271,9 +272,8 @@ export function Detail({ signOut, expired }: { signOut: () => void; expired: () 
 
           {data.status === 'approved' ? (
             <div className="card">
-              <h2>Sessions</h2>
-              <div className="seg" aria-hidden><span>Active</span><span>Upcoming</span><span>Past</span></div>
-              <div className="empty-note">This trainer&apos;s sessions will appear here once bookings can be assigned to trainers. Coming soon.</div>
+              <h2>Earnings and sessions</h2>
+              {data.trainerStatus ? <TrainerPerformance applicationId={data.id} phone={data.phone} expired={expired} /> : <div className="empty-note">Sessions appear here once this person is a trainer.</div>}
             </div>
           ) : null}
         </div>

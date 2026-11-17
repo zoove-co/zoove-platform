@@ -80,3 +80,13 @@ export const Icons = {
   face: icon(<><circle cx="12" cy="12" r="8.5" /><path d="M9 10h.01M15 10h.01M8.8 14.5c.8 1 1.9 1.5 3.2 1.5s2.4-.5 3.2-1.5" /></>, 17),
   file: icon(<><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" /><path d="M14 3v5h5" /></>, 17),
 };
+
+// A "Call" button that opens the phone / softphone with the number filled in. The number is also written out so it can be read or copied.
+export function CallLink({ phone, label, small = false }: { phone: string | null | undefined; label: string; small?: boolean }) {
+  if (!phone) return <span className="muted small">{label}: no number</span>;
+  return (
+    <a className={`btn ${small ? 'small ' : ''}ghost`} href={`tel:${phone}`} title={phone} aria-label={`${label} on ${phone}`}>
+      {label}<span className="callnum"> · {phone}</span>
+    </a>
+  );
+}

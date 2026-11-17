@@ -11,7 +11,7 @@ import { destinationFor, useApplication } from '@/lib/useApplication';
 import { useJobs } from '@/lib/useJobs';
 import { colors, fonts } from '@/theme';
 
-// The approved trainer's app: open jobs, their own sessions, and their profile.
+// The approved trainer's app: open jobs, their own sessions, their earnings, and their profile.
 export default function TabsLayout() {
   const application = useApplication();
   const jobs = useJobs();
@@ -38,12 +38,13 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors.purple,
         tabBarInactiveTintColor: colors.muted,
         tabBarLabelStyle: { fontFamily: fonts.semibold, fontSize: 11 },
-        tabBarStyle: { backgroundColor: colors.white, borderTopColor: colors.line },
+        tabBarStyle: { backgroundColor: colors.white, borderTopColor: 'transparent', height: 66, paddingTop: 6, paddingBottom: 8, borderTopLeftRadius: 22, borderTopRightRadius: 22, shadowColor: '#2A0F8F', shadowOpacity: 0.1, shadowRadius: 16, shadowOffset: { width: 0, height: -4 }, elevation: 12 },
         sceneStyle: { backgroundColor: colors.background },
       }}>
       <Tabs.Screen name="today" options={{ title: 'Today', tabBarIcon: ({ color, size }) => <Icon name="home-outline" color={String(color)} size={size} /> }} />
       <Tabs.Screen name="jobs" options={{ title: 'Open jobs', ...(openCount > 0 ? { tabBarBadge: openCount } : {}), tabBarIcon: ({ color, size }) => <Icon name="flash-outline" color={String(color)} size={size} /> }} />
       <Tabs.Screen name="sessions" options={{ title: 'My sessions', tabBarIcon: ({ color, size }) => <Icon name="calendar-outline" color={String(color)} size={size} /> }} />
+      <Tabs.Screen name="insights" options={{ title: 'Earnings', tabBarIcon: ({ color, size }) => <Icon name="stats-chart-outline" color={String(color)} size={size} /> }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: ({ color, size }) => <Icon name="person-outline" color={String(color)} size={size} /> }} />
     </Tabs>
     {alert.fresh ? (

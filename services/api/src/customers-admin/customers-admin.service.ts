@@ -12,7 +12,7 @@ export type CustomerRow = {
 
 export type CustomerDetail = CustomerRow & {
   addresses: { id: string; label: string; line1: string; line2: string | null; locality: string | null; city: string; pincode: string | null; isDefault: boolean }[];
-  bookings: { id: string; sessionCode: string; serviceName: string; formatName: string; mode: string; status: string; startsAt: string | null; trainerName: string | null; totalPaise: number; rating: number | null; createdAt: string }[];
+  bookings: { id: string; sessionCode: string; serviceName: string; formatName: string; mode: string; status: string; startsAt: string | null; trainerName: string | null; trainerApplicationId: string | null; totalPaise: number; rating: number | null; createdAt: string }[];
   packages: { id: string; name: string; status: string; creditsTotal: number; creditsUsed: number; expiresAt: string | null; totalPaise: number }[];
   referralCode: string | null;
   referredBy: string | null;
@@ -60,9 +60,10 @@ export class CustomersAdminService {
     const [addresses, bookings, packages, code, referred, rated] = await Promise.all([
       this.db.query<{ id: string; label: string; line1: string; line2: string | null; locality: string | null; city: string; pincode: string | null; is_default: boolean }>(
         `select id, label, line1, line2, locality, city, pincode, is_default from addresses where user_id = $1 and deleted_at is null order by is_default desc, created_at`, [id]),
-      this.db.query<{ id: string; mode: string; status: string; starts_at: Date | null; total_paise: number; created_at: Date; service_name: string; format_name: string; trainer_name: string | null; stars: number | null }>(
+      this.db.query<{ id: string; mode: string; status: string; starts_at: Date | null; total_paise: number; created_at: Date; service_name: string; format_name: string; trainer_name: string | null; trainer_application_id: string | null; stars: number | null }>(
         `select b.id, b.mode, b.status, b.starts_at, b.total_paise, b.created_at, s.name as service_name, f.name as format_name,
                 (select trim(concat_ws(' ', ta.first_name, ta.last_name)) from trainers t join trainer_applications ta on ta.id = t.application_id where t.user_id = b.coach_id) as trainer_name,
+                (select t.application_id from trainers t where t.user_id = b.coach_id) as trainer_application_id,
                 (select r.stars from session_ratings r where r.booking_id = b.id) as stars
            from bookings b join services s on s.id = b.service_id join service_formats f on f.id = b.format_id
           where b.user_id = $1 order by coalesce(b.starts_at, b.created_at) desc limit 50`, [id]),
@@ -81,7 +82,7 @@ export class CustomersAdminService {
       addresses: addresses.rows.map((a) => ({ id: a.id, label: a.label, line1: a.line1, line2: a.line2, locality: a.locality, city: a.city, pincode: a.pincode, isDefault: a.is_default })),
       bookings: bookings.rows.map((b) => ({
         id: b.id, sessionCode: sessionCodeOf(b.id), serviceName: b.service_name, formatName: b.format_name, mode: b.mode, status: b.status,
-        startsAt: b.starts_at ? b.starts_at.toISOString() : null, trainerName: b.trainer_name, totalPaise: b.total_paise, rating: b.stars, createdAt: b.created_at.toISOString(),
+        startsAt: b.starts_at ? b.starts_at.toISOString() : null, trainerName: b.trainer_name, trainerApplicationId: b.trainer_application_id, totalPaise: b.total_paise, rating: b.stars, createdAt: b.created_at.toISOString(),
       })),
       packages: packages.rows.map((p) => ({ id: p.id, name: p.name, status: p.status, creditsTotal: p.credits_total, creditsUsed: p.credits_used, expiresAt: p.expires_at ? p.expires_at.toISOString() : null, totalPaise: p.total_paise })),
       referralCode: code.rows[0]?.code ?? null,
