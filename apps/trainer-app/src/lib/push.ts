@@ -21,7 +21,20 @@ async function currentToken(askPermission: boolean): Promise<string | null> {
   let { status } = await Notifications.getPermissionsAsync();
   if (status !== 'granted' && askPermission) status = (await Notifications.requestPermissionsAsync()).status;
   if (status !== 'granted') return null;
-  if (Platform.OS === 'android') await Notifications.setNotificationChannelAsync('default', { name: 'Zoove jobs', importance: AndroidImportance.HIGH });
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', { name: 'Zoove updates', importance: AndroidImportance.HIGH });
+    // New job requests: maximum importance (heads-up pop-up, even on the lock screen), a ring and a strong vibration.
+    // A channel's sound cannot be changed after it is created, which is why this is its own channel.
+    await Notifications.setNotificationChannelAsync('jobs', {
+      name: 'New job requests',
+      importance: AndroidImportance.MAX,
+      sound: 'job_alert.wav',
+      vibrationPattern: [0, 600, 250, 600, 250, 600],
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      enableVibrate: true,
+      bypassDnd: false,
+    });
+  }
   return (await Notifications.getExpoPushTokenAsync({ projectId })).data;
 }
 

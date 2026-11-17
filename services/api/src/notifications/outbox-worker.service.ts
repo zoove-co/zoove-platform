@@ -154,8 +154,8 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
       if (trainer.email) await this.email.send(build ? build(trainer.email, ctx, this.config.TRAINER_SITE_URL) : jobCancelledEmail(trainer.email, { ...ctx, ...(p.reason ? { reason: p.reason } : {}) }, this.config.TRAINER_SITE_URL));
       // The phone alert goes after the email, so a retry of a failed email never buzzes the phone twice. It is best effort.
       const detail = [ctx.serviceName, ctx.when, ctx.area].filter(Boolean).join(' · ');
-      const title = { 'trainer.job_available': 'New job near you', 'trainer.job_assigned': 'A session was assigned to you', 'trainer.job_moved': 'Session time changed', 'trainer.job_cancelled': 'A session was cancelled', 'trainer.session_reminder': `Session starts in about ${p.minutes ?? 30} minutes` }[event.event_type] ?? 'Zoove';
-      try { await this.push.deliver({ userId: p.trainerId, title, body: detail || 'Open the Zoove Trainer app', bookingId: p.bookingId ?? null }); } catch (error) { this.logger.warn(`Trainer push failed: ${error instanceof Error ? error.message : String(error)}`); }
+      const title = { 'trainer.job_available': '🔔 New job request', 'trainer.job_assigned': 'A session was assigned to you', 'trainer.job_moved': 'Session time changed', 'trainer.job_cancelled': 'A session was cancelled', 'trainer.session_reminder': `Session starts in about ${p.minutes ?? 30} minutes` }[event.event_type] ?? 'Zoove';
+      try { await this.push.deliver({ userId: p.trainerId, title, body: detail || 'Open the Zoove Trainer app', bookingId: p.bookingId ?? null, urgent: event.event_type === 'trainer.job_available' }); } catch (error) { this.logger.warn(`Trainer push failed: ${error instanceof Error ? error.message : String(error)}`); }
       return;
     }
     if (event.event_type === 'referral.reward_granted') {

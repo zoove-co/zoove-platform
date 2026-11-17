@@ -1,6 +1,7 @@
 // A message to a customer that may go out on several channels (email, push, WhatsApp). Each channel decides for itself
 // whether it can reach this customer: no email on file, no phone registered, channel not switched on, and so on.
-export type CustomerMessage = { userId: string; title: string; body: string; bookingId: string | null };
+// `urgent` marks a time-critical alert (a new job offer): push sends it on the loud, ringing channel and drops it if it cannot be delivered soon.
+export type CustomerMessage = { userId: string; title: string; body: string; bookingId: string | null; urgent?: boolean };
 
 export type ChannelResult = 'sent' | 'skipped';
 

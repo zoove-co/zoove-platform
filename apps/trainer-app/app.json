@@ -28,7 +28,7 @@
     "web": { "output": "static", "favicon": "./assets/images/favicon.png" },
     "plugins": [
       "expo-router",
-      "expo-notifications",
+      ["expo-notifications", { "sounds": ["./assets/sounds/job_alert.wav"] }],
       ["expo-splash-screen", { "backgroundColor": "#4B18F8", "image": "./assets/images/splash-icon.png", "imageWidth": 200 }],
       "expo-secure-store",
       ["expo-image-picker", { "cameraPermission": "Zoove uses your camera to photograph your ID documents and take your selfie for KYC.", "photosPermission": "Zoove uses your photos so you can choose pictures of your ID documents and certificates." }]
