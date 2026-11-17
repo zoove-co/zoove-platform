@@ -64,6 +64,24 @@ suite('checkout details, coach-assigned message and the Needs attention list', (
       await http().patch('/v1/me').set(as(me)).send({ contactPhone: '12345' }).expect(400);
     });
 
+    it('keeps the single full name in step with the first and last name, so ops and trainers do not see "Customer"', async () => {
+      await http().patch('/v1/me').set(as(me)).send({ firstName: 'Meera', lastName: 'Shah' }).expect(200);
+      const read = async () => (await pool.query<{ full_name: string | null }>(`select full_name from users where phone_e164 = $1`, [ME])).rows[0]!.full_name;
+      expect(await read()).toBe('Meera Shah');
+      await http().patch('/v1/me').set(as(me)).send({ lastName: '' }).expect(200);
+      expect(await read()).toBe('Meera');
+    });
+
+    it('shows ops the contact number typed at checkout next to the email', async () => {
+      await http().patch('/v1/me').set(as(me)).send({ firstName: 'Meera', contactPhone: '+919811122233' }).expect(200);
+      const admin = await adminToken('ops-contact@zoove.test', true, []);
+      const id = await bookInstant();
+      const list = (await http().get('/v1/admin/sessions').set(as(admin)).expect(200)).body;
+      const row = (list.items ?? list).find((x: { id: string }) => x.id === id);
+      expect(row.customerName).toBe('Meera');
+      expect(row.customerContact).toContain(ME);
+    });
+
     it('lets two customers give the same contact number: it is not a sign-in', async () => {
       const other = await signIn(app, pool, '+919812345678');
       await http().patch('/v1/me').set(as(me)).send({ contactPhone: '+919811122233' }).expect(200);

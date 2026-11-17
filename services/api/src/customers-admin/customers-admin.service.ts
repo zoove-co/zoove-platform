@@ -32,9 +32,9 @@ export class CustomersAdminService {
     const like = `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
     // A customer is anyone with the customer role or any booking (someone who also works on the team can book too).
     const where = `(exists (select 1 from user_roles r where r.user_id = u.id and r.role = 'customer') or exists (select 1 from bookings x where x.user_id = u.id))
-                   and ($1 = '' or u.full_name ilike $2 or u.email ilike $2 or u.phone_e164 like $2 or u.verified_email ilike $2)`;
+                   and ($1 = '' or u.full_name ilike $2 or u.email ilike $2 or u.phone_e164 like $2 or u.contact_phone like $2 or u.verified_email ilike $2)`;
     const rows = await this.db.query<ListDbRow>(
-      `select u.id, u.full_name, coalesce(u.email, u.verified_email) as email, u.phone_e164, u.status, u.created_at, u.last_login_at,
+      `select u.id, u.full_name, coalesce(u.email, u.verified_email) as email, coalesce(u.phone_e164, u.contact_phone) as phone_e164, u.status, u.created_at, u.last_login_at,
               (select count(*) from bookings b where b.user_id = u.id and b.status = 'completed') as done,
               (select count(*) from bookings b where b.user_id = u.id and b.status in ('matching', 'confirmed', 'rematching')) as upcoming,
               (select coalesce(sum(b.total_paise), 0) from bookings b where b.user_id = u.id and b.status = 'completed') as spent
@@ -47,7 +47,7 @@ export class CustomersAdminService {
 
   async detail(adminId: string, id: string): Promise<CustomerDetail> {
     const found = await this.db.query<ListDbRow>(
-      `select u.id, u.full_name, coalesce(u.email, u.verified_email) as email, u.phone_e164, u.status, u.created_at, u.last_login_at,
+      `select u.id, u.full_name, coalesce(u.email, u.verified_email) as email, coalesce(u.phone_e164, u.contact_phone) as phone_e164, u.status, u.created_at, u.last_login_at,
               (select count(*) from bookings b where b.user_id = u.id and b.status = 'completed') as done,
               (select count(*) from bookings b where b.user_id = u.id and b.status in ('matching', 'confirmed', 'rematching')) as upcoming,
               (select coalesce(sum(b.total_paise), 0) from bookings b where b.user_id = u.id and b.status = 'completed') as spent

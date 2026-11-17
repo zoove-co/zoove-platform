@@ -29,7 +29,11 @@ export function CheckoutDetailsSheet({ visible, profile, onClose, onSaved }: Pro
   const trimmed = name.trim();
   const mobile = profile.phone ?? normalizeIndianMobile(phone);
   const nameOk = trimmed.length >= 2 && trimmed.length <= 60;
-  const [first = '', ...rest] = trimmed.split(/\s+/);
+  const [token = '', ...tail] = trimmed.split(/\s+/);
+  // A one-letter first word ("A Sharma") would fail the 2-letter rule, so keep the whole name as the first name.
+  const oneLetter = token.length < 2;
+  const first = oneLetter ? trimmed : token;
+  const rest = oneLetter ? [] : tail;
 
   const save = () => {
     setTouched(true);

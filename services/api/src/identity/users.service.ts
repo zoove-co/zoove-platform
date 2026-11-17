@@ -109,15 +109,21 @@ export class UsersService {
     if (sets.length === 0) return this.getProfile(userId);
 
     try {
-      const result = await this.db.query<UserRow>(
-        `update users set ${sets.join(', ')}
-          where id = $1 and status = 'active'
-          returning phone_e164, contact_phone, first_name, last_name, email`,
-        params,
-      );
-      const row = result.rows[0];
-      if (!row) throw new DomainError('NOT_FOUND', 'Profile not found.');
-      return toProfile(row);
+      return await this.db.tx(async (client) => {
+        const result = await client.query<UserRow>(
+          `update users set ${sets.join(', ')}
+            where id = $1 and status = 'active'
+            returning phone_e164, contact_phone, first_name, last_name, email`,
+          params,
+        );
+        const row = result.rows[0];
+        if (!row) throw new DomainError('NOT_FOUND', 'Profile not found.');
+        // Ops and the trainer read the single full_name. Without this a customer who types their name is still shown as "Customer".
+        if (input.firstName !== undefined || input.lastName !== undefined) {
+          await client.query(`update users set full_name = nullif(btrim(concat_ws(' ', first_name, last_name)), '') where id = $1`, [userId]);
+        }
+        return toProfile(row);
+      });
     } catch (error) {
       // 23505 = unique violation: another customer already uses this email.
       if (typeof error === 'object' && error !== null && (error as { code?: string }).code === '23505') {

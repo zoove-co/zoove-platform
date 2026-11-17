@@ -27,12 +27,12 @@ export type AvailableTrainer = { id: string; name: string; sameDay: number; acce
 
 type ListRow = {
   id: string; status: BookingStatus; mode: string; participant: string; group_size: number | null; service_name: string; format_name: string; starts_at: Date | null;
-  address_area: string | null; customer_name: string | null; email: string | null; phone_e164: string | null; coach_id: string | null; trainer_name: string | null;
+  address_area: string | null; customer_name: string | null; email: string | null; phone_e164: string | null; contact_phone: string | null; coach_id: string | null; trainer_name: string | null;
   trainer_cancel_count: number; trainer_cancelled_at: Date | null; total_paise: number; package_purchase_id: string | null; discount_code: string | null; created_at: Date; started_at: Date | null; ends_at: Date | null; rating_stars: number | null;
 };
 
 const COLS = `b.id, b.status, b.mode, b.participant, b.group_size, b.starts_at, b.address_area, b.coach_id, b.trainer_cancel_count, b.trainer_cancelled_at, b.total_paise,
-              b.package_purchase_id, b.discount_code, b.created_at, b.started_at, b.ends_at, (select r.stars from session_ratings r where r.booking_id = b.id) as rating_stars, s.name as service_name, f.name as format_name, u.full_name as customer_name, u.email, u.phone_e164,
+              b.package_purchase_id, b.discount_code, b.created_at, b.started_at, b.ends_at, (select r.stars from session_ratings r where r.booking_id = b.id) as rating_stars, s.name as service_name, f.name as format_name, u.full_name as customer_name, u.email, u.phone_e164, u.contact_phone,
               coalesce(c.full_name, (select trim(concat_ws(' ', ta.first_name, ta.last_name)) from trainers t join trainer_applications ta on ta.id = t.application_id where t.user_id = b.coach_id)) as trainer_name`;
 const FROM = `from bookings b join services s on s.id = b.service_id join service_formats f on f.id = b.format_id join users u on u.id = b.user_id left join users c on c.id = b.coach_id`;
 
@@ -41,7 +41,7 @@ function toSession(r: ListRow, now = new Date()): AdminSession {
     id: r.id, sessionCode: sessionCodeOf(r.id), status: r.status, mode: r.mode, participant: r.participant, groupSize: r.group_size, serviceName: r.service_name, formatName: r.format_name,
     startsAt: r.starts_at ? r.starts_at.toISOString() : null, whenLabel: r.starts_at ? formatWhen(r.starts_at) : r.mode === 'instant' ? 'As soon as possible' : 'To be scheduled',
     startPassed: r.starts_at !== null && r.starts_at.getTime() < now.getTime() && (r.status === 'matching' || r.status === 'rematching'),
-    area: r.address_area, customerName: r.customer_name ?? 'Customer', customerContact: r.email ?? r.phone_e164 ?? '',
+    area: r.address_area, customerName: r.customer_name ?? 'Customer', customerContact: [r.email, r.phone_e164 ?? r.contact_phone].filter(Boolean).join(' · '),
     live: r.status === 'confirmed' && r.started_at !== null, startedAt: r.started_at ? r.started_at.toISOString() : null, endsAt: r.ends_at ? r.ends_at.toISOString() : null, rating: r.rating_stars,
     canMarkNoShow: r.status === 'confirmed' && r.coach_id !== null && r.started_at === null && (r.starts_at === null || r.starts_at.getTime() <= now.getTime()),
     trainerId: r.coach_id, trainerName: r.trainer_name, trainerCancelCount: r.trainer_cancel_count, trainerCancelledAt: r.trainer_cancelled_at ? r.trainer_cancelled_at.toISOString() : null,
