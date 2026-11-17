@@ -12,6 +12,8 @@ const updateSchema = z
     firstName: z.string().trim().min(2).max(60).optional(),
     lastName: z.string().trim().max(60).optional(),
     email: z.union([z.literal(''), z.email().max(200)]).optional(),
+    // An Indian mobile in +91 form, as the app sends it.
+    contactPhone: z.union([z.literal(''), z.string().regex(/^\+91[6-9]\d{9}$/)]).optional(),
   })
   .refine((value) => Object.values(value).some((field) => field !== undefined), { message: 'Send at least one field to change.' });
 
@@ -22,6 +24,7 @@ const profileSchema: NonNullable<ApiResponseSchemaHost['schema']> = {
     firstName: { type: 'string', nullable: true },
     lastName: { type: 'string', nullable: true },
     email: { type: 'string', nullable: true },
+    contactPhone: { type: 'string', nullable: true },
   },
 };
 
@@ -51,7 +54,7 @@ export class MeController {
   @ApiBody({
     schema: {
       type: 'object',
-      properties: { firstName: { type: 'string' }, lastName: { type: 'string' }, email: { type: 'string' } },
+      properties: { firstName: { type: 'string' }, lastName: { type: 'string' }, email: { type: 'string' }, contactPhone: { type: 'string' } },
     },
   })
   @ApiOkResponse({ schema: profileSchema })

@@ -152,7 +152,8 @@ export function bookingFromRow(row: Row, now = new Date()): Booking {
     trainerCancelled: row.status === 'rematching' && row.trainer_cancelled_at !== null,
     overdue: (row.status === 'matching' || row.status === 'rematching') &&
       ((row.starts_at !== null && row.starts_at.getTime() <= now.getTime()) || (row.mode === 'instant' && row.unfilled_notified_at !== null)),
-    whenLabel: row.starts_at ? formatWhen(row.starts_at) : row.mode === 'instant' ? 'Finding your coach' : 'To be scheduled',
+    // An instant session has no start time. "Finding your coach" is only true while nobody has accepted it.
+    whenLabel: row.starts_at ? formatWhen(row.starts_at) : row.mode !== 'instant' ? 'To be scheduled' : row.status === 'confirmed' ? 'Coach assigned' : 'Finding your coach',
     addressLabel: row.address_label,
     areaLabel: row.address_area ?? '',
     totalPaise: row.total_paise,

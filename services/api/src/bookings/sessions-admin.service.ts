@@ -3,7 +3,7 @@ import type { PoolClient } from 'pg';
 import { v7 as uuidv7 } from 'uuid';
 
 import { DomainError } from '../common/domain-error';
-import { notifyCustomer } from '../customer/notify';
+import { coachAssignedBody, notifyCustomer } from '../customer/notify';
 import { queueTrainerAlert } from '../notifications/trainer-alerts';
 import { APP_CONFIG, type Env } from '../config/env';
 import { DatabaseService } from '../database/database.service';
@@ -316,7 +316,7 @@ export class SessionsAdminService {
       await client.query(`insert into booking_events (id, booking_id, type, actor, payload) values ($1, $2, 'trainer_assigned', 'admin', $3)`, [uuidv7(), id, JSON.stringify({ trainerId, byUserId: adminId })]);
       await client.query(`insert into outbox_events (id, aggregate_type, aggregate_id, event_type, payload) values ($1, 'booking', $2, 'booking.trainer_assigned', $3)`, [uuidv7(), id, JSON.stringify({ bookingId: id, userId: row.user_id, trainerId })]);
       await client.query(`insert into audit_log (actor_user_id, action, entity_type, entity_id, after) values ($1, 'session.trainer_assigned', 'booking', $2, $3)`, [adminId, id, JSON.stringify({ trainerId })]);
-      await notifyCustomer(client, row.user_id, 'Coach assigned', `Coach ${trainer.name.split(' ')[0]} will take your ${row.service_name} session${row.starts_at ? ` on ${formatWhen(row.starts_at)}` : ''} (session ${sessionCodeOf(id)}).`, id);
+      await notifyCustomer(client, row.user_id, 'Coach assigned', coachAssignedBody({ coachFirstName: trainer.name.split(' ')[0] ?? 'Your coach', serviceName: row.service_name, when: row.starts_at ? formatWhen(row.starts_at) : null, area: row.address_area, sessionCode: sessionCodeOf(id) }), id);
       // The trainer is told by email (outbox worker, retried). They can cancel from the Jobs page if they cannot make it.
       await client.query(`insert into outbox_events (id, aggregate_type, aggregate_id, event_type, payload) values ($1, 'booking', $2, 'trainer.job_assigned', $3)`, [
         uuidv7(), id, JSON.stringify({ trainerId, sessionCode: sessionCodeOf(id), serviceName: row.service_name, when: row.starts_at ? formatWhen(row.starts_at) : 'as soon as possible', area: row.address_area ?? '' }),

@@ -7,10 +7,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AddressPicker } from '@/components/booking/AddressPicker';
 import { BookingSuccess } from '@/components/booking/BookingSuccess';
+import { CheckoutDetailsSheet, profileComplete } from '@/components/booking/CheckoutDetailsSheet';
 import { CoachPicker } from '@/components/booking/CoachPicker';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { DiscountField } from '@/components/booking/DiscountField';
 import { ParticipantPicker } from '@/components/booking/ParticipantPicker';
+import { RecipientFields } from '@/components/booking/RecipientFields';
 import { ReviewCard } from '@/components/booking/ReviewCard';
 import { SchedulePicker } from '@/components/booking/SchedulePicker';
 import { StylePicker } from '@/components/booking/StylePicker';
@@ -20,6 +22,7 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { StepHeading } from '@/components/ui/StepHeading';
 import { TabFooter } from '@/components/ui/TabFooter';
 import { useAddresses, useCreateBooking, useMyPackages, usePastCoaches, useService } from '@/features/booking/hooks';
+import { useProfile } from '@/features/auth/hooks';
 import { useHomeData } from '@/features/home/useHomeData';
 import { track } from '@/lib/analytics/track';
 import { bookingErrorMessage } from '@/lib/api/errorMessage';
@@ -40,6 +43,7 @@ export default function BookingScreen() {
     params.mode === 'instant' || params.mode === 'demo' ? params.mode : 'scheduled';
 
   const { data: home } = useHomeData();
+  const { data: profile } = useProfile();
   const { data: addresses } = useAddresses();
   const createBooking = useCreateBooking();
   const { data: pastCoaches } = usePastCoaches();
@@ -60,6 +64,9 @@ export default function BookingScreen() {
   const [preferredCoachId, setPreferredCoachId] = useState<string | undefined>();
   const [step, setStep] = useState(0);
   const [result, setResult] = useState<BookingResult | null>(null);
+  // Name and mobile are asked once, right before checkout, and only if the customer has not filled them in yet.
+  const [askDetails, setAskDetails] = useState(false);
+  const detailsNext = useRef<() => void>(() => undefined);
 
   // booking_abandoned: the customer got past step 0 but left without confirming.
   const progress = useRef({ step: 0, confirmed: false });
@@ -103,11 +110,12 @@ export default function BookingScreen() {
 
   const canAdvance =
     step === 0
-      ? participant !== 'loved_one' || (isValidRecipientName(recipientName) && normalizeIndianMobile(recipientPhone) !== null)
+      ? true
       : step === 1
         ? Boolean(service && format)
         : step === 2
-          ? Boolean(selectedAddress?.serviceable) && (instant || Boolean(slotStartsAt))
+          ? Boolean(selectedAddress?.serviceable) && (instant || Boolean(slotStartsAt)) &&
+            (participant !== 'loved_one' || (isValidRecipientName(recipientName) && normalizeIndianMobile(recipientPhone) !== null))
           : Boolean(service && format && selectedAddress);
 
   const onServiceChange = (slug: string) => {
@@ -189,12 +197,27 @@ export default function BookingScreen() {
     );
   };
 
+  // Runs `next` now, or after the customer has added their name and mobile when those are missing.
+  const afterDetails = (next: () => void) => {
+    if (profile && !profileComplete(profile)) {
+      detailsNext.current = next;
+      setAskDetails(true);
+      return;
+    }
+    next();
+  };
+
   const onPrimary = () => {
     if (step < LAST_STEP) {
-      scrollToEndNext.current = true;
-      setStep(step + 1);
+      const advance = () => {
+        scrollToEndNext.current = true;
+        setStep(step + 1);
+      };
+      // Leaving the address step is the point where checkout begins.
+      if (step === 2) afterDetails(advance);
+      else advance();
     } else {
-      onConfirm();
+      afterDetails(onConfirm);
     }
   };
 
@@ -258,10 +281,6 @@ export default function BookingScreen() {
           onChange={setParticipant}
           groupSize={groupSize}
           onGroupSize={setGroupSize}
-          recipientName={recipientName}
-          onRecipientName={setRecipientName}
-          recipientPhone={recipientPhone}
-          onRecipientPhone={setRecipientPhone}
         />
 
         {step >= 1 ? (
@@ -298,6 +317,9 @@ export default function BookingScreen() {
               selectedId={selectedAddress?.id}
               onSelect={onAddressSelect}
             />
+            {participant === 'loved_one' ? (
+              <RecipientFields name={recipientName} onName={setRecipientName} phone={recipientPhone} onPhone={setRecipientPhone} />
+            ) : null}
             {showCoachPicker ? (
               <CoachPicker
                 stepNumber={instant ? '4' : '5'}
@@ -384,6 +406,17 @@ export default function BookingScreen() {
         />
       </View>
       </KeyboardAvoidingView>
+      {profile ? (
+        <CheckoutDetailsSheet
+          visible={askDetails}
+          profile={profile}
+          onClose={() => setAskDetails(false)}
+          onSaved={() => {
+            setAskDetails(false);
+            detailsNext.current();
+          }}
+        />
+      ) : null}
       <TabFooter />
     </SafeAreaView>
   );

@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
-import { sessionSummary } from '@/lib/api';
+import { getAttention, sessionSummary } from '@/lib/api';
 
 import { can, useMe } from './me';
 import { Icons, Wordmark, avatarTone, initials } from './ui';
@@ -106,12 +106,23 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
   const onOfferings = path.startsWith('/offerings');
   const onAreas = path.startsWith('/areas');
   const onRewards = path.startsWith('/rewards');
+  const onAttention = path.startsWith('/attention');
   const onCustomers = path.startsWith('/customers');
-  const other = onCustomers || onTeam || onCalc || onDiscounts || onParties || onPackages || onSessions || onOfferings || onAreas || onRewards;
+  const other = onAttention || onCustomers || onTeam || onCalc || onDiscounts || onParties || onPackages || onSessions || onOfferings || onAreas || onRewards;
   // Sessions waiting for a trainer, so a cancellation is noticed without opening the page.
   const [waiting, setWaiting] = useState(0);
   const [overdue, setOverdue] = useState(0);
   const canSessions = can(me, 'sessions.manage');
+  // The number on the "Needs attention" tab: everything waiting for the team, red when something is urgent.
+  const [attention, setAttention] = useState({ total: 0, urgent: 0 });
+  useEffect(() => {
+    if (me === null) return;
+    let live = true;
+    const tick = () => getAttention().then((a) => { if (live) setAttention({ total: a.total, urgent: a.urgent }); }).catch(() => undefined);
+    void tick();
+    const timer = setInterval(() => void tick(), 30_000);
+    return () => { live = false; clearInterval(timer); };
+  }, [me]);
   useEffect(() => {
     if (!canSessions || me === null) return;
     let live = true;
@@ -128,6 +139,13 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
           <span className="tag">admin</span>
         </Link>
         <nav className="nav" aria-label="Main">
+          {me !== null ? (
+            <Link href="/attention" aria-current={onAttention ? 'page' : undefined}>
+              {Icons.complaints}
+              Needs attention
+              {attention.total ? <span className="badge" style={attention.urgent ? { background: 'var(--red)', color: '#fff' } : undefined} title={attention.urgent ? `${attention.urgent} urgent` : undefined}>{attention.total}</span> : null}
+            </Link>
+          ) : null}
           {can(me, 'trainers.view') ? (
             <Link href="/" aria-current={other ? undefined : 'page'}>
               {Icons.users}

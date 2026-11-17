@@ -4,12 +4,14 @@ import { DomainError } from '../common/domain-error';
 import { DatabaseService } from '../database/database.service';
 
 // Same shape as Profile in the customer app, so the app can swap its mock for this API unchanged.
-export type Profile = { phone: string | null; firstName: string | null; lastName: string | null; email: string | null };
+// `contactPhone` is the mobile the customer typed when booking: not verified, unlike `phone`.
+export type Profile = { phone: string | null; contactPhone: string | null; firstName: string | null; lastName: string | null; email: string | null };
 
-type UserRow = { phone_e164: string | null; first_name: string | null; last_name: string | null; email: string | null };
+type UserRow = { phone_e164: string | null; contact_phone: string | null; first_name: string | null; last_name: string | null; email: string | null };
 
 const toProfile = (row: UserRow): Profile => ({
   phone: row.phone_e164,
+  contactPhone: row.contact_phone,
   firstName: row.first_name,
   lastName: row.last_name,
   email: row.email,
@@ -21,7 +23,7 @@ export class UsersService {
 
   async getProfile(userId: string): Promise<Profile> {
     const result = await this.db.query<UserRow>(
-      `select phone_e164, first_name, last_name, email from users where id = $1 and status = 'active'`,
+      `select phone_e164, contact_phone, first_name, last_name, email from users where id = $1 and status = 'active'`,
       [userId],
     );
     const row = result.rows[0];
@@ -51,7 +53,7 @@ export class UsersService {
       }
 
       await client.query(
-        `update users set status = 'deleted', phone_e164 = null, email = null, verified_email = null,
+        `update users set status = 'deleted', phone_e164 = null, contact_phone = null, email = null, verified_email = null,
                 first_name = null, last_name = null, full_name = null
           where id = $1`,
         [userId],
@@ -91,7 +93,7 @@ export class UsersService {
 
   async updateProfile(
     userId: string,
-    input: { firstName?: string | undefined; lastName?: string | undefined; email?: string | undefined },
+    input: { firstName?: string | undefined; lastName?: string | undefined; email?: string | undefined; contactPhone?: string | undefined },
   ): Promise<Profile> {
     // Only the fields that were sent are changed; an empty string clears lastName or email.
     const sets: string[] = [];
@@ -103,13 +105,14 @@ export class UsersService {
     if (input.firstName !== undefined) add('first_name', input.firstName);
     if (input.lastName !== undefined) add('last_name', input.lastName || null);
     if (input.email !== undefined) add('email', input.email || null);
+    if (input.contactPhone !== undefined) add('contact_phone', input.contactPhone || null);
     if (sets.length === 0) return this.getProfile(userId);
 
     try {
       const result = await this.db.query<UserRow>(
         `update users set ${sets.join(', ')}
           where id = $1 and status = 'active'
-          returning phone_e164, first_name, last_name, email`,
+          returning phone_e164, contact_phone, first_name, last_name, email`,
         params,
       );
       const row = result.rows[0];

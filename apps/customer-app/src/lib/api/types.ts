@@ -256,6 +256,7 @@ export interface ServiceabilityCheck {
 
 export interface Profile {
   phone: string | null; // E.164, e.g. +919876543210. Null when the customer signed in with email.
+  contactPhone: string | null; // The mobile typed at checkout. Not verified.
   firstName: string | null;
   lastName: string | null;
   email: string | null;
@@ -265,6 +266,7 @@ export interface ProfileUpdate {
   firstName: string;
   lastName?: string;
   email?: string;
+  contactPhone?: string; // +91XXXXXXXXXX
 }
 
 export interface OtpRequestResult {

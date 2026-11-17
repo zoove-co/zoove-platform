@@ -5,10 +5,9 @@ import { useTranslation } from 'react-i18next';
 import { AppText } from '@/components/ui/AppText';
 import { Icon } from '@/components/ui/Icon';
 import { StepHeading } from '@/components/ui/StepHeading';
-import { TextField } from '@/components/ui/TextField';
 import type { Participant } from '@/lib/api';
 import { participantImages } from '@/lib/images';
-import { GROUP_MAX, GROUP_MIN, normalizeIndianMobile, isValidRecipientName } from '@/lib/participant';
+import { GROUP_MAX, GROUP_MIN } from '@/lib/participant';
 import { colors, radius, spacing } from '@/theme';
 
 type Props = {
@@ -16,13 +15,9 @@ type Props = {
   onChange: (value: Participant) => void;
   groupSize: number;
   onGroupSize: (value: number) => void;
-  recipientName: string;
-  onRecipientName: (value: string) => void;
-  recipientPhone: string;
-  onRecipientPhone: (value: string) => void;
 };
 
-export function ParticipantPicker({ value, onChange, groupSize, onGroupSize, recipientName, onRecipientName, recipientPhone, onRecipientPhone }: Props) {
+export function ParticipantPicker({ value, onChange, groupSize, onGroupSize }: Props) {
   const { t } = useTranslation();
   const options: { id: Participant; title: string; subtitle: string; enabled: boolean }[] = [
     { id: 'personal', title: t('booking.personal'), subtitle: t('booking.personalSub'), enabled: true },
@@ -90,29 +85,6 @@ export function ParticipantPicker({ value, onChange, groupSize, onGroupSize, rec
         </View>
       ) : null}
 
-      {value === 'loved_one' ? (
-        <View style={styles.detail}>
-          <TextField
-            label={t('booking.recipientName')}
-            value={recipientName}
-            onChangeText={onRecipientName}
-            autoCapitalize="words"
-            autoComplete="name"
-            error={recipientName.length > 0 && !isValidRecipientName(recipientName) ? t('booking.recipientNameError') : undefined}
-          />
-          <TextField
-            label={t('booking.recipientPhone')}
-            value={recipientPhone}
-            onChangeText={onRecipientPhone}
-            keyboardType="phone-pad"
-            autoComplete="tel"
-            error={recipientPhone.length > 0 && !normalizeIndianMobile(recipientPhone) ? t('booking.recipientPhoneError') : undefined}
-          />
-          <AppText variant="micro" color={colors.muted}>
-            {t('booking.recipientPhoneHint')}
-          </AppText>
-        </View>
-      ) : null}
     </View>
   );
 }

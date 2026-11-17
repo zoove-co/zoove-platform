@@ -190,14 +190,14 @@ suite('API against a real database', () => {
     it('reads and updates the profile', async () => {
       const { token } = await signIn();
       const empty = await http().get('/v1/me').set('Authorization', `Bearer ${token}`).expect(200);
-      expect(empty.body).toEqual({ phone: PHONE, firstName: null, lastName: null, email: null });
+      expect(empty.body).toEqual({ phone: PHONE, contactPhone: null, firstName: null, lastName: null, email: null });
 
       const updated = await http()
         .patch('/v1/me')
         .set('Authorization', `Bearer ${token}`)
         .send({ firstName: '  Ritesh ', lastName: 'Sharma', email: 'ritesh@example.com' })
         .expect(200);
-      expect(updated.body).toEqual({ phone: PHONE, firstName: 'Ritesh', lastName: 'Sharma', email: 'ritesh@example.com' });
+      expect(updated.body).toEqual({ phone: PHONE, contactPhone: null, firstName: 'Ritesh', lastName: 'Sharma', email: 'ritesh@example.com' });
     });
 
     it('updates only what is sent, and an empty value clears it', async () => {
@@ -205,9 +205,9 @@ suite('API against a real database', () => {
       const auth = { Authorization: `Bearer ${token}` };
       await http().patch('/v1/me').set(auth).send({ firstName: 'Ritesh', lastName: 'Sharma' }).expect(200);
       const emailOnly = await http().patch('/v1/me').set(auth).send({ email: 'only@example.com' }).expect(200);
-      expect(emailOnly.body).toEqual({ phone: PHONE, firstName: 'Ritesh', lastName: 'Sharma', email: 'only@example.com' });
+      expect(emailOnly.body).toEqual({ phone: PHONE, contactPhone: null, firstName: 'Ritesh', lastName: 'Sharma', email: 'only@example.com' });
       const cleared = await http().patch('/v1/me').set(auth).send({ email: '', lastName: '' }).expect(200);
-      expect(cleared.body).toEqual({ phone: PHONE, firstName: 'Ritesh', lastName: null, email: null });
+      expect(cleared.body).toEqual({ phone: PHONE, contactPhone: null, firstName: 'Ritesh', lastName: null, email: null });
       await http().patch('/v1/me').set(auth).send({}).expect(400);
     });
 

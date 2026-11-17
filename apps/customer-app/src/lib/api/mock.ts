@@ -530,8 +530,8 @@ function startMockSession(identity: string, isEmail: boolean): boolean {
   knownPhones.add(identity);
   if (!profiles.has(identity)) {
     profiles.set(identity, isEmail
-      ? { phone: null, firstName: null, lastName: null, email: identity }
-      : { phone: identity, firstName: null, lastName: null, email: null });
+      ? { phone: null, contactPhone: null, firstName: null, lastName: null, email: identity }
+      : { phone: identity, contactPhone: null, firstName: null, lastName: null, email: null });
   }
   signedInPhone = identity;
   return isNewUser;
@@ -569,8 +569,8 @@ export const mockApi: Api = {
       knownPhones.add(identity);
       if (!profiles.has(identity)) {
         profiles.set(identity, identity.includes('@')
-          ? { phone: null, firstName: null, lastName: null, email: identity }
-          : { phone: identity, firstName: null, lastName: null, email: null });
+          ? { phone: null, contactPhone: null, firstName: null, lastName: null, email: identity }
+          : { phone: identity, contactPhone: null, firstName: null, lastName: null, email: null });
       }
     } else {
       signedInPhone = null;
@@ -628,6 +628,7 @@ export const mockApi: Api = {
     profile.firstName = firstName;
     profile.lastName = input.lastName?.trim() || null;
     profile.email = input.email?.trim() || null;
+    if (input.contactPhone !== undefined) profile.contactPhone = input.contactPhone || null;
     return { ...profile };
   },
 

@@ -383,3 +383,9 @@ export const renameArea = (id: string, name: string) => api<AdminArea[]>(`/v1/ad
 export const setAreaActive = (id: string, active: boolean) => api<AdminArea[]>(`/v1/admin/areas/${id}/status`, { method: 'PUT', json: { active } });
 export const addAreaPincode = (id: string, pincode: string) => api<AdminArea[]>(`/v1/admin/areas/${id}/pincodes`, { method: 'POST', json: { pincode } });
 export const removeAreaPincode = (id: string, pincode: string) => api<AdminArea[]>(`/v1/admin/areas/${id}/pincodes/${pincode}`, { method: 'DELETE' });
+
+// "Needs attention": what the team should act on now. The server only returns the groups this admin may handle.
+export type AttentionItem = { id: string; title: string; detail: string; since: string; href: string; urgent: boolean };
+export type AttentionGroup = { key: string; title: string; hint: string; href: string; items: AttentionItem[] };
+export type Attention = { total: number; urgent: number; groups: AttentionGroup[]; generatedAt: string };
+export const getAttention = () => api<Attention>('/v1/admin/attention');

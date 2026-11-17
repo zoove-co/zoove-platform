@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { v7 as uuidv7 } from 'uuid';
 
 import { DomainError } from '../common/domain-error';
-import { notifyCustomer } from '../customer/notify';
+import { coachAssignedBody, notifyCustomer } from '../customer/notify';
 import { DatabaseService } from '../database/database.service';
 import { sessionCodeOf } from './bookings.service';
 import { CHECK_IN_EARLY_MINUTES, formatWhen } from './rules';
@@ -99,8 +99,8 @@ export class TrainerJobsService {
       throw new DomainError('INVALID_STATE', 'You are switched off for new jobs. Switch on to take this job.');
     }
     await this.db.tx(async (client) => {
-      const row = (await client.query<{ id: string; user_id: string; status: string; starts_at: Date | null; service_name: string; minutes: number }>(
-        `select b.id, b.user_id, b.status, b.starts_at, s.name as service_name, s.duration_max_minutes as minutes from bookings b join services s on s.id = b.service_id where b.id = $1 for update of b`, [id])).rows[0];
+      const row = (await client.query<{ id: string; user_id: string; status: string; starts_at: Date | null; address_area: string | null; service_name: string; minutes: number }>(
+        `select b.id, b.user_id, b.status, b.starts_at, b.address_area, s.name as service_name, s.duration_max_minutes as minutes from bookings b join services s on s.id = b.service_id where b.id = $1 for update of b`, [id])).rows[0];
       if (!row) throw new DomainError('NOT_FOUND', 'We could not find that job.');
       if (row.status !== 'matching' && row.status !== 'rematching') throw new DomainError('INVALID_STATE', 'Someone else just took this job.');
       if (row.starts_at && row.starts_at.getTime() <= Date.now()) throw new DomainError('INVALID_STATE', 'This job\'s start time has passed.');
@@ -122,7 +122,7 @@ export class TrainerJobsService {
       await client.query(`insert into booking_events (id, booking_id, type, actor, payload) values ($1, $2, 'trainer_assigned', 'trainer', $3)`, [uuidv7(), id, JSON.stringify({ trainerId: userId, byUserId: userId, pickedByTrainer: true })]);
       await client.query(`insert into outbox_events (id, aggregate_type, aggregate_id, event_type, payload) values ($1, 'booking', $2, 'booking.trainer_assigned', $3)`, [uuidv7(), id, JSON.stringify({ bookingId: id, userId: row.user_id, trainerId: userId })]);
       await client.query(`insert into audit_log (actor_user_id, action, entity_type, entity_id, after) values ($1, 'session.trainer_picked', 'booking', $2, $3)`, [userId, id, JSON.stringify({ trainerId: userId })]);
-      await notifyCustomer(client, row.user_id, 'Coach assigned', `Coach ${me.name.split(' ')[0]} will take your ${row.service_name} session${row.starts_at ? ` on ${formatWhen(row.starts_at)}` : ''} (session ${sessionCodeOf(id)}).`, id);
+      await notifyCustomer(client, row.user_id, 'Coach assigned', coachAssignedBody({ coachFirstName: me.name.split(' ')[0] ?? 'Your coach', serviceName: row.service_name, when: row.starts_at ? formatWhen(row.starts_at) : null, area: row.address_area, sessionCode: sessionCodeOf(id) }), id);
     });
     return this.board(userId);
   }

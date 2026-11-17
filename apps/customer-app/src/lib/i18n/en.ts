@@ -68,6 +68,7 @@ export const en = {
     groupSizeLess: 'Fewer people',
     groupSizeMore: 'More people',
     groupSizeHint: 'Between 3 and 30, including you.',
+    recipientTitle: 'Who is this session for?',
     recipientName: "Their name",
     recipientPhone: "Their mobile number",
     recipientPhoneHint: 'Your coach may call them to reach the session.',
@@ -258,6 +259,15 @@ export const en = {
     tooMany: 'Too many wrong codes. Please try again in a while.',
     error: 'We could not check that code. Please try again.',
     changedNote: 'Your code was removed because the session changed. Apply it again to see the new total.',
+  },
+  checkoutDetails: {
+    title: 'Almost there',
+    body: 'Add your name and mobile number so your coach knows who to greet and can reach you. You only do this once.',
+    name: 'Your name',
+    mobile: 'Mobile number',
+    emailVerified: 'Your email {{email}} is already verified.',
+    save: 'Save and continue',
+    close: 'Close',
   },
   profile: {
     title: 'Your profile',
