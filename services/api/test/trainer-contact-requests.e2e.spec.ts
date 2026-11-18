@@ -139,4 +139,21 @@ suite('trainer asks Zoove to change their email or mobile', () => {
     await http().post(`/v1/admin/trainer-contact-requests/${await pendingId()}/approve`).set(as(owner)).send({}).expect(409);
     expect((await row()).verified_email).toBe('asha@trainer.test');
   });
+
+  it('limits how many requests one trainer can send in a day', async () => {
+    for (let i = 0; i < 5; i += 1) {
+      await ask({ kind: 'phone', value: `+91987654321${i}` }).expect(200);
+      await http().delete(`/v1/trainer/contact-requests/${await pendingId()}`).set(as(trainerToken)).expect(200);
+    }
+    await ask({ kind: 'phone', value: '+919876543219' }).expect(429);
+  });
+
+  it('removes the requests and the saved mobile when the trainer deletes their account', async () => {
+    await ask({ kind: 'phone', value: '+919822222222' }).expect(200);
+    await http().post(`/v1/admin/trainer-contact-requests/${await pendingId()}/approve`).set(as(owner)).send({}).expect(200);
+    await ask({ kind: 'email', value: 'gone@trainer.test' }).expect(200);
+    await http().delete('/v1/trainer-application/account').set(as(trainerToken)).expect(204);
+    expect((await pool.query('select 1 from trainer_contact_requests')).rowCount).toBe(0);
+    expect((await pool.query('select contact_phone from users where id = $1', [trainerId])).rows[0].contact_phone).toBeNull();
+  });
 });

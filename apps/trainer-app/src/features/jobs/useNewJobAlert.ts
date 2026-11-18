@@ -1,5 +1,5 @@
 import * as Notifications from 'expo-notifications';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, Vibration } from 'react-native';
 
 import type { OpenJob } from '@/lib/api';
@@ -35,6 +35,8 @@ async function ring(job: OpenJob): Promise<void> {
 export function useNewJobAlert(open: OpenJob[] | undefined, enabled: boolean) {
   const seen = useRef<Set<string> | null>(null);
   const [fresh, setFresh] = useState<OpenJob | null>(null);
+  // After the trainer taps a job notification the app opens on the job list, so a pop-up for the same job would only get in the way.
+  const quietUntil = useRef(0);
 
   useEffect(() => {
     if (!enabled) return;
@@ -50,12 +52,16 @@ export function useNewJobAlert(open: OpenJob[] | undefined, enabled: boolean) {
     const added = open.filter((job) => !seen.current?.has(job.id));
     open.forEach((job) => seen.current?.add(job.id));
     const first = added[0];
-    if (!first || !enabled) return;
+    if (!first || !enabled || Date.now() < quietUntil.current) return;
     setFresh(first);
     void ring(first);
   }, [open, enabled]);
 
   // The card goes away by itself if somebody else takes the job first.
   const stillOpen = fresh && open?.some((job) => job.id === fresh.id) ? fresh : null;
-  return { fresh: stillOpen, dismiss: () => setFresh(null) };
+  const quietFor = useCallback((ms: number) => {
+    quietUntil.current = Date.now() + ms;
+    setFresh(null);
+  }, []);
+  return { fresh: stillOpen, dismiss: () => setFresh(null), quietFor };
 }

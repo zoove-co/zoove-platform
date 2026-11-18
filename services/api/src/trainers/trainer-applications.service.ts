@@ -341,9 +341,11 @@ export class TrainerApplicationsService {
         }
         await this.event(client, app.id, 'account_deleted', 'trainer', userId, {});
       }
+      // Requests to change email or mobile hold the old and new values: they go too.
+      await client.query(`delete from trainer_contact_requests where user_id = $1`, [userId]);
       await client.query(`update trainers set status = 'revoked', accepting_jobs = false where user_id = $1`, [userId]);
       await client.query(
-        `update users set status = 'deleted', phone_e164 = null, email = null, verified_email = null, first_name = null, last_name = null, full_name = null where id = $1`,
+        `update users set status = 'deleted', phone_e164 = null, contact_phone = null, email = null, verified_email = null, first_name = null, last_name = null, full_name = null where id = $1`,
         [userId],
       );
       await client.query(`delete from refresh_tokens where user_id = $1`, [userId]);

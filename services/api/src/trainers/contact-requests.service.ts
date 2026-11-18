@@ -13,6 +13,8 @@ export type MyContactRequest = { id: string; kind: ContactKind; newValue: string
 // What ops see: the trainer, what they have now, what they want, and why.
 export type AdminContactRequest = MyContactRequest & { applicationId: string | null; trainerName: string; oldValue: string | null; reason: string | null; decidedByName: string | null };
 
+const MAX_PER_DAY = 5;
+
 type Row = { id: string; kind: ContactKind; new_value: string; status: ContactStatus; decision_note: string | null; created_at: Date; decided_at: Date | null };
 const mine = (r: Row): MyContactRequest => ({ id: r.id, kind: r.kind, newValue: r.new_value, status: r.status, decisionNote: r.decision_note, createdAt: r.created_at.toISOString(), decidedAt: r.decided_at ? r.decided_at.toISOString() : null });
 
@@ -47,6 +49,9 @@ export class ContactRequestsService {
       const taken = await this.db.query(`select 1 from users where id <> $1 and (lower(verified_email) = $2 or lower(email) = $2)`, [userId, value]);
       if (taken.rows[0]) throw new DomainError('EMAIL_TAKEN', 'That email is already used by another Zoove account. Use a different one.');
     }
+    // Each request emails the team, so a trainer cannot keep sending and withdrawing them.
+    const recent = await this.db.query<{ n: string }>(`select count(*)::text as n from trainer_contact_requests where user_id = $1 and created_at > now() - interval '24 hours'`, [userId]);
+    if (Number(recent.rows[0]?.n ?? 0) >= MAX_PER_DAY) throw new DomainError('TOO_MANY_REQUESTS', 'You have sent a lot of requests today. Please wait until tomorrow, or contact the Zoove team.');
     try {
       await this.db.tx(async (client) => {
         const id = uuidv7();
@@ -71,19 +76,21 @@ export class ContactRequestsService {
 
   // ---- Ops ----
 
-  async listAdmin(status: ContactStatus | 'all', limit: number): Promise<{ pending: number; requests: AdminContactRequest[] }> {
+  private async adminRows(where: string, params: unknown[], limit: number): Promise<AdminContactRequest[]> {
     const r = await this.db.query<Row & { application_id: string | null; first_name: string | null; last_name: string | null; old_value: string | null; reason: string | null; decided_by_name: string | null }>(
       `select q.id, q.kind, q.new_value, q.old_value, q.reason, q.status, q.decision_note, q.created_at, q.decided_at, a.id as application_id, a.first_name, a.last_name,
               (select p.display_name from admin_profiles p where p.user_id = q.decided_by) as decided_by_name
          from trainer_contact_requests q left join trainer_applications a on a.user_id = q.user_id
-        where ($1 = 'all' or q.status = $1) order by (q.status = 'pending') desc, q.created_at desc limit $2`, [status, limit]);
+        where ${where} order by (q.status = 'pending') desc, q.created_at desc limit ${limit}`, params);
+    return r.rows.map((row) => ({
+      ...mine(row), applicationId: row.application_id, trainerName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Trainer', oldValue: row.old_value, reason: row.reason, decidedByName: row.decided_by_name,
+    }));
+  }
+
+  async listAdmin(status: ContactStatus | 'all', limit: number): Promise<{ pending: number; requests: AdminContactRequest[] }> {
+    const requests = await this.adminRows(`($1 = 'all' or q.status = $1)`, [status], limit);
     const pending = (await this.db.query<{ n: string }>(`select count(*)::text as n from trainer_contact_requests where status = 'pending'`)).rows[0]?.n ?? '0';
-    return {
-      pending: Number(pending),
-      requests: r.rows.map((row) => ({
-        ...mine(row), applicationId: row.application_id, trainerName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Trainer', oldValue: row.old_value, reason: row.reason, decidedByName: row.decided_by_name,
-      })),
-    };
+    return { pending: Number(pending), requests };
   }
 
   async decide(adminId: string, id: string, decision: 'approved' | 'rejected', note: string | undefined): Promise<AdminContactRequest> {
@@ -117,7 +124,7 @@ export class ContactRequestsService {
         uuidv7(), id, JSON.stringify({ requestId: id, trainerId: req.user_id, kind: req.kind, decision, newValue: req.new_value, oldValue: req.old_value, note: note?.trim() || null }),
       ]);
     });
-    const after = (await this.listAdmin('all', 200)).requests.find((r) => r.id === id);
+    const after = (await this.adminRows('q.id = $1', [id], 1))[0];
     if (!after) throw new DomainError('NOT_FOUND', 'Request not found.');
     return after;
   }

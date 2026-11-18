@@ -21,13 +21,14 @@ export default function TabsLayout() {
   const approved = application.data ? destinationFor(application.data) === 'jobs' : false;
   const accepting = jobs.data?.acceptingJobs ?? true;
   const alert = useNewJobAlert(jobs.data?.open, approved && accepting);
+  const { quietFor } = alert;
   const timeUp = useTimeUpAlert(jobs.data?.mine);
 
   // An approved trainer's phone is registered for job alerts; tapping one opens the job list.
   useEffect(() => {
     if (approved) void registerForPush();
   }, [approved]);
-  useEffect(() => onNotificationTapped(() => router.navigate('/jobs')), []);
+  useEffect(() => onNotificationTapped(() => { quietFor(8_000); router.navigate('/jobs'); }), [quietFor]);
   // A job request push while the app is open: check the list at once, so the pop-up shows without waiting for the next refresh.
   useEffect(() => onJobPushReceived(() => void queryClient.invalidateQueries({ queryKey: JOBS_KEY })), [queryClient]);
 
