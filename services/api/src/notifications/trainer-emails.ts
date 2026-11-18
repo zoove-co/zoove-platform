@@ -65,3 +65,23 @@ export function opsNewApplicationEmail(to: string, name: string, phone: string, 
   );
   return { to, subject: `${resubmission ? 'Re-submitted' : 'New'} trainer application: ${name}`, html, text };
 }
+
+const KIND_LABEL = { email: 'email address', phone: 'mobile number' } as const;
+
+export function opsContactChangeEmail(to: string, name: string, kind: 'email' | 'phone', adminUrl: string): EmailMessage {
+  const { html, text } = layout(
+    'Trainer wants to change their details',
+    [`${name} asked to change their ${KIND_LABEL[kind]}.${kind === 'email' ? ' This is also how they sign in, so please confirm it is really them (a call is best) before approving.' : ' Please confirm it is really them before approving.'}`],
+    { label: 'Review the request', url: adminUrl },
+  );
+  return { to, subject: `Trainer ${name} wants to change their ${KIND_LABEL[kind]}`, html, text };
+}
+
+export function contactChangeDecidedEmail(to: string, o: { firstName: string; kind: 'email' | 'phone'; decision: 'approved' | 'rejected'; newValue: string; note: string | null; statusUrl: string }): EmailMessage {
+  const label = KIND_LABEL[o.kind];
+  const paragraphs = o.decision === 'approved'
+    ? [`Hi ${o.firstName},`, `Your ${label} on Zoove is now ${o.newValue}.`, ...(o.kind === 'email' ? ['Please sign in with this email from now on.'] : []), 'If you did not ask for this, reply to this email right away.']
+    : [`Hi ${o.firstName},`, `We could not change your ${label} to ${o.newValue}.`, ...(o.note ? [o.note] : []), 'Your details stay as they were. Reply to this email if you need help.'];
+  const { html, text } = layout(o.decision === 'approved' ? `Your ${label} was updated` : `Your ${label} was not changed`, paragraphs, { label: 'Open Zoove Trainer', url: o.statusUrl }, 'You received this because you asked Zoove to update your details.');
+  return { to, subject: o.decision === 'approved' ? `Your Zoove ${label} was updated` : `Your Zoove ${label} was not changed`, html, text };
+}

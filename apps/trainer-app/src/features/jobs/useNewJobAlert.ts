@@ -1,29 +1,36 @@
 import * as Notifications from 'expo-notifications';
-import { AndroidImportance } from 'expo-notifications';
 import { useEffect, useRef, useState } from 'react';
 import { Platform, Vibration } from 'react-native';
 
 import type { OpenJob } from '@/lib/api';
+import { ensureChannels, JOB_CHANNEL } from '@/lib/push';
 
-const CHANNEL = 'new-jobs';
 // A long, hard-to-miss buzz: three strong pulses.
 const BUZZ = [0, 700, 300, 700, 300, 700];
 
-async function ready(): Promise<boolean> {
+// Rings with the Zoove bell (the job request channel). Where the phone will not show notifications, it still buzzes.
+async function ring(job: OpenJob): Promise<void> {
   try {
-    if (Platform.OS === 'android') await Notifications.setNotificationChannelAsync(CHANNEL, { name: 'New jobs', importance: AndroidImportance.MAX, vibrationPattern: BUZZ, sound: 'default' });
+    await ensureChannels();
     let { status } = await Notifications.getPermissionsAsync();
     if (status !== 'granted') status = (await Notifications.requestPermissionsAsync()).status;
-    return status === 'granted';
+    if (status === 'granted') {
+      await Notifications.scheduleNotificationAsync({
+        content: { title: 'New job request', body: `${job.serviceName} · ${job.whenLabel}${job.area ? ` · ${job.area}` : ''}`, sound: 'zoove_job_bell.wav', ...(Platform.OS === 'android' ? { channelId: JOB_CHANNEL } : {}) },
+        trigger: null,
+      });
+      return;
+    }
   } catch {
-    return false;
+    // fall through to the buzz
   }
+  Vibration.vibrate(BUZZ);
 }
 
 /**
- * Watches the open jobs. When one appears that the trainer has not seen yet, the phone buzzes and a notification with sound
- * shows at once, and the returned job (for a banner on screen) stays until dismissed. The first load never alerts.
- * This works while the app is open. Alerts with the app closed need a push build (see push.ts).
+ * Watches the open jobs. When one appears that the trainer has not seen yet, the phone rings with the Zoove bell and the returned
+ * job (for the pop-up card on screen) stays until dismissed. The first load never alerts.
+ * This works while the app is open. With the app closed, the push message does the ringing (see push.ts).
  */
 export function useNewJobAlert(open: OpenJob[] | undefined, enabled: boolean) {
   const seen = useRef<Set<string> | null>(null);
@@ -31,7 +38,7 @@ export function useNewJobAlert(open: OpenJob[] | undefined, enabled: boolean) {
 
   useEffect(() => {
     if (!enabled) return;
-    void ready();
+    void ensureChannels().catch(() => undefined);
   }, [enabled]);
 
   useEffect(() => {
@@ -45,12 +52,10 @@ export function useNewJobAlert(open: OpenJob[] | undefined, enabled: boolean) {
     const first = added[0];
     if (!first || !enabled) return;
     setFresh(first);
-    Vibration.vibrate(BUZZ);
-    void Notifications.scheduleNotificationAsync({
-      content: { title: 'New job near you', body: `${first.serviceName} · ${first.whenLabel}${first.area ? ` · ${first.area}` : ''}. Open Zoove to accept it.`, sound: 'default', ...(Platform.OS === 'android' ? { channelId: CHANNEL } : {}) },
-      trigger: null,
-    }).catch(() => undefined);
+    void ring(first);
   }, [open, enabled]);
 
-  return { fresh, dismiss: () => setFresh(null) };
+  // The card goes away by itself if somebody else takes the job first.
+  const stillOpen = fresh && open?.some((job) => job.id === fresh.id) ? fresh : null;
+  return { fresh: stillOpen, dismiss: () => setFresh(null) };
 }

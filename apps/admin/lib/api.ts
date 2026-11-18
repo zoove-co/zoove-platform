@@ -411,3 +411,13 @@ export type TrainerPerformance = { insights: TrainerInsights; live: TrainerSessi
 export const getTrainerPerformance = (applicationId: string) => api<TrainerPerformance>(`/v1/admin/trainers/${applicationId}/performance`);
 export const getTrainerPayout = () => api<{ payouts: TrainerPayouts }>('/v1/admin/trainer-payout');
 export const setTrainerPayout = (payouts: TrainerPayouts) => api<{ payouts: TrainerPayouts; filledIn: number }>('/v1/admin/trainer-payout', { method: 'PUT', json: { payouts } });
+
+// Trainers asking to change their sign-in email or mobile number. Approving changes it right away (the email is their sign-in).
+export type ContactRequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+export type TrainerContactRequest = {
+  id: string; kind: 'email' | 'phone'; newValue: string; oldValue: string | null; reason: string | null; status: ContactRequestStatus; decisionNote: string | null;
+  createdAt: string; decidedAt: string | null; decidedByName: string | null; applicationId: string | null; trainerName: string;
+};
+export const listTrainerContactRequests = (status: ContactRequestStatus | 'all') => api<{ pending: number; requests: TrainerContactRequest[] }>(`/v1/admin/trainer-contact-requests?status=${status}`);
+export const approveContactRequest = (id: string, note?: string) => api<TrainerContactRequest>(`/v1/admin/trainer-contact-requests/${id}/approve`, { method: 'POST', json: note ? { note } : {} });
+export const rejectContactRequest = (id: string, note: string) => api<TrainerContactRequest>(`/v1/admin/trainer-contact-requests/${id}/reject`, { method: 'POST', json: { note } });

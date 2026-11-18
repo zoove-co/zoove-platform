@@ -73,6 +73,14 @@ export class AttentionService {
         items: rows.map((r) => ({ id: r.id, title: r.name || 'New applicant', detail: 'Waiting for review', since: (r.submitted_at ?? r.created_at).toISOString(), href: `/applications/${r.id}`, urgent: false })) });
     }
 
+    if (can('trainers.view')) {
+      const rows = (await this.db.query<{ id: string; kind: string; new_value: string; created_at: Date; name: string }>(
+        `select q.id, q.kind, q.new_value, q.created_at, coalesce(nullif(trim(concat_ws(' ', a.first_name, a.last_name)), ''), 'Trainer') as name
+           from trainer_contact_requests q left join trainer_applications a on a.user_id = q.user_id where q.status = 'pending' order by q.created_at limit ${LIMIT}`)).rows;
+      groups.push({ key: 'trainer_requests', title: 'Trainers asking to change their email or mobile', hint: 'Check it is really them (a call is best), then approve or reject.', href: '/trainer-requests',
+        items: rows.map((r) => ({ id: r.id, title: r.name, detail: `New ${r.kind === 'email' ? 'email' : 'mobile'}: ${r.new_value}`, since: r.created_at.toISOString(), href: '/trainer-requests', urgent: false })) });
+    }
+
     if (can('packages.manage')) {
       const rows = (await this.db.query<{ id: string; name: string; total_paise: number; created_at: Date }>(
         `select id, name, total_paise, created_at from package_purchases where status = 'awaiting_payment' and created_at < now() - interval '1 day' order by created_at limit ${LIMIT}`)).rows;

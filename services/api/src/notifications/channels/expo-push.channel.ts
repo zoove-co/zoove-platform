@@ -6,8 +6,11 @@ import type { ChannelResult, CustomerMessage, MessageChannel } from '../message-
 
 export const PUSH_HTTP = Symbol('PUSH_HTTP');
 const ENDPOINT = 'https://exp.host/--/api/v2/push/send';
-// The trainer app creates this loud, ringing Android channel. An older install without it falls back to the default sound.
-const URGENT_CHANNEL = 'jobs';
+// The trainer app creates this loud, ringing Android channel (the Zoove bell). An older install without it falls back to the default sound.
+// The channel's sound is fixed when it is created on the phone, so a new ring needs a new channel id (the first one was 'jobs').
+const URGENT_CHANNEL = 'jobs-v2';
+// Every other message. Each app creates its own channel with this id and its own sound (customer app: the Zoove chime; trainer app: the standard tone).
+const NORMAL_CHANNEL = 'zoove';
 // A job offer older than this is stale (the job is likely taken), so a phone that was offline should not ring for it later.
 const URGENT_TTL_SECONDS = 600;
 
@@ -34,7 +37,7 @@ export class ExpoPushChannel implements MessageChannel {
     const response = await this.http(ENDPOINT, {
       method: 'POST',
       headers,
-      body: JSON.stringify(devices.rows.map((d) => ({ to: d.token, title: message.title, body: message.body, sound: 'default', priority: 'high', channelId: message.urgent ? URGENT_CHANNEL : 'default', ...(message.urgent ? { ttl: URGENT_TTL_SECONDS } : {}), data: { bookingId: message.bookingId } }))),
+      body: JSON.stringify(devices.rows.map((d) => ({ to: d.token, title: message.title, body: message.body, sound: 'default', priority: 'high', channelId: message.urgent ? URGENT_CHANNEL : NORMAL_CHANNEL, ...(message.urgent ? { ttl: URGENT_TTL_SECONDS } : {}), data: { bookingId: message.bookingId, ...(message.urgent ? { kind: 'job_available' } : {}) } }))),
       signal: AbortSignal.timeout(15_000),
     });
     if (!response.ok) throw new Error(`push service answered ${response.status}`);

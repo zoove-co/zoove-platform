@@ -3,6 +3,8 @@
     "name": "Zoove",
     "slug": "zoove-customer",
     "version": "1.0.0",
+    "runtimeVersion": { "policy": "appVersion" },
+    "updates": { "url": "https://u.expo.dev/78279a3b-10e6-43a3-850e-278b8a82d713", "fallbackToCacheTimeout": 0, "checkAutomatically": "ON_LOAD" },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "zoove",
@@ -31,7 +33,12 @@
     },
     "plugins": [
       "expo-router",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "sounds": ["./assets/sounds/zoove_chime.wav"]
+        }
+      ],
       [
         "expo-splash-screen",
         {

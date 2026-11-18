@@ -10,9 +10,42 @@ import { reportError } from '@/lib/monitoring';
 // Push messages. Everything here is best effort: a trainer who says no, a simulator, or a build without push credentials
 // simply gets the same messages by email and sees the jobs when they open the app.
 
+// The channel new job requests arrive on (the server sends this id). A channel's sound cannot be changed after the phone
+// creates it, so a new ring means a new id: the first was 'jobs', this one carries the Zoove bell.
+export const JOB_CHANNEL = 'jobs-v2';
+
+// With the app open, a job request is shown by the app itself (a pop-up card that rings), so the system does not show a second one.
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
+  handleNotification: async (notification) => {
+    const isJob = (notification.request.content.data as { kind?: unknown } | undefined)?.kind === 'job_available';
+    return { shouldShowBanner: !isJob, shouldShowList: !isJob, shouldPlaySound: !isJob, shouldSetBadge: false };
+  },
 });
+
+/** Runs when a job request push arrives while the app is open. */
+export const onJobPushReceived = (listener: () => void) => {
+  const subscription = Notifications.addNotificationReceivedListener((notification) => {
+    if ((notification.request.content.data as { kind?: unknown } | undefined)?.kind === 'job_available') listener();
+  });
+  return () => subscription.remove();
+};
+
+/** Creates the Android channels (safe to call again). Job requests ring loudly: heads-up pop-up, lock screen, the Zoove bell and a strong buzz. */
+export async function ensureChannels(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync('zoove', { name: 'Zoove updates', importance: AndroidImportance.HIGH });
+  await Notifications.setNotificationChannelAsync(JOB_CHANNEL, {
+    name: 'New job requests',
+    importance: AndroidImportance.MAX,
+    sound: 'zoove_job_bell.wav',
+    vibrationPattern: [0, 600, 250, 600, 250, 600],
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    enableVibrate: true,
+    bypassDnd: false,
+  });
+  // Older builds made these; they are not used any more.
+  for (const old of ['jobs', 'new-jobs', 'default']) await Notifications.deleteNotificationChannelAsync(old).catch(() => undefined);
+}
 
 async function currentToken(askPermission: boolean): Promise<string | null> {
   if (Platform.OS === 'web' || !Device.isDevice) return null;
@@ -21,20 +54,7 @@ async function currentToken(askPermission: boolean): Promise<string | null> {
   let { status } = await Notifications.getPermissionsAsync();
   if (status !== 'granted' && askPermission) status = (await Notifications.requestPermissionsAsync()).status;
   if (status !== 'granted') return null;
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', { name: 'Zoove updates', importance: AndroidImportance.HIGH });
-    // New job requests: maximum importance (heads-up pop-up, even on the lock screen), a ring and a strong vibration.
-    // A channel's sound cannot be changed after it is created, which is why this is its own channel.
-    await Notifications.setNotificationChannelAsync('jobs', {
-      name: 'New job requests',
-      importance: AndroidImportance.MAX,
-      sound: 'job_alert.wav',
-      vibrationPattern: [0, 600, 250, 600, 250, 600],
-      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-      enableVibrate: true,
-      bypassDnd: false,
-    });
-  }
+  await ensureChannels();
   return (await Notifications.getExpoPushTokenAsync({ projectId })).data;
 }
 

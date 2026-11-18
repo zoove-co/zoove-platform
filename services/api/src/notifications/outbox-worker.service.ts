@@ -10,13 +10,13 @@ import { ExpoPushChannel } from './channels/expo-push.channel';
 import { CustomerMessageService } from './customer-message.service';
 import { jobAssignedEmail, jobAvailableEmail, sessionReminderEmail, jobCancelledEmail, jobMovedEmail } from './trainer-job-emails';
 import { packageExpiredOpsEmail, partyRequestedEmail, sessionNotClosedEmail, sessionOverdueEmail, sessionUnfilledEmail, teamInviteEmail, trainerCancelledEmail } from './team-emails';
-import { approvedEmail, changesEmail, opsNewApplicationEmail, receivedEmail, rejectedEmail } from './trainer-emails';
+import { approvedEmail, changesEmail, contactChangeDecidedEmail, opsContactChangeEmail, opsNewApplicationEmail, receivedEmail, rejectedEmail } from './trainer-emails';
 
 type OutboxRow = { id: string; aggregate_id: string; event_type: string; payload: Record<string, unknown>; attempts: number };
 
 type ApplicationInfo = { first_name: string | null; last_name: string | null; email: string | null; phone_e164: string | null; review_note: string | null };
 
-const HANDLED = ['trainer.application_submitted', 'trainer.application_approved', 'trainer.application_rejected', 'trainer.application_changes_requested', 'team.member_invited', 'party.requested', 'booking.trainer_cancelled', 'booking.overdue', 'referral.reward_granted', 'trainer.job_assigned', 'trainer.job_moved', 'trainer.job_cancelled', 'trainer.job_available', 'trainer.session_reminder', 'booking.unfilled', 'booking.completion_open', 'package.expired', 'customer.notify'];
+const HANDLED = ['trainer.application_submitted', 'trainer.application_approved', 'trainer.application_rejected', 'trainer.application_changes_requested', 'team.member_invited', 'party.requested', 'booking.trainer_cancelled', 'booking.overdue', 'referral.reward_granted', 'trainer.job_assigned', 'trainer.job_moved', 'trainer.job_cancelled', 'trainer.job_available', 'trainer.session_reminder', 'booking.unfilled', 'booking.completion_open', 'package.expired', 'customer.notify', 'trainer.contact_change_requested', 'trainer.contact_change_decided'];
 const MAX_ATTEMPTS = 10;
 const BATCH = 10;
 
@@ -105,6 +105,30 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
       for (const ops of this.config.OPS_NOTIFY_EMAILS.split(',').map((value) => value.trim()).filter(Boolean)) {
         await this.email.send(trainerCancelledEmail(ops, { sessionCode: p.sessionCode ?? '', serviceName: p.serviceName ?? 'a', when: p.when ?? '', reason: p.reason ?? '' }, `${this.config.ADMIN_URL}/sessions?code=${encodeURIComponent(p.sessionCode ?? '')}`));
       }
+      return;
+    }
+    if (event.event_type === 'trainer.contact_change_requested') {
+      const p = event.payload as { applicationId?: string; kind?: 'email' | 'phone' };
+      if (!p.applicationId || !p.kind) return;
+      const a = (await this.db.query<{ first_name: string | null; last_name: string | null }>(`select first_name, last_name from trainer_applications where id = $1`, [p.applicationId])).rows[0];
+      const name = [a?.first_name, a?.last_name].filter(Boolean).join(' ') || 'A trainer';
+      for (const ops of this.opsEmails()) await this.email.send(opsContactChangeEmail(ops, name, p.kind, `${this.config.ADMIN_URL}/trainer-requests`));
+      return;
+    }
+    if (event.event_type === 'trainer.contact_change_decided') {
+      const p = event.payload as { trainerId?: string; kind?: 'email' | 'phone'; decision?: 'approved' | 'rejected'; newValue?: string; oldValue?: string | null; note?: string | null };
+      if (!p.trainerId || !p.kind || !p.decision || !p.newValue) return;
+      const who = (await this.db.query<{ email: string | null; first_name: string | null }>(
+        `select coalesce(u.verified_email, u.email, ta.email) as email, ta.first_name from trainer_applications ta join users u on u.id = ta.user_id where ta.user_id = $1`, [p.trainerId])).rows[0];
+      if (!who) return;
+      const mail = { firstName: who.first_name ?? 'there', kind: p.kind, decision: p.decision, newValue: p.newValue, note: p.note ?? null, statusUrl: this.config.TRAINER_SITE_URL };
+      if (who.email) await this.email.send(contactChangeDecidedEmail(who.email, mail));
+      // A changed sign-in email also gets a notice at the old address, in case the request was not the trainer's own.
+      if (p.kind === 'email' && p.decision === 'approved' && p.oldValue && p.oldValue.toLowerCase() !== who.email?.toLowerCase()) await this.email.send(contactChangeDecidedEmail(p.oldValue, mail));
+      const label = p.kind === 'email' ? 'email' : 'mobile number';
+      try {
+        await this.push.deliver({ userId: p.trainerId, title: p.decision === 'approved' ? `Your ${label} was updated` : `Your ${label} was not changed`, body: p.decision === 'approved' ? `It is now ${p.newValue}.` : (p.note || 'Open the app to see why.'), bookingId: null });
+      } catch (error) { this.logger.warn(`Trainer push failed: ${error instanceof Error ? error.message : String(error)}`); }
       return;
     }
     if (event.event_type === 'customer.notify') {

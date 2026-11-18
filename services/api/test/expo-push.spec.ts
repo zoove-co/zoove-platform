@@ -17,13 +17,13 @@ describe('ExpoPushChannel', () => {
   it('sends an ordinary message on the default channel with no expiry', async () => {
     const { sent, channel } = setup();
     expect(await channel.deliver({ userId: 'u', title: 'Hi', body: 'There', bookingId: null })).toBe('sent');
-    expect(sent[0]).toMatchObject({ channelId: 'default', priority: 'high' });
+    expect(sent[0]).toMatchObject({ channelId: 'zoove', priority: 'high' });
     expect(sent[0]).not.toHaveProperty('ttl');
   });
 
   it('sends an urgent message on the ringing jobs channel and lets it expire', async () => {
     const { sent, channel } = setup();
     await channel.deliver({ userId: 'u', title: 'New job request', body: 'x', bookingId: 'b1', urgent: true });
-    expect(sent[0]).toMatchObject({ channelId: 'jobs', priority: 'high', ttl: 600, data: { bookingId: 'b1' } });
+    expect(sent[0]).toMatchObject({ channelId: 'jobs-v2', priority: 'high', ttl: 600, data: { bookingId: 'b1' } });
   });
 });

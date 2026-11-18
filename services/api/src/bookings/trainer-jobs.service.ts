@@ -12,6 +12,8 @@ import { trainerBusySql } from './trainer-clash';
 export type OpenJob = {
   id: string; sessionCode: string; serviceName: string; formatName: string; startsAt: string | null; whenLabel: string;
   participant: string; groupSize: number | null; area: string | null;
+  // When this trainer was told about the job (open jobs only), so the app can mark the newest one. Null elsewhere.
+  offeredAt: string | null;
   // How close the job is to this trainer's own pincode: same pincode, same area group, or elsewhere in the city. Null where it does not apply.
   nearness: 'same_pincode' | 'near_you' | 'elsewhere' | null;
 };
@@ -23,7 +25,7 @@ export type JobBoard = { acceptingJobs: boolean; open: OpenJob[]; mine: MyJob[];
 
 type Row = {
   id: string; mode: string; participant: string; group_size: number | null; starts_at: Date | null; address_area: string | null; address_pincode: string | null;
-  address_label: string; address_line: string; service_name: string; format_name: string; full_name: string | null; note?: string | null; completed_at?: Date | null; started_at?: Date | null; ends_at?: Date | null; cluster_name: string | null; near?: 'same_pincode' | 'near_you' | 'elsewhere' | null;
+  address_label: string; address_line: string; service_name: string; format_name: string; full_name: string | null; note?: string | null; completed_at?: Date | null; started_at?: Date | null; ends_at?: Date | null; cluster_name: string | null; offered_at?: Date | null; near?: 'same_pincode' | 'near_you' | 'elsewhere' | null;
 };
 const COLS = `b.id, b.mode, b.participant, b.group_size, b.starts_at, b.address_area, b.address_pincode, b.address_label, b.address_line, s.name as service_name, f.name as format_name, u.full_name,
   (select c.name from cluster_pincodes cp join clusters c on c.id = cp.cluster_id where cp.pincode = b.address_pincode limit 1) as cluster_name`;
@@ -34,7 +36,7 @@ const areaLabel = (r: Row): string | null => (r.address_area && r.address_area.t
 
 const toOpen = (r: Row): OpenJob => ({
   id: r.id, sessionCode: sessionCodeOf(r.id), serviceName: r.service_name, formatName: r.format_name, startsAt: r.starts_at ? r.starts_at.toISOString() : null,
-  whenLabel: r.starts_at ? formatWhen(r.starts_at) : 'As soon as possible', participant: r.participant, groupSize: r.group_size, area: areaLabel(r), nearness: r.near ?? null,
+  whenLabel: r.starts_at ? formatWhen(r.starts_at) : 'As soon as possible', participant: r.participant, groupSize: r.group_size, area: areaLabel(r), nearness: r.near ?? null, offeredAt: r.offered_at ? r.offered_at.toISOString() : null,
 });
 
 // What a trainer sees and does: the open jobs nobody has taken (first to accept gets it), their own sessions, and cancelling one of theirs.
@@ -58,7 +60,8 @@ export class TrainerJobsService {
         `select ${COLS},
                 case when b.address_pincode is not null and b.address_pincode = me.pin then 'same_pincode'
                      when exists (select 1 from cluster_pincodes a join cluster_pincodes c on c.cluster_id = a.cluster_id where a.pincode = b.address_pincode and c.pincode = me.pin) then 'near_you'
-                     else 'elsewhere' end as near
+                     else 'elsewhere' end as near,
+                (select a.alerted_at from job_alerts a where a.booking_id = b.id and a.trainer_id = $1::uuid) as offered_at
            ${FROM}
            cross join (select (select ta.address_pincode from trainers t join trainer_applications ta on ta.id = t.application_id where t.user_id = $1::uuid) as pin) me
           where b.status in ('matching', 'rematching') and (b.starts_at is null or b.starts_at > now())

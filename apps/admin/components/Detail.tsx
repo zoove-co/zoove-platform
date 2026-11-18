@@ -31,6 +31,9 @@ const EVENT_LABEL: Record<string, string> = {
   trainer_revoked: 'Trainer revoked',
   trainer_resumed: 'Trainer resumed',
   profile_edited: 'Details corrected by ops',
+  contact_change_requested: 'Asked to change email or mobile',
+  contact_change_approved: 'Email or mobile change approved',
+  contact_change_rejected: 'Email or mobile change rejected',
 };
 
 export function Detail({ signOut, expired }: { signOut: () => void; expired: () => void }) {

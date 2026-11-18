@@ -22,7 +22,10 @@ async function currentToken(askPermission: boolean): Promise<string | null> {
   if (status !== 'granted' && askPermission) status = (await Notifications.requestPermissionsAsync()).status;
   if (status !== 'granted') return null;
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', { name: 'Zoove', importance: AndroidImportance.DEFAULT });
+    // The server sends every message on this channel id. It carries the Zoove chime; a channel's sound is fixed when the phone creates it,
+    // so the older 'default' channel (standard tone) is removed rather than changed.
+    await Notifications.setNotificationChannelAsync('zoove', { name: 'Zoove', importance: AndroidImportance.HIGH, sound: 'zoove_chime.wav', vibrationPattern: [0, 180, 90, 180], enableVibrate: true });
+    await Notifications.deleteNotificationChannelAsync('default').catch(() => undefined);
   }
   return (await Notifications.getExpoPushTokenAsync({ projectId })).data;
 }

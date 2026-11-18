@@ -74,7 +74,7 @@ suite('trainer jobs: who is free, assigning, open jobs, accepting and cancelling
   };
   const assign = (id: string, trainerId: string) => http().post(`/v1/admin/sessions/${id}/assign`).set(as(owner)).send({ trainerId });
   const available = async (id: string) => (await http().get(`/v1/admin/sessions/${id}/available-trainers`).set(as(owner)).expect(200)).body as { id: string; name: string; sameDay: number }[];
-  const board = async (t: string) => (await dispatch(), await http().get('/v1/trainer/jobs').set(as(t)).expect(200)).body as { open: { id: string }[]; mine: { id: string; addressLine: string; customerFirstName: string; canCancel: boolean; note: string }[]; done: { id: string; note: string }[]; doneCount: number };
+  const board = async (t: string) => (await dispatch(), await http().get('/v1/trainer/jobs').set(as(t)).expect(200)).body as { open: { id: string; offeredAt: string | null }[]; mine: { id: string; addressLine: string; customerFirstName: string; canCancel: boolean; note: string }[]; done: { id: string; note: string }[]; doneCount: number };
 
   beforeAll(async () => {
     ({ app, pool } = await startApp(url as string, (builder) => builder.overrideProvider(EmailProvider).useValue(mail)));
@@ -205,7 +205,10 @@ suite('trainer jobs: who is free, assigning, open jobs, accepting and cancelling
       const mine = await board(t1);
       expect(mine.mine).toHaveLength(1);
       expect(mine.open).toEqual([]);
-      expect((await board(t2)).open).toHaveLength(1);
+      const others = (await board(t2)).open;
+      expect(others).toHaveLength(1);
+      // The app marks the newest job by the time this trainer was told about it.
+      expect(Date.now() - new Date(others[0]!.offeredAt as string).getTime()).toBeLessThan(120_000);
     });
 
     it('does not offer a session whose time has passed', async () => {
