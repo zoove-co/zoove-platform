@@ -9,14 +9,14 @@ import { referralRewardEmail } from './customer-emails';
 import { ExpoPushChannel } from './channels/expo-push.channel';
 import { CustomerMessageService } from './customer-message.service';
 import { jobAssignedEmail, jobAvailableEmail, sessionReminderEmail, jobCancelledEmail, jobMovedEmail } from './trainer-job-emails';
-import { packageExpiredOpsEmail, partyRequestedEmail, sessionNotClosedEmail, sessionOverdueEmail, sessionUnfilledEmail, teamInviteEmail, trainerCancelledEmail } from './team-emails';
+import { packageExpiredOpsEmail, packageOrderedOpsEmail, partyRequestedEmail, sessionNotClosedEmail, sessionOverdueEmail, sessionUnfilledEmail, teamInviteEmail, trainerCancelledEmail } from './team-emails';
 import { approvedEmail, changesEmail, contactChangeDecidedEmail, opsContactChangeEmail, opsNewApplicationEmail, receivedEmail, rejectedEmail } from './trainer-emails';
 
 type OutboxRow = { id: string; aggregate_id: string; event_type: string; payload: Record<string, unknown>; attempts: number };
 
 type ApplicationInfo = { first_name: string | null; last_name: string | null; email: string | null; phone_e164: string | null; review_note: string | null };
 
-const HANDLED = ['trainer.application_submitted', 'trainer.application_approved', 'trainer.application_rejected', 'trainer.application_changes_requested', 'team.member_invited', 'party.requested', 'booking.trainer_cancelled', 'booking.overdue', 'referral.reward_granted', 'trainer.job_assigned', 'trainer.job_moved', 'trainer.job_cancelled', 'trainer.job_available', 'trainer.session_reminder', 'booking.unfilled', 'booking.completion_open', 'package.expired', 'customer.notify', 'trainer.contact_change_requested', 'trainer.contact_change_decided'];
+const HANDLED = ['trainer.application_submitted', 'trainer.application_approved', 'trainer.application_rejected', 'trainer.application_changes_requested', 'team.member_invited', 'party.requested', 'booking.trainer_cancelled', 'booking.overdue', 'referral.reward_granted', 'trainer.job_assigned', 'trainer.job_moved', 'trainer.job_cancelled', 'trainer.job_available', 'trainer.session_reminder', 'booking.unfilled', 'booking.completion_open', 'package.expired', 'package.ordered', 'customer.notify', 'trainer.contact_change_requested', 'trainer.contact_change_decided'];
 const MAX_ATTEMPTS = 10;
 const BATCH = 10;
 
@@ -145,6 +145,14 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
     if (event.event_type === 'booking.completion_open') {
       const p = event.payload as { sessionCode?: string; serviceName?: string; when?: string; trainerName?: string };
       for (const ops of this.opsEmails()) await this.email.send(sessionNotClosedEmail(ops, { sessionCode: p.sessionCode ?? '', serviceName: p.serviceName ?? 'a', when: p.when ?? '', trainerName: p.trainerName ?? 'the trainer' }, `${this.config.ADMIN_URL}/sessions?code=${encodeURIComponent(p.sessionCode ?? '')}`));
+      return;
+    }
+    if (event.event_type === 'package.ordered') {
+      const o = (await this.db.query<{ name: string; total_paise: number; customer: string | null }>(
+        `select p.name, p.total_paise, coalesce(u.full_name, u.email, u.verified_email, u.phone_e164) as customer from package_purchases p join users u on u.id = p.user_id where p.id = $1`, [event.aggregate_id])).rows[0];
+      if (!o) return;
+      const amountRupees = `₹${Math.round(o.total_paise / 100).toLocaleString('en-IN')}`;
+      for (const ops of this.opsEmails()) await this.email.send(packageOrderedOpsEmail(ops, { customer: o.customer ?? 'A customer', packageName: o.name, amountRupees }, `${this.config.ADMIN_URL}/packages`));
       return;
     }
     if (event.event_type === 'package.expired') {

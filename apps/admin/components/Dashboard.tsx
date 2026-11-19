@@ -53,7 +53,6 @@ export function Dashboard({ signOut, expired, initialView = 'applications' }: { 
   const load = useCallback(async () => {
     if (!allowed) return;
     const mine = ++seq.current;
-    listTrainerContactRequests('pending').then((r) => setInfoWaiting(r.pending)).catch(() => undefined);
     try {
       const result = await listApplications(filter, search);
       if (mine !== seq.current) return; // a newer request is already running
@@ -67,6 +66,19 @@ export function Dashboard({ signOut, expired, initialView = 'applications' }: { 
       if (mine === seq.current) setLoading(false);
     }
   }, [filter, search, expired, allowed]);
+
+  // How many detail-change requests are waiting. Kept apart from the list so typing in the search box does not ask for it each time.
+  const loadInfo = useCallback(() => {
+    if (!allowed) return;
+    listTrainerContactRequests('pending').then((r) => setInfoWaiting(r.pending)).catch(() => undefined);
+  }, [allowed]);
+  useEffect(() => {
+    loadInfo();
+    const tick = () => { if (document.visibilityState === 'visible') loadInfo(); };
+    const timer = setInterval(tick, REFRESH_MS);
+    document.addEventListener('visibilitychange', tick);
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', tick); };
+  }, [loadInfo]);
 
   // Reload when the filter or search changes (search waits a moment for typing to stop).
   useEffect(() => {
@@ -135,7 +147,7 @@ export function Dashboard({ signOut, expired, initialView = 'applications' }: { 
         </button>
       </div>
 
-      {view === 'requests' ? <ContactRequestsPanel expired={expired} onChanged={() => void load()} /> : (<>
+      {view === 'requests' ? <ContactRequestsPanel expired={expired} onChanged={loadInfo} /> : (<>
       <div className="toolbar">
         <div className="search">
           {Icons.search}

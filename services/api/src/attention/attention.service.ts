@@ -39,6 +39,12 @@ export class AttentionService {
       const cancelled = (await this.db.query<SessionRow>(`${base} where b.status = 'rematching' and b.trainer_cancelled_at is not null order by b.trainer_cancelled_at limit ${LIMIT}`)).rows;
       const unconfirmedStart = (await this.db.query<SessionRow>(
         `${base} where b.status = 'confirmed' and b.started_at is null and b.starts_at is not null and b.starts_at <= now() order by b.starts_at limit ${LIMIT}`)).rows;
+      // A trainer was paused, suspended or revoked while still holding sessions. Those sessions are not on their app any more, so nobody will go.
+      const orphaned = (await this.db.query<SessionRow & { trainer_status: string }>(
+        `select b.id, s.name as service_name, b.starts_at, b.mode, b.address_area, b.created_at, b.trainer_cancelled_at, b.unfilled_notified_at, coalesce(u.full_name, u.email) as customer, t.status as trainer_status
+           from bookings b join services s on s.id = b.service_id join users u on u.id = b.user_id join trainers t on t.user_id = b.coach_id
+          where b.status = 'confirmed' and b.started_at is null and t.status <> 'active' and (b.starts_at is null or b.starts_at > now() - interval '3 hours')
+          order by b.starts_at nulls first limit ${LIMIT}`)).rows;
       const lowRated = (await this.db.query<{ id: string; stars: number; created_at: Date; service_name: string; comment: string | null }>(
         `select b.id, r.stars, r.created_at, s.name as service_name, r.comment from session_ratings r join bookings b on b.id = r.booking_id join services s on s.id = b.service_id
           where r.stars <= 2 and r.created_at > now() - interval '7 days' order by r.created_at desc limit ${LIMIT}`)).rows;
@@ -54,6 +60,8 @@ export class AttentionService {
           items: cancelled.map((r) => session(r, where(r), r.trainer_cancelled_at ?? r.created_at, true)) },
         { key: 'not_started', title: 'Start time passed, session not started', hint: 'The trainer may be late or a no-show. Call them and the customer.', href: '/sessions',
           items: unconfirmedStart.map((r) => session(r, where(r), r.starts_at ?? r.created_at, true)) },
+        { key: 'trainer_inactive', title: 'Session is on a trainer who is no longer active', hint: 'Open the session, record the trainer as cancelled and assign someone else, or call the customer.', href: '/sessions',
+          items: orphaned.map((r) => session(r, `${where(r)} · trainer ${r.trainer_status}`, r.starts_at ?? r.created_at, true)) },
         { key: 'low_rating', title: 'Low ratings this week', hint: 'A customer gave 1 or 2 stars. Read the session and follow up.', href: '/sessions',
           items: lowRated.map((r) => ({ id: r.id, title: `${r.stars} ${r.stars === 1 ? 'star' : 'stars'} · ${r.service_name} · ${sessionCodeOf(r.id)}`, detail: r.comment ?? 'No comment left', since: r.created_at.toISOString(), href: '/sessions', urgent: false })) },
       );

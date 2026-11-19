@@ -116,6 +116,7 @@ export function Detail({ signOut, expired }: { signOut: () => void; expired: () 
     setOpening(documentId);
     // Open the tab first (inside the click), then point it at the short-lived link. Otherwise pop-up blockers stop it.
     const tab = window.open('', '_blank');
+    if (tab) tab.opener = null; // the document page must not be able to reach back into the admin
     try {
       const link = await documentLink(id, documentId);
       if (tab) tab.location.href = link.url;

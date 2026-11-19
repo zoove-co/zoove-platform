@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   ApiError, assignTrainer, completeSession, getDispatchSettings, saveDispatchSettings, getSession, listAvailableTrainers, type AvailableTrainer, listSessions, moveSession, recordTrainerCancel, recordTrainerNoShow,
@@ -16,7 +16,7 @@ const stamp = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'num
 const STATUS_LABEL: Record<SessionStatus, string> = { matching: 'Finding a trainer', rematching: 'Finding a new trainer', confirmed: 'Confirmed', completed: 'Done', cancelled: 'Cancelled' };
 const STATUS_PILL: Record<SessionStatus, string> = { matching: 'changes_requested', rematching: 'submitted', confirmed: 'approved', completed: 'approved', cancelled: 'rejected' };
 const EVENT_LABEL: Record<string, string> = {
-  created: 'Booked by the customer', rescheduled: 'Moved to another time', cancelled: 'Cancelled', trainer_assigned: 'Trainer assigned', trainer_cancelled: 'Trainer cancelled', trainer_no_show: 'Trainer did not arrive', overdue: 'Start time passed with no trainer, customer told',
+  created: 'Booked by the customer', rescheduled: 'Moved to another time', cancelled: 'Cancelled', trainer_assigned: 'Trainer assigned', trainer_cancelled: 'Trainer cancelled', trainer_no_show: 'Trainer did not arrive', started: 'Session started (customer gave the start code)', completed: 'Session finished', dispatch_wave: 'Trainers nearby were alerted', unfilled: 'No trainer found yet, our team was alerted', overdue: 'Start time passed with no trainer, customer told',
 };
 const FILTERS: [SessionFilter, string][] = [['needs_trainer', 'Needs a trainer'], ['upcoming', 'Confirmed'], ['all', 'All sessions']];
 const SLOT_TIMES = ['06:00', '07:00', '08:00', '09:00', '16:00', '17:00', '18:00', '19:00'];
@@ -65,8 +65,16 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
     return err instanceof ApiError ? err.message : 'Something went wrong. Please try again.';
   }, [expired]);
 
+  // Only the newest answer is shown, so a slow reply to an old search cannot overwrite a newer one.
+  const listSeq = useRef(0);
   const load = useCallback(async () => {
-    try { setRows(await listSessions(filter, query, customer?.id)); setError(null); } catch (err) { setError(handle(err) || null); }
+    const mine = ++listSeq.current;
+    try {
+      const result = await listSessions(filter, query, customer?.id);
+      if (mine === listSeq.current) { setRows(result); setError(null); }
+    } catch (err) {
+      if (mine === listSeq.current) setError(handle(err) || null);
+    }
   }, [filter, query, customer, handle]);
 
   useEffect(() => {

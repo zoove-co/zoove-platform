@@ -97,3 +97,16 @@ export function packageExpiredOpsEmail(to: string, ctx: { packageName: string; u
   );
   return { to, subject: `Package expired with ${ctx.unused} unused session${ctx.unused === 1 ? '' : 's'}`, html, text };
 }
+
+export function packageOrderedOpsEmail(to: string, ctx: { customer: string; packageName: string; amountRupees: string }, adminUrl: string): EmailMessage {
+  const { html, text } = layout(
+    'A customer ordered a package',
+    [
+      `${ctx.customer} ordered the ${ctx.packageName} package for ${ctx.amountRupees}.`,
+      'Their session credits stay off until you mark the order paid. When the money has arrived, open Packages, find the order and mark it paid.',
+    ],
+    { label: 'Open packages', url: adminUrl },
+    OPS_FOOTER,
+  );
+  return { to, subject: `New package order: ${ctx.packageName} (${ctx.amountRupees})`, html, text };
+}
