@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { ApiError, STATUS_LABEL, listApplications, nice, type Filter, type ListResult } from '@/lib/api';
+import { ApiError, STATUS_LABEL, listApplications, listTrainerContactRequests, nice, type Filter, type ListResult } from '@/lib/api';
 import { Shell } from './Shell';
+import { ContactRequestsPanel } from './TrainerRequests';
 import { can, useMe } from './me';
 import { Banner, Icons, PageLoader, avatarTone, initials } from './ui';
 
@@ -34,10 +35,13 @@ function ago(iso: string | null): string {
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
 }
 
-export function Dashboard({ signOut, expired }: { signOut: () => void; expired: () => void }) {
+export function Dashboard({ signOut, expired, initialView = 'applications' }: { signOut: () => void; expired: () => void; initialView?: 'applications' | 'requests' }) {
   const router = useRouter();
   const me = useMe();
   const allowed = can(me, 'trainers.view');
+  const [view, setView] = useState<'applications' | 'requests'>(initialView);
+  // Trainers who asked to change their email or mobile and are waiting for us.
+  const [infoWaiting, setInfoWaiting] = useState<number | null>(null);
   const [filter, setFilter] = useState<Filter>('pending');
   const [search, setSearch] = useState('');
   const [data, setData] = useState<ListResult | null>(null);
@@ -49,6 +53,7 @@ export function Dashboard({ signOut, expired }: { signOut: () => void; expired: 
   const load = useCallback(async () => {
     if (!allowed) return;
     const mine = ++seq.current;
+    listTrainerContactRequests('pending').then((r) => setInfoWaiting(r.pending)).catch(() => undefined);
     try {
       const result = await listApplications(filter, search);
       if (mine !== seq.current) return; // a newer request is already running
@@ -85,6 +90,7 @@ export function Dashboard({ signOut, expired }: { signOut: () => void; expired: 
 
   const counts = data?.counts ?? {};
   const pending = (counts.submitted ?? 0) + (counts.in_review ?? 0);
+  const infoCount = infoWaiting ?? 0;
   const countOf = (key: Filter): number | undefined => {
     if (!data) return undefined;
     if (key === 'pending') return pending;
@@ -93,8 +99,8 @@ export function Dashboard({ signOut, expired }: { signOut: () => void; expired: 
   };
 
   useEffect(() => {
-    document.title = pending > 0 ? `(${pending}) Zoove admin` : 'Zoove admin';
-  }, [pending]);
+    document.title = pending + infoCount > 0 ? `(${pending + infoCount}) Zoove admin` : 'Zoove admin';
+  }, [pending, infoCount]);
 
   const total = countOf('all');
 
@@ -108,23 +114,28 @@ export function Dashboard({ signOut, expired }: { signOut: () => void; expired: 
   }
 
   return (
-    <Shell signOut={signOut} pending={pending}>
+    <Shell signOut={signOut} pending={pending + infoCount}>
       <div className="pagehead">
         <div>
           <h1>Trainers</h1>
-          <p>{pending > 0 ? `${pending} ${pending === 1 ? 'application is' : 'applications are'} waiting for your review.` : 'Review trainer applications and documents.'}</p>
+          <p>{pending > 0 ? `${pending} ${pending === 1 ? 'application is' : 'applications are'} waiting for your review.` : 'Review trainer applications and documents.'}{infoCount > 0 ? ` ${infoCount} ${infoCount === 1 ? 'trainer has' : 'trainers have'} asked to change their email or mobile.` : ''}</p>
         </div>
       </div>
 
       <div className="stats">
         {CARDS.map(({ key, label, tone }) => (
-          <button key={key} type="button" className={`stat ${tone} ${key === 'pending' && pending > 0 ? 'hot' : ''}`} aria-pressed={filter === key} onClick={() => setFilter(key)}>
+          <button key={key} type="button" className={`stat ${tone} ${key === 'pending' && pending > 0 ? 'hot' : ''}`} aria-pressed={view === 'applications' && filter === key} onClick={() => { setView('applications'); setFilter(key); }}>
             <span className="label"><i className="dot" />{label}</span>
             <div className="num">{countOf(key) ?? '–'}</div>
           </button>
         ))}
+        <button type="button" className={`stat t-purple ${infoCount > 0 ? 'hot' : ''}`} aria-pressed={view === 'requests'} onClick={() => setView('requests')} title="Trainers asking to change their email or mobile number">
+          <span className="label"><i className="dot" />Detail changes</span>
+          <div className="num">{infoWaiting ?? '–'}</div>
+        </button>
       </div>
 
+      {view === 'requests' ? <ContactRequestsPanel expired={expired} onChanged={() => void load()} /> : (<>
       <div className="toolbar">
         <div className="search">
           {Icons.search}
@@ -186,6 +197,7 @@ export function Dashboard({ signOut, expired }: { signOut: () => void; expired: 
           </table>
         </div>
       )}
+      </>)}
     </Shell>
   );
 }

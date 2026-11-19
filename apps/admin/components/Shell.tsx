@@ -107,9 +107,8 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
   const onAreas = path.startsWith('/areas');
   const onRewards = path.startsWith('/rewards');
   const onAttention = path.startsWith('/attention');
-  const onTrainerRequests = path.startsWith('/trainer-requests');
   const onCustomers = path.startsWith('/customers');
-  const other = onAttention || onTrainerRequests || onCustomers || onTeam || onCalc || onDiscounts || onParties || onPackages || onSessions || onOfferings || onAreas || onRewards;
+  const other = onAttention || onCustomers || onTeam || onCalc || onDiscounts || onParties || onPackages || onSessions || onOfferings || onAreas || onRewards;
   // Sessions waiting for a trainer, so a cancellation is noticed without opening the page.
   const [waiting, setWaiting] = useState(0);
   const [overdue, setOverdue] = useState(0);
@@ -152,12 +151,6 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
               {Icons.users}
               Trainers
               {pending ? <span className="badge">{pending}</span> : null}
-            </Link>
-          ) : null}
-          {can(me, 'trainers.view') ? (
-            <Link href="/trainer-requests" aria-current={onTrainerRequests ? 'page' : undefined}>
-              {Icons.users}
-              Trainer requests
             </Link>
           ) : null}
           {can(me, 'customers.view') ? (

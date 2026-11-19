@@ -125,7 +125,7 @@ p { margin: 0 0 12px; }
 .pagehead p { margin: 6px 0 0; color: var(--muted); }
 
 /* ---- status cards (they are the filters) ---- */
-.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+.stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }
 @media (max-width: 860px) { .stats { grid-template-columns: repeat(2, 1fr); } }
 .stat {
   position: relative; text-align: left; padding: 16px 18px 15px; border-radius: 16px; cursor: pointer;
@@ -139,6 +139,7 @@ p { margin: 0 0 12px; }
 .stat .num { font-family: var(--font-display), sans-serif; font-size: 40px; font-weight: 700; letter-spacing: -0.04em; line-height: 1.1; margin-top: 8px; }
 .stat.t-orange { --tone: var(--orange); }
 .stat.t-amber { --tone: var(--amber); }
+.stat.t-purple { --tone: #6d3df0; }
 .stat.t-green { --tone: var(--green); }
 .stat.t-red { --tone: var(--red); }
 /* The review queue is the thing to act on: when it has work, it glows. */

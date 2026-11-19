@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { ApiError, approveContactRequest, listTrainerContactRequests, rejectContactRequest, type ContactRequestStatus, type TrainerContactRequest } from '@/lib/api';
 import { can, useMe } from './me';
-import { Shell } from './Shell';
 import { Banner, PageLoader, Spinner } from './ui';
 
 const when = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' });
@@ -14,7 +13,7 @@ const LABEL: Record<ContactRequestStatus, string> = { pending: 'Waiting', approv
 
 // A trainer's email is how they sign in, and both it and their mobile were checked when they were approved. So a trainer asks here, and
 // someone at Zoove verifies it first (a call to the number on file is best) before approving. Nothing changes until then.
-export function TrainerRequests({ signOut, expired }: { signOut: () => void; expired: () => void }) {
+export function ContactRequestsPanel({ expired, onChanged }: { expired: () => void; onChanged?: () => void }) {
   const me = useMe();
   const [tab, setTab] = useState<'pending' | 'all'>('pending');
   const [data, setData] = useState<{ pending: number; requests: TrainerContactRequest[] } | null>(null);
@@ -34,14 +33,7 @@ export function TrainerRequests({ signOut, expired }: { signOut: () => void; exp
 
   useEffect(() => { if (can(me, 'trainers.view')) void load(); }, [load, me]);
 
-  if (!can(me, 'trainers.view')) {
-    return (
-      <Shell signOut={signOut}>
-        <div className="pagehead"><div><h1>Trainer requests</h1></div></div>
-        <Banner tone="info">You do not have access to trainers. Ask an owner to turn it on for you.</Banner>
-      </Shell>
-    );
-  }
+  if (!can(me, 'trainers.view')) return null;
   const canDecide = can(me, 'trainers.status');
 
   async function decide() {
@@ -53,6 +45,7 @@ export function TrainerRequests({ signOut, expired }: { signOut: () => void; exp
       setOpen(null);
       setNote('');
       await load();
+      onChanged?.();
     } catch (err) {
       setError(handle(err) || null);
       setOpen(null);
@@ -63,10 +56,10 @@ export function TrainerRequests({ signOut, expired }: { signOut: () => void; exp
 
   const kindLabel = (r: TrainerContactRequest) => (r.kind === 'email' ? 'Email' : 'Mobile');
   return (
-    <Shell signOut={signOut}>
-      <div className="pagehead">
+    <>
+      <div className="pagehead" style={{ marginTop: 4 }}>
         <div>
-          <h1>Trainer requests</h1>
+          <h2 style={{ margin: 0 }}>Trainers asking to change their details</h2>
           <p>Trainers ask here to change their email or mobile number. A trainer&apos;s email is also how they sign in, so first check it is really them (a call to the number we have is best), then approve. Nothing changes until you approve.</p>
         </div>
       </div>
@@ -139,6 +132,6 @@ export function TrainerRequests({ signOut, expired }: { signOut: () => void; exp
           </div>
         </div>
       ) : null}
-    </Shell>
+    </>
   );
 }
