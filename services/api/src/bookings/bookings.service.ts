@@ -46,6 +46,7 @@ export type Booking = {
   discountPaise: number;
   discountCode: string | null;
   paidWithCredit: boolean;
+  packageId: string | null; // the package order this session was paid from
   canChange: boolean;
   // Live: the trainer entered the start code. Not derived from the clock any more.
   inProgress: boolean;
@@ -160,6 +161,7 @@ export function bookingFromRow(row: Row, now = new Date()): Booking {
     discountPaise: row.discount_paise,
     discountCode: row.discount_code,
     paidWithCredit: row.package_purchase_id !== null,
+    packageId: row.package_purchase_id,
     canChange: canChange(row.status, row.starts_at, now),
     inProgress: isInProgress(row.status, row.started_at),
     startedAt: row.started_at ? row.started_at.toISOString() : null,

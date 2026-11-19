@@ -88,6 +88,8 @@ suite('packages, party, referral, progress profile, Duo/Group prices', () => {
       const booked = (await book(me, address, 3, { useCredit: true }).expect(201)).body;
       expect(booked).toMatchObject({ totalPaise: 0, paidWithCredit: true });
       expect((await http().get('/v1/me/packages').set(as(me)).expect(200)).body.credits.creditsLeft).toBe(pkg.sessionsCount - 1);
+      // the session says which package it was paid from, so the app can list each package's sessions
+      expect((await http().get(`/v1/bookings/${booked.id}`).set(as(me)).expect(200)).body.packageId).toBe(order.id);
       await http().post(`/v1/bookings/${booked.id}/cancel`).set(as(me)).expect(201);
       expect((await http().get('/v1/me/packages').set(as(me)).expect(200)).body.credits.creditsLeft).toBe(pkg.sessionsCount);
       // The other customer cannot touch it.

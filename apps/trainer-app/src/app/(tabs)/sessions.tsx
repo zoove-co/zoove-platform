@@ -94,7 +94,11 @@ export default function Sessions() {
               <TextField label="Start code" placeholder="4 digits" keyboardType="number-pad" maxLength={4} value={codes[job.id] ?? ''} onChangeText={(v) => setCode(job.id, v)} hint="When you arrive, ask the customer for the start code in their app." />
               <Button label="Start session" small loading={busy === job.id} disabled={(codes[job.id] ?? '').length !== 4} onPress={() => void run(job.id, () => checkInJob(job.id, codes[job.id] ?? ''), 'The session is live.')} />
             </View>
-          ) : null}
+          ) : (
+            <View style={{ marginTop: 10 }}>
+              <Banner tone="info">Start opens 30 minutes before the session. Come back then and ask the customer for their start code.</Banner>
+            </View>
+          )}
 
           {job.canCancel ? (
             cancelling === job.id ? (

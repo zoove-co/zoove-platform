@@ -9,9 +9,9 @@ import type { Booking } from '@/lib/api';
 import { isActiveStatus } from '@/lib/api/status';
 import { colors, fonts, radius } from '@/theme';
 
-type Props = { booking: Booking; onPress: () => void };
+type Props = { booking: Booking; onPress: () => void; showCoach?: boolean };
 
-export function BookingRow({ booking, onPress }: Props) {
+export function BookingRow({ booking, onPress, showCoach }: Props) {
   const { t } = useTranslation();
   const active = isActiveStatus(booking.status);
   const statusLabel =
@@ -42,6 +42,11 @@ export function BookingRow({ booking, onPress }: Props) {
         <AppText variant="caption" color={colors.muted} numberOfLines={1}>
           {booking.whenLabel} · {booking.areaLabel}
         </AppText>
+        {showCoach ? (
+          <AppText variant="caption" color={colors.muted} numberOfLines={1}>
+            {booking.coach ? t('packages.coachName', { name: booking.coach.name }) : t('packages.coachPending')}
+          </AppText>
+        ) : null}
         <View style={styles.meta}>
           <StatusChip label={booking.inProgress ? t('session.statusLive') : statusLabel} active={active} live={booking.inProgress} endsAt={booking.endsAt} />
           <AppText variant="caption" color={colors.muted}>

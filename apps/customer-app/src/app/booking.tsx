@@ -38,7 +38,7 @@ const newKey = () => `bk-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 export default function BookingScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const params = useLocalSearchParams<{ service?: string; mode?: string; format?: string }>();
+  const params = useLocalSearchParams<{ service?: string; mode?: string; format?: string; credit?: string }>();
   const mode: BookingMode =
     params.mode === 'instant' || params.mode === 'demo' ? params.mode : 'scheduled';
 
@@ -52,7 +52,7 @@ export default function BookingScreen() {
 
   const [participant, setParticipant] = useState<Participant>('personal');
   const [discount, setDiscount] = useState<DiscountQuote | null>(null);
-  const [useCredit, setUseCredit] = useState(false);
+  const [useCredit, setUseCredit] = useState(params.credit === '1');
   const [groupSize, setGroupSize] = useState(4);
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');

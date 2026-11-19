@@ -194,6 +194,7 @@ export interface Booking {
   discountPaise: Paise;
   discountCode: string | null;
   paidWithCredit: boolean;
+  packageId: string | null; // the package order this session was paid from
   // Short code the customer and the Zoove team both use for this session, for example ZV-3F9A21BC.
   sessionCode: string;
   // The coach cancelled and we are finding another one (status rematching). The customer can wait, reschedule or cancel.
@@ -351,6 +352,8 @@ export interface PackagePurchase {
   status: 'awaiting_payment' | 'paid' | 'cancelled';
   creditsLeft: number;
   creditsTotal: number;
+  creditsUnused?: number; // credits never used, also after the package expired
+  expired?: boolean; // past its end date
   expiresAt: string | null;
   paidAt: string | null;
   createdAt: string;
