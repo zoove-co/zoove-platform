@@ -15,8 +15,8 @@ export function coachAssignedBody(o: { coachFirstName: string; serviceName: stri
 export async function notifyCustomer(
   client: PoolClient, userId: string, title: string, body: string, bookingId: string | null, options: { external?: boolean; complaintId?: string } = {},
 ): Promise<void> {
-  await client.query(`insert into customer_notifications (id, user_id, title, body, booking_id) values ($1, $2, $3, $4, $5)`, [
-    uuidv7(), userId, title, body, bookingId,
+  await client.query(`insert into customer_notifications (id, user_id, title, body, booking_id, complaint_id) values ($1, $2, $3, $4, $5, $6)`, [
+    uuidv7(), userId, title, body, bookingId, options.complaintId ?? null,
   ]);
   if (options.external === false) return;
   await client.query(

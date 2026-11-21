@@ -299,6 +299,7 @@ export interface AppNotification {
   createdAt: string; // ISO 8601
   read: boolean;
   bookingId: string | null;
+  complaintId?: string | null; // set when the team wrote about a complaint: tapping it opens that conversation
 }
 
 export interface ServiceabilityCheck {

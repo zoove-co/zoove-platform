@@ -147,7 +147,9 @@ export class ComplaintsService {
         const open = await client.query<{ id: string }>(
           `select id from complaints where user_id = $1 and side = $2 and booking_id = $3 and category = $4 and status <> 'resolved' limit 1`, [userId, side, session.id, category.key]);
         if (open.rows[0]) {
-          await this.addUserMessage(client, userId, side, open.rows[0].id, input.message);
+          // A retry of the same request (a dropped connection) must not add the same message twice.
+          const dup = await client.query(`select 1 from complaint_messages where complaint_id = $1 and sender_kind = 'user' and body = $2 and created_at > now() - interval '2 minutes' limit 1`, [open.rows[0].id, input.message]);
+          if (!dup.rows[0]) await this.addUserMessage(client, userId, side, open.rows[0].id, input.message);
           return open.rows[0].id;
         }
       }
@@ -156,9 +158,12 @@ export class ComplaintsService {
       const complaintId = uuidv7();
       const code = complaintCodeOf(complaintId);
       const subject = session ? `${category.label} · ${sessionCodeOf(session.id)}` : category.label;
-      await client.query(
-        `insert into complaints (id, user_id, side, booking_id, category, subject, priority, idempotency_key) values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      // Two identical requests at the same moment: one wins, the other gets the same complaint back instead of an error.
+      const inserted = await client.query<{ id: string }>(
+        `insert into complaints (id, user_id, side, booking_id, category, subject, priority, idempotency_key) values ($1, $2, $3, $4, $5, $6, $7, $8)
+         on conflict (user_id, idempotency_key) do nothing returning id`,
         [complaintId, userId, side, session?.id ?? null, category.key, subject, category.urgent ? 'urgent' : 'normal', input.idempotencyKey]);
+      if (!inserted.rows[0]) return (await client.query<{ id: string }>(`select id from complaints where user_id = $1 and idempotency_key = $2`, [userId, input.idempotencyKey])).rows[0]!.id;
       await client.query(`insert into complaint_messages (id, complaint_id, sender_kind, sender_user_id, body) values ($1, $2, 'user', $3, $4)`, [uuidv7(), complaintId, userId, input.message]);
       await client.query(`insert into complaint_messages (id, complaint_id, sender_kind, body, created_at) values ($1, $2, 'system', $3, now() + interval '1 millisecond')`, [
         uuidv7(), complaintId, `Thank you. We have your complaint (reference ${code}). The Zoove team will reply here. You will get a notification when we do.`]);
@@ -237,7 +242,7 @@ export class ComplaintsService {
          join users u on u.id = c.user_id
          ${TRAINER_APPLICATION_JOIN}
          left join admin_profiles ap on ap.user_id = c.assigned_to
-         left join lateral (select sender_kind, body from complaint_messages m where m.complaint_id = c.id order by m.created_at desc limit 1) lm on true
+         left join lateral (select sender_kind, body from complaint_messages m where m.complaint_id = c.id and not m.internal order by m.created_at desc limit 1) lm on true
         where c.side = any($1)
           and (($2::text = 'all') or ($2::text = 'active' and c.status <> 'resolved') or c.status = $2::text)
           and ($3::boolean is not true or c.assigned_to = $4)

@@ -254,6 +254,69 @@ suite('complaints: a thread between a customer or trainer and the Zoove team', (
     expect(((await http().get('/v1/admin/complaints?status=resolved').set(as(ops.token)).expect(200)).body as unknown[])).toHaveLength(0);
   });
 
+  it('two identical requests at the same moment make one complaint and no error', async () => {
+    const same = key();
+    const send = () => http().post('/v1/complaints').set(as(customer)).send({ category: 'other', message: 'Something is wrong with my account.', idempotencyKey: same });
+    const [a, b] = await Promise.all([send(), send()]);
+    expect([a.status, b.status]).toEqual([200, 200]);
+    expect(b.body.id).toBe(a.body.id);
+    expect((await pool.query(`select 1 from complaints`)).rowCount).toBe(1);
+  });
+
+  it('retrying a message on an open topic does not add it twice', async () => {
+    const booking = await session();
+    const first = (await raise(customer, { category: 'session_quality', bookingId: booking, message: 'The session was cut short.' }).expect(200)).body as Thread;
+    await raise(customer, { category: 'session_quality', bookingId: booking, message: 'The trainer also left early.' }).expect(200);
+    const retry = (await raise(customer, { category: 'session_quality', bookingId: booking, message: 'The trainer also left early.' }).expect(200)).body as Thread;
+    expect(retry.id).toBe(first.id);
+    expect(retry.messages.filter((m) => m.from === 'you')).toHaveLength(2);
+  });
+
+  it('nobody can open or write in another person\'s complaint', async () => {
+    const other = await signIn(app, pool, OTHER_CUSTOMER);
+    const mine = (await raise(customer, { category: 'other', message: 'This is private to me.' }).expect(200)).body as Thread;
+    await http().get(`/v1/complaints/${mine.id}`).set(as(other)).expect(404);
+    await http().post(`/v1/complaints/${mine.id}/messages`).set(as(other)).send({ body: 'I should not be able to write here.' }).expect(404);
+    // A customer's thread is not reachable from the trainer side, and a person who is not a trainer cannot use it at all.
+    await http().get(`/v1/trainer/complaints/${mine.id}`).set(as(trainer)).expect(404);
+    await http().get('/v1/trainer/complaints').set(as(customer)).expect(403);
+    const theirs = (await raise(trainer, { category: 'payout', message: 'My payout is missing.' }, '/v1/trainer/complaints').expect(200)).body as Thread;
+    await http().get(`/v1/complaints/${theirs.id}`).set(as(trainer)).expect(404);
+  });
+
+  it('the customer\'s notification opens the complaint, and a trainer gets the reply by email as well as push', async () => {
+    const ops = await admin('both@zoove.test', true, []);
+    const c = (await raise(customer, { category: 'other', message: 'I need some help.' }).expect(200)).body as Thread;
+    await http().post(`/v1/admin/complaints/${c.id}/reply`).set(as(ops.token)).send({ body: 'We are on it.' }).expect(200);
+    const notes = (await http().get('/v1/notifications').set(as(customer)).expect(200)).body as { title: string; complaintId: string | null }[];
+    expect(notes.find((x) => x.title.includes(c.code))?.complaintId).toBe(c.id);
+
+    await pool.query(`update users set verified_email = 'asha@trainer.test' where id = $1`, [trainerId]);
+    const t = (await raise(trainer, { category: 'payout', message: 'My payout is missing.' }, '/v1/trainer/complaints').expect(200)).body as Thread;
+    mail.sent = [];
+    await http().post(`/v1/admin/complaints/${t.id}/reply`).set(as(ops.token)).send({ body: 'We have found it and will pay it today.' }).expect(200);
+    await app.get(OutboxWorkerService).runOnce();
+    const toTrainer = mail.sent.filter((m) => m.to === 'asha@trainer.test');
+    expect(toTrainer).toHaveLength(1);
+    expect(toTrainer[0]!.text).toContain('We have found it');
+  });
+
+  it('the inbox preview shows the conversation, not a private note', async () => {
+    const ops = await admin('notes@zoove.test', true, []);
+    const c = (await raise(customer, { category: 'other', message: 'Please call me about this.' }).expect(200)).body as Thread;
+    await http().post(`/v1/admin/complaints/${c.id}/note`).set(as(ops.token)).send({ body: 'Private: check with the bank first.' }).expect(200);
+    const rows = (await http().get('/v1/admin/complaints').set(as(ops.token)).expect(200)).body as { lastMessage: { body: string } | null }[];
+    expect(rows[0]!.lastMessage?.body).not.toContain('Private');
+  });
+
+  it('deleting a customer account removes ordinary complaints and keeps safety ones', async () => {
+    await raise(customer, { category: 'other', message: 'My name and address are in here.' }).expect(200);
+    await raise(customer, { category: 'trainer_behaviour', message: 'The trainer made me feel unsafe.' }).expect(200);
+    await http().delete('/v1/me').set(as(customer)).expect(204);
+    const left = await pool.query<{ priority: string }>(`select priority from complaints`);
+    expect(left.rows).toEqual([{ priority: 'urgent' }]);
+  });
+
   it('refuses a person who is not signed in', async () => {
     await http().get('/v1/complaints').expect(401);
     await http().get('/v1/trainer/complaints').expect(401);

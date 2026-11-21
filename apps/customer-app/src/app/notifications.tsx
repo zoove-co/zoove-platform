@@ -59,11 +59,13 @@ export default function NotificationsScreen() {
             <Pressable
               key={item.id}
               accessibilityRole="button"
-              disabled={!item.bookingId}
+              disabled={!item.bookingId && !item.complaintId}
               onPress={() =>
-                item.bookingId
-                  ? router.push({ pathname: '/session/[id]', params: { id: item.bookingId } })
-                  : undefined
+                item.complaintId
+                  ? router.push({ pathname: '/complaint/[id]', params: { id: item.complaintId } })
+                  : item.bookingId
+                    ? router.push({ pathname: '/session/[id]', params: { id: item.bookingId } })
+                    : undefined
               }
               style={styles.row}>
               <View style={styles.badge}>

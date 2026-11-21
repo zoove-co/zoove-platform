@@ -10,7 +10,7 @@ import { ExpoPushChannel } from './channels/expo-push.channel';
 import { CustomerMessageService } from './customer-message.service';
 import { jobAssignedEmail, jobAvailableEmail, sessionReminderEmail, jobCancelledEmail, jobMovedEmail } from './trainer-job-emails';
 import { complaintOpsEmail, packageExpiredOpsEmail, packageOrderedOpsEmail, partyRequestedEmail, sessionNotClosedEmail, sessionOverdueEmail, sessionUnfilledEmail, teamInviteEmail, trainerCancelledEmail } from './team-emails';
-import { approvedEmail, changesEmail, contactChangeDecidedEmail, opsContactChangeEmail, opsNewApplicationEmail, receivedEmail, rejectedEmail } from './trainer-emails';
+import { approvedEmail, changesEmail, complaintReplyEmail, contactChangeDecidedEmail, opsContactChangeEmail, opsNewApplicationEmail, receivedEmail, rejectedEmail } from './trainer-emails';
 
 type OutboxRow = { id: string; aggregate_id: string; event_type: string; payload: Record<string, unknown>; attempts: number };
 
@@ -166,6 +166,12 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
     if (event.event_type === 'complaint.trainer_reply') {
       const p = event.payload as { userId?: string; complaintId?: string; title?: string; body?: string };
       if (!p.userId || !p.complaintId || !p.title || !p.body) return;
+      // Email first, then the phone alert: a retry of a failed email never buzzes the phone twice.
+      const who = await this.db.query<{ email: string | null; first_name: string | null }>(
+        `select coalesce(u.verified_email, u.email, ta.email) as email, ta.first_name
+           from trainers t join users u on u.id = t.user_id left join trainer_applications ta on ta.id = t.application_id where t.user_id = $1`, [p.userId]);
+      const to = who.rows[0]?.email;
+      if (to) await this.email.send(complaintReplyEmail(to, { firstName: who.rows[0]?.first_name ?? 'there', title: p.title, body: p.body }, this.config.TRAINER_SITE_URL));
       try {
         await this.push.deliver({ userId: p.userId, title: p.title, body: p.body, bookingId: null, complaintId: p.complaintId });
       } catch (error) { this.logger.warn(`Trainer push failed: ${error instanceof Error ? error.message : String(error)}`); }

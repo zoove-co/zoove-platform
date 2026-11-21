@@ -85,3 +85,9 @@ export function contactChangeDecidedEmail(to: string, o: { firstName: string; ki
   const { html, text } = layout(o.decision === 'approved' ? `Your ${label} was updated` : `Your ${label} was not changed`, paragraphs, { label: 'Open Zoove Trainer', url: o.statusUrl }, 'You received this because you asked Zoove to update your details.');
   return { to, subject: o.decision === 'approved' ? `Your Zoove ${label} was updated` : `Your Zoove ${label} was not changed`, html, text };
 }
+
+// The team wrote back on a trainer's complaint. The phone alert may be off, so the same words go by email too.
+export function complaintReplyEmail(to: string, o: { firstName: string; title: string; body: string }, appUrl: string): EmailMessage {
+  const { html, text } = layout(o.title, [`Hi ${o.firstName},`, o.body, 'Open the Zoove Trainer app, then Profile, then My complaints, to read the whole conversation and reply.'], { label: 'Open Zoove Trainer', url: appUrl }, 'You received this because you are a Zoove trainer.');
+  return { to, subject: o.title, html, text };
+}

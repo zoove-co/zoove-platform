@@ -58,3 +58,7 @@ create table complaint_messages (
 create index complaint_messages_thread_idx on complaint_messages (complaint_id, created_at);
 create index complaint_messages_sender_idx on complaint_messages (sender_user_id) where sender_user_id is not null;
 alter table complaint_messages enable row level security;
+
+-- A reply from the team shows in the customer's notification list; tapping it opens the complaint, not the session.
+alter table customer_notifications add column complaint_id uuid references complaints(id) on delete cascade;
+create index customer_notifications_complaint_idx on customer_notifications (complaint_id) where complaint_id is not null;
