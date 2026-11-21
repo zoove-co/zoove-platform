@@ -16,6 +16,8 @@ type Props = {
   autoCapitalize?: TextInputProps['autoCapitalize'];
   autoComplete?: TextInputProps['autoComplete'];
   editable?: boolean;
+  multiline?: boolean;
+  maxLength?: number;
 };
 
 export function TextField({
@@ -29,6 +31,8 @@ export function TextField({
   autoCapitalize,
   autoComplete,
   editable = true,
+  multiline = false,
+  maxLength,
 }: Props) {
   const wrap = useRef<FieldNode>(null);
   const reveal = useContext(FieldScrollContext);
@@ -49,7 +53,10 @@ export function TextField({
         autoCapitalize={autoCapitalize}
         autoComplete={autoComplete}
         editable={editable}
-        style={[styles.input, error ? styles.inputError : null, !editable && styles.inputOff]}
+        multiline={multiline}
+        maxLength={maxLength}
+        textAlignVertical={multiline ? 'top' : 'center'}
+        style={[styles.input, multiline ? styles.inputMulti : null, error ? styles.inputError : null, !editable && styles.inputOff]}
       />
       {error ? (
         <AppText variant="micro" color={colors.danger}>
@@ -74,6 +81,7 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     backgroundColor: colors.white,
   },
+  inputMulti: { minHeight: 130, paddingTop: 12 },
   inputError: { borderColor: colors.danger },
   inputOff: { opacity: 0.55 },
 });

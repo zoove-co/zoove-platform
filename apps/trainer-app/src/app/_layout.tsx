@@ -67,6 +67,9 @@ function RootLayout() {
           <Stack.Screen name="apply" />
           <Stack.Screen name="status" />
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="complaints" />
+          <Stack.Screen name="complaint/new" />
+          <Stack.Screen name="complaint/[id]" />
         </Stack.Protected>
       </Stack>
       <OutageOverlay />

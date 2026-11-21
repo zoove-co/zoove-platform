@@ -11,6 +11,14 @@ export const api: Api = USE_MOCK ? mockApi : httpApi;
 export { ApiError } from './types';
 export type {
   ApiErrorCode,
+  ComplaintCategory,
+  ComplaintDetail,
+  ComplaintMessage,
+  ComplaintSession,
+  ComplaintStatus,
+  ComplaintSummary,
+  MyComplaints,
+  NewComplaintInput,
   FitnessGoal,
   MyPackages,
   PackagePurchase,

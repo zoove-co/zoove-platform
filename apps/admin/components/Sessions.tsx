@@ -7,6 +7,7 @@ import {
   ApiError, assignTrainer, completeSession, getDispatchSettings, saveDispatchSettings, getSession, listAvailableTrainers, type AvailableTrainer, listSessions, moveSession, recordTrainerCancel, recordTrainerNoShow,
   type AdminSession, type SessionDetail, type SessionFilter, type SessionStatus,
 } from '@/lib/api';
+import { ComplaintLinks } from './ComplaintLinks';
 import { can, useMe } from './me';
 import { Shell } from './Shell';
 import { Banner, CallLink, PageLoader, Spinner } from './ui';
@@ -211,6 +212,7 @@ export function Sessions({ signOut, expired }: { signOut: () => void; expired: (
               <dt>Paid</dt><dd>{open.paidWithCredit ? 'With a package credit' : rupees(open.totalPaise)}{open.discountCode ? ` (code ${open.discountCode})` : ''}</dd>
               <dt>Trainer</dt><dd>{open.trainerName && open.trainerApplicationId && can(me, 'trainers.view') ? <Link className="xlink" href={`/applications/${open.trainerApplicationId}`}>{open.trainerName}</Link> : (open.trainerName ?? 'Not assigned')}{open.trainerCancelCount ? ` · cancelled ${open.trainerCancelCount} time${open.trainerCancelCount > 1 ? 's' : ''}` : ''}</dd>
             </dl>
+            <ComplaintLinks kind="session" id={open.id} />
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '0 0 12px' }}>
               <CallLink phone={open.customerPhone} label="Call customer" />
               {open.trainerId ? <CallLink phone={open.trainerPhone} label="Call trainer" /> : null}

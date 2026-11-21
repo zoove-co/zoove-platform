@@ -56,5 +56,14 @@ export function bookingIdFrom(response: Notifications.NotificationResponse): str
   return typeof id === 'string' && id.length > 0 ? id : null;
 }
 
+/** The complaint a tapped notification is about, if it names one. */
+export function complaintIdFrom(response: Notifications.NotificationResponse): string | null {
+  const id = (response.notification.request.content.data as { complaintId?: unknown } | undefined)?.complaintId;
+  return typeof id === 'string' && id.length > 0 ? id : null;
+}
+
+export const onNotificationReceived = (listener: (notification: Notifications.Notification) => void) =>
+  Notifications.addNotificationReceivedListener(listener);
+
 export const onNotificationTapped = (listener: (response: Notifications.NotificationResponse) => void) =>
   Notifications.addNotificationResponseReceivedListener(listener);

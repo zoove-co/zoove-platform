@@ -67,6 +67,18 @@ export class AttentionService {
       );
     }
 
+    const complaintSides = (['customer', 'trainer'] as const).filter((side) => can(side === 'customer' ? 'complaints.customers' : 'complaints.trainers'));
+    if (complaintSides.length > 0) {
+      // Every complaint waiting for the team's reply. Safety ones, and any that has waited over a day, are urgent.
+      const rows = (await this.db.query<{ id: string; code: string; side: string; subject: string; priority: string; last_message_at: Date; person: string | null }>(
+        `select c.id, c.code, c.side, c.subject, c.priority, c.last_message_at, coalesce(nullif(u.full_name, ''), u.email, u.phone_e164) as person
+           from complaints c join users u on u.id = c.user_id where c.status = 'open' and c.side = any($1)
+          order by (c.priority = 'urgent') desc, c.last_message_at limit ${LIMIT}`, [complaintSides])).rows;
+      groups.push({ key: 'complaints', title: 'Complaints waiting for a reply', hint: 'Open the complaint, read the thread and reply. Safety complaints come first.', href: '/complaints',
+        items: rows.map((r) => ({ id: r.id, title: `${r.code} · ${r.subject}`, detail: `${r.side === 'trainer' ? 'Trainer' : 'Customer'}: ${r.person ?? 'Unknown'}`, since: r.last_message_at.toISOString(), href: `/complaints?id=${r.id}`,
+          urgent: r.priority === 'urgent' || now.getTime() - r.last_message_at.getTime() > 86_400_000 })) });
+    }
+
     if (can('parties.manage')) {
       const rows = (await this.db.query<{ id: string; occasion: string; guests: number; starts_at: Date; created_at: Date; contact_name: string | null }>(
         `select id, occasion, guests, starts_at, created_at, contact_name from party_requests where status = 'new' order by starts_at limit ${LIMIT}`)).rows;

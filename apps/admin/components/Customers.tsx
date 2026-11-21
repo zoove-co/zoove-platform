@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
 import { ApiError, getCustomer, listCustomers, type CustomerDetail, type CustomerRow } from '@/lib/api';
+import { ComplaintLinks } from './ComplaintLinks';
 import { can, useMe } from './me';
 import { Shell } from './Shell';
 import { Banner, CallLink, PageLoader, Spinner } from './ui';
@@ -120,6 +121,7 @@ export function Customers({ signOut, expired }: { signOut: () => void; expired: 
               <dt>Ratings given</dt><dd>{open.ratingsGiven}</dd>
             </dl>
 
+            <ComplaintLinks kind="person" id={open.id} />
             <h3 style={{ marginBottom: 6 }}>Addresses</h3>
             {open.addresses.length === 0 ? <p className="muted small" style={{ marginTop: 0 }}>No saved address.</p> : (
               <ul className="accesslist" style={{ marginTop: 0 }}>

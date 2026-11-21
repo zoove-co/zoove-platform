@@ -265,3 +265,45 @@ export const cancelContactRequest = (id: string) => call<ContactRequest[]>(`/v1/
 export const errorMessage = (err: unknown): string => (err instanceof ApiError ? err.message : GENERIC_MESSAGE);
 export const saveNote = (id: string, note: string) => call<JobBoard>(`/v1/trainer/jobs/${id}/note`, { method: 'PUT', json: { note } });
 export const setAcceptingJobs = (acceptingJobs: boolean) => call<JobBoard>('/v1/trainer/jobs/availability', { method: 'PUT', json: { acceptingJobs } });
+
+// Complaints: a conversation with the Zoove team about a session or about anything else. Each one is its own thread.
+export type ComplaintStatus = 'open' | 'waiting_on_user' | 'resolved';
+export type ComplaintCategory = { key: string; label: string; hint: string; urgent: boolean; needsSession: boolean };
+export type ComplaintSession = { id: string; code: string; serviceName: string; startsAt: string | null; status: string };
+export type ComplaintFrom = 'you' | 'team' | 'system';
+export type ComplaintMessage = { id: string; from: ComplaintFrom; body: string; createdAt: string };
+export type ComplaintSummary = {
+  id: string;
+  code: string;
+  category: string;
+  categoryLabel: string;
+  subject: string;
+  status: ComplaintStatus;
+  session: ComplaintSession | null;
+  lastMessage: { from: ComplaintFrom; body: string; at: string } | null;
+  unread: boolean;
+  createdAt: string;
+  resolvedAt: string | null;
+  canReply: boolean;
+};
+export type ComplaintDetail = ComplaintSummary & { messages: ComplaintMessage[]; resolutionNote: string | null };
+export type MyComplaints = { active: ComplaintSummary[]; past: ComplaintSummary[]; unread: number };
+export type NewComplaint = { category: string; bookingId?: string; message: string; idempotencyKey: string };
+
+export const getComplaintCategories = () => call<ComplaintCategory[]>('/v1/trainer/complaints/categories');
+export const getComplaintSessions = () => call<ComplaintSession[]>('/v1/trainer/complaints/sessions');
+export const getMyComplaints = () => call<MyComplaints>('/v1/trainer/complaints');
+export const getComplaint = (id: string) => call<ComplaintDetail>(`/v1/trainer/complaints/${id}`);
+export const createComplaint = (body: NewComplaint) => call<ComplaintDetail>('/v1/trainer/complaints', { method: 'POST', json: body });
+export const replyToComplaint = (id: string, body: string) => call<ComplaintDetail>(`/v1/trainer/complaints/${id}/messages`, { method: 'POST', json: { body } });
+export const getComplaintUnread = () => call<{ unread: number }>('/v1/trainer/complaints/unread');
+
+/** One clear sentence for a complaint that could not be sent. */
+export function complaintErrorMessage(err: unknown): string {
+  if (err instanceof ApiError) {
+    if (err.code === 'TOO_MANY_REQUESTS') return 'You have sent a few complaints today. Please add to one of them and we will reply there.';
+    if (err.code === 'INVALID_STATE') return 'This complaint is closed. Please raise a new one.';
+    if (err.code === 'NETWORK') return err.message;
+  }
+  return 'We could not send that. Please try again.';
+}

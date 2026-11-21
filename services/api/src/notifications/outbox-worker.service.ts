@@ -9,14 +9,14 @@ import { referralRewardEmail } from './customer-emails';
 import { ExpoPushChannel } from './channels/expo-push.channel';
 import { CustomerMessageService } from './customer-message.service';
 import { jobAssignedEmail, jobAvailableEmail, sessionReminderEmail, jobCancelledEmail, jobMovedEmail } from './trainer-job-emails';
-import { packageExpiredOpsEmail, packageOrderedOpsEmail, partyRequestedEmail, sessionNotClosedEmail, sessionOverdueEmail, sessionUnfilledEmail, teamInviteEmail, trainerCancelledEmail } from './team-emails';
+import { complaintOpsEmail, packageExpiredOpsEmail, packageOrderedOpsEmail, partyRequestedEmail, sessionNotClosedEmail, sessionOverdueEmail, sessionUnfilledEmail, teamInviteEmail, trainerCancelledEmail } from './team-emails';
 import { approvedEmail, changesEmail, contactChangeDecidedEmail, opsContactChangeEmail, opsNewApplicationEmail, receivedEmail, rejectedEmail } from './trainer-emails';
 
 type OutboxRow = { id: string; aggregate_id: string; event_type: string; payload: Record<string, unknown>; attempts: number };
 
 type ApplicationInfo = { first_name: string | null; last_name: string | null; email: string | null; phone_e164: string | null; review_note: string | null };
 
-const HANDLED = ['trainer.application_submitted', 'trainer.application_approved', 'trainer.application_rejected', 'trainer.application_changes_requested', 'team.member_invited', 'party.requested', 'booking.trainer_cancelled', 'booking.overdue', 'referral.reward_granted', 'trainer.job_assigned', 'trainer.job_moved', 'trainer.job_cancelled', 'trainer.job_available', 'trainer.session_reminder', 'booking.unfilled', 'booking.completion_open', 'package.expired', 'package.ordered', 'customer.notify', 'trainer.contact_change_requested', 'trainer.contact_change_decided'];
+const HANDLED = ['trainer.application_submitted', 'trainer.application_approved', 'trainer.application_rejected', 'trainer.application_changes_requested', 'team.member_invited', 'party.requested', 'booking.trainer_cancelled', 'booking.overdue', 'referral.reward_granted', 'trainer.job_assigned', 'trainer.job_moved', 'trainer.job_cancelled', 'trainer.job_available', 'trainer.session_reminder', 'booking.unfilled', 'booking.completion_open', 'package.expired', 'package.ordered', 'customer.notify', 'trainer.contact_change_requested', 'trainer.contact_change_decided', 'complaint.raised', 'complaint.user_replied', 'complaint.trainer_reply'];
 const MAX_ATTEMPTS = 10;
 const BATCH = 10;
 
@@ -132,9 +132,9 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
       return;
     }
     if (event.event_type === 'customer.notify') {
-      const p = event.payload as { userId?: string; title?: string; body?: string; bookingId?: string | null };
+      const p = event.payload as { userId?: string; title?: string; body?: string; bookingId?: string | null; complaintId?: string };
       if (!p.userId || !p.title || !p.body) return;
-      await this.customerMessages.deliver(client, event.id, { userId: p.userId, title: p.title, body: p.body, bookingId: p.bookingId ?? null });
+      await this.customerMessages.deliver(client, event.id, { userId: p.userId, title: p.title, body: p.body, bookingId: p.bookingId ?? null, ...(p.complaintId ? { complaintId: p.complaintId } : {}) });
       return;
     }
     if (event.event_type === 'booking.unfilled') {
@@ -153,6 +153,22 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
       if (!o) return;
       const amountRupees = `₹${Math.round(o.total_paise / 100).toLocaleString('en-IN')}`;
       for (const ops of this.opsEmails()) await this.email.send(packageOrderedOpsEmail(ops, { customer: o.customer ?? 'A customer', packageName: o.name, amountRupees }, `${this.config.ADMIN_URL}/packages`));
+      return;
+    }
+    if (event.event_type === 'complaint.raised' || event.event_type === 'complaint.user_replied') {
+      const p = event.payload as { complaintId?: string; code?: string; side?: 'customer' | 'trainer'; who?: string; label?: string; urgent?: boolean; reopened?: boolean; snippet?: string; sessionCode?: string | null };
+      if (!p.complaintId || !p.code || !p.side) return;
+      const raised = event.event_type === 'complaint.raised';
+      const headline = raised ? `New ${p.side} complaint: ${p.label ?? 'complaint'}` : p.reopened ? `${p.who ?? 'Someone'} reopened a complaint` : `${p.who ?? 'Someone'} replied to a complaint`;
+      for (const ops of this.opsEmails()) await this.email.send(complaintOpsEmail(ops, { code: p.code, side: p.side, who: p.who ?? 'Someone', headline, snippet: p.snippet ?? '', urgent: p.urgent === true, sessionCode: p.sessionCode ?? null }, `${this.config.ADMIN_URL}/complaints?id=${p.complaintId}`));
+      return;
+    }
+    if (event.event_type === 'complaint.trainer_reply') {
+      const p = event.payload as { userId?: string; complaintId?: string; title?: string; body?: string };
+      if (!p.userId || !p.complaintId || !p.title || !p.body) return;
+      try {
+        await this.push.deliver({ userId: p.userId, title: p.title, body: p.body, bookingId: null, complaintId: p.complaintId });
+      } catch (error) { this.logger.warn(`Trainer push failed: ${error instanceof Error ? error.message : String(error)}`); }
       return;
     }
     if (event.event_type === 'package.expired') {

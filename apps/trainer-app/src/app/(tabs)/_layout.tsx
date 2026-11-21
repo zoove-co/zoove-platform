@@ -8,8 +8,9 @@ import { Icon } from '@/components/ui/Icon';
 import { JobAlertPopup } from '@/features/jobs/JobAlertPopup';
 import { useNewJobAlert } from '@/features/jobs/useNewJobAlert';
 import { useTimeUpAlert } from '@/features/jobs/useTimeUpAlert';
-import { onJobPushReceived, onNotificationTapped, registerForPush } from '@/lib/push';
+import { onComplaintPushReceived, onJobPushReceived, onNotificationTapped, registerForPush } from '@/lib/push';
 import { destinationFor, useApplication } from '@/lib/useApplication';
+import { COMPLAINT_UNREAD_KEY, COMPLAINTS_KEY, useComplaintUnread } from '@/lib/useComplaints';
 import { JOBS_KEY, useJobs } from '@/lib/useJobs';
 import { colors, fonts } from '@/theme';
 
@@ -18,6 +19,7 @@ export default function TabsLayout() {
   const application = useApplication();
   const jobs = useJobs();
   const queryClient = useQueryClient();
+  const unreadComplaints = useComplaintUnread().data?.unread ?? 0;
   const approved = application.data ? destinationFor(application.data) === 'jobs' : false;
   const accepting = jobs.data?.acceptingJobs ?? true;
   const alert = useNewJobAlert(jobs.data?.open, approved && accepting);
@@ -28,7 +30,29 @@ export default function TabsLayout() {
   useEffect(() => {
     if (approved) void registerForPush();
   }, [approved]);
-  useEffect(() => onNotificationTapped(() => { quietFor(8_000); router.navigate('/jobs'); }), [quietFor]);
+  // A tapped reply from the team opens that complaint; any other tap is a job alert.
+  useEffect(
+    () =>
+      onNotificationTapped((complaintId) => {
+        if (complaintId) {
+          router.push({ pathname: '/complaint/[id]', params: { id: complaintId } });
+          return;
+        }
+        quietFor(8_000);
+        router.navigate('/jobs');
+      }),
+    [quietFor],
+  );
+  // The team replied while the app is open: the list, the thread and the unread dot refresh at once.
+  useEffect(
+    () =>
+      onComplaintPushReceived((complaintId) => {
+        void queryClient.invalidateQueries({ queryKey: COMPLAINTS_KEY });
+        void queryClient.invalidateQueries({ queryKey: COMPLAINT_UNREAD_KEY });
+        void queryClient.invalidateQueries({ queryKey: ['complaint', complaintId] });
+      }),
+    [queryClient],
+  );
   // A job request push while the app is open: check the list at once, so the pop-up shows without waiting for the next refresh.
   useEffect(() => onJobPushReceived(() => void queryClient.invalidateQueries({ queryKey: JOBS_KEY })), [queryClient]);
 
@@ -51,7 +75,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="jobs" options={{ title: 'Open jobs', ...(openCount > 0 ? { tabBarBadge: openCount } : {}), tabBarIcon: ({ color, size }) => <Icon name="flash-outline" color={String(color)} size={size} /> }} />
       <Tabs.Screen name="sessions" options={{ title: 'My sessions', tabBarIcon: ({ color, size }) => <Icon name="calendar-outline" color={String(color)} size={size} /> }} />
       <Tabs.Screen name="insights" options={{ title: 'Earnings', tabBarIcon: ({ color, size }) => <Icon name="stats-chart-outline" color={String(color)} size={size} /> }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: ({ color, size }) => <Icon name="person-outline" color={String(color)} size={size} /> }} />
+      <Tabs.Screen name="profile" options={{ title: 'Profile', ...(unreadComplaints > 0 ? { tabBarBadge: '' , tabBarBadgeStyle: { backgroundColor: colors.magenta, minWidth: 10, maxHeight: 10, borderRadius: 5 } } : {}), tabBarIcon: ({ color, size }) => <Icon name="person-outline" color={String(color)} size={size} /> }} />
     </Tabs>
     <JobAlertPopup job={alert.fresh} onView={() => { alert.dismiss(); router.navigate('/jobs'); }} onLater={alert.dismiss} />
     {timeUp.over ? (

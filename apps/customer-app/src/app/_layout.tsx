@@ -22,7 +22,7 @@ import { track } from '@/lib/analytics/track';
 import { useAuth } from '@/lib/auth/useAuth';
 import { initMonitoring, reportError, withMonitoring } from '@/lib/monitoring';
 import { useOutage } from '@/lib/outage';
-import { bookingIdFrom, onNotificationTapped, registerForPush } from '@/lib/push';
+import { bookingIdFrom, complaintIdFrom, onNotificationReceived, onNotificationTapped, registerForPush } from '@/lib/push';
 import { colors } from '@/theme';
 
 initMonitoring();
@@ -84,11 +84,26 @@ function RootLayout() {
   }, [authStatus]);
   useEffect(() => {
     const subscription = onNotificationTapped((response) => {
+      const complaintId = complaintIdFrom(response);
+      if (complaintId) {
+        router.push({ pathname: '/complaint/[id]', params: { id: complaintId } });
+        return;
+      }
       const id = bookingIdFrom(response);
       if (id) router.push({ pathname: '/session/[id]', params: { id } });
     });
     return () => subscription.remove();
   }, []);
+  // A reply from the team that arrives while the app is open shows up in the conversation straight away.
+  useEffect(() => {
+    const subscription = onNotificationReceived((notification) => {
+      const complaintId = (notification.request.content.data as { complaintId?: unknown } | undefined)?.complaintId;
+      if (typeof complaintId !== 'string') return;
+      void queryClient.invalidateQueries({ queryKey: ['complaint', complaintId] });
+      void queryClient.invalidateQueries({ queryKey: ['complaints'] });
+    });
+    return () => subscription.remove();
+  }, [queryClient]);
 
   if (!ready) {
     return null;
@@ -112,6 +127,9 @@ function RootLayout() {
           <Stack.Screen name="party" />
           <Stack.Screen name="academy" />
           <Stack.Screen name="help" />
+          <Stack.Screen name="complaints" />
+          <Stack.Screen name="complaint/new" />
+          <Stack.Screen name="complaint/[id]" />
           <Stack.Screen name="policies" />
           <Stack.Screen name="referral" />
           <Stack.Screen name="progress" />

@@ -110,3 +110,22 @@ export function packageOrderedOpsEmail(to: string, ctx: { customer: string; pack
   );
   return { to, subject: `New package order: ${ctx.packageName} (${ctx.amountRupees})`, html, text };
 }
+
+// A customer or trainer raised a complaint, or wrote back on one. Safety complaints say so in the subject so they are not missed.
+export function complaintOpsEmail(
+  to: string,
+  ctx: { code: string; side: 'customer' | 'trainer'; who: string; headline: string; snippet: string; urgent: boolean; sessionCode: string | null },
+  adminUrl: string,
+): EmailMessage {
+  const role = ctx.side === 'trainer' ? 'trainer' : 'customer';
+  const { html, text } = layout(
+    ctx.headline,
+    [
+      `${ctx.who} (${role}) wrote about ${ctx.sessionCode ? `session ${ctx.sessionCode}` : 'something general'}: “${ctx.snippet}”`,
+      ctx.urgent ? 'This is about safety or conduct. Please read it and reply as soon as you can.' : 'Open the complaint to read the whole thread and reply.',
+    ],
+    { label: 'Open complaint', url: adminUrl },
+    OPS_FOOTER,
+  );
+  return { to, subject: `${ctx.urgent ? 'URGENT · ' : ''}${ctx.headline} · ${ctx.code}`, html, text };
+}

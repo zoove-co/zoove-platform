@@ -47,6 +47,58 @@ export class ApiError extends Error {
   }
 }
 
+// A complaint is a conversation with the Zoove team about a session or about anything else.
+export type ComplaintStatus = 'open' | 'waiting_on_user' | 'resolved';
+export interface ComplaintCategory {
+  key: string;
+  label: string;
+  hint: string;
+  urgent: boolean;
+  needsSession: boolean;
+}
+export interface ComplaintSession {
+  id: string;
+  code: string;
+  serviceName: string;
+  startsAt: string | null;
+  status: string;
+}
+export interface ComplaintMessage {
+  id: string;
+  from: 'you' | 'team' | 'system';
+  body: string;
+  createdAt: string;
+}
+export interface ComplaintSummary {
+  id: string;
+  code: string;
+  category: string;
+  categoryLabel: string;
+  subject: string;
+  status: ComplaintStatus;
+  session: ComplaintSession | null;
+  lastMessage: { from: 'you' | 'team' | 'system'; body: string; at: string } | null;
+  unread: boolean;
+  createdAt: string;
+  resolvedAt: string | null;
+  canReply: boolean;
+}
+export interface ComplaintDetail extends ComplaintSummary {
+  messages: ComplaintMessage[];
+  resolutionNote: string | null;
+}
+export interface MyComplaints {
+  active: ComplaintSummary[];
+  past: ComplaintSummary[];
+  unread: number;
+}
+export interface NewComplaintInput {
+  category: string;
+  bookingId?: string;
+  message: string;
+  idempotencyKey: string;
+}
+
 export type BookingMode = 'instant' | 'scheduled' | 'demo';
 export type Participant = 'personal' | 'duo' | 'loved_one' | 'group';
 
@@ -445,6 +497,14 @@ export interface Api {
   getProgressProfile(): Promise<ProgressProfile>;
   saveProgressProfile(input: ProgressProfile): Promise<ProgressProfile>;
   savePartyPlan(input: PartyPlanInput): Promise<PartyPlan>;
+  complaintCategories(): Promise<ComplaintCategory[]>;
+  // My recent sessions, to pick the one a complaint is about.
+  complaintSessions(): Promise<ComplaintSession[]>;
+  listComplaints(): Promise<MyComplaints>;
+  // Opening a thread marks the team's replies as read.
+  getComplaint(id: string): Promise<ComplaintDetail>;
+  createComplaint(input: NewComplaintInput): Promise<ComplaintDetail>;
+  replyToComplaint(id: string, body: string): Promise<ComplaintDetail>;
   rescheduleBooking(id: string, startsAt: string): Promise<Booking>;
   // Development only: the mock implements it so the trainer-cancel flow can be tried by hand.
   dev?: { simulateTrainerCancel(id: string): Promise<void> };

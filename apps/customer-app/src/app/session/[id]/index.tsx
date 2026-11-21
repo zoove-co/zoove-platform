@@ -13,7 +13,6 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { clockText, useCountdown } from '@/lib/useCountdown';
-import { openSupport } from '@/lib/support';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { TabFooter } from '@/components/ui/TabFooter';
 import { useBooking, useCancelBooking, useRateBooking, useSimulateTrainerCancel } from '@/features/booking/hooks';
@@ -301,11 +300,11 @@ export default function SessionDetailScreen() {
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          onPress={() => openSupport(t('help.mailSubject'), booking.sessionCode)}
+          onPress={() => router.push({ pathname: '/complaint/new', params: { bookingId: booking.id } })}
           style={styles.linkRow}>
           <Icon name="help-circle-outline" size={16} color={colors.purple} />
           <AppText variant="caption" style={styles.detailText}>
-            {t('session.support')}
+            {t('complaints.sessionCta')}
           </AppText>
           <Icon name="chevron-forward" size={14} color={colors.muted} />
         </Pressable>

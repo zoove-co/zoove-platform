@@ -8,6 +8,8 @@ import { isActiveStatus } from './status';
 
 import {
   ApiError,
+  type ComplaintCategory,
+  type ComplaintDetail,
   type Address,
   type CoachRef,
   type PastCoach,
@@ -27,6 +29,17 @@ import {
   type ServiceDetail,
   type TimeSlot,
 } from './types';
+
+// Complaints for development: a thread that the "team" answers after a few seconds, so the chat can be tried by hand.
+const MOCK_CATEGORIES: ComplaintCategory[] = [
+  { key: 'trainer_late_or_no_show', label: 'Trainer late or did not come', hint: 'The trainer is late, cannot be reached or did not arrive.', urgent: false, needsSession: true },
+  { key: 'trainer_behaviour', label: 'Trainer behaviour or safety', hint: 'You did not feel safe or respected.', urgent: true, needsSession: false },
+  { key: 'session_quality', label: 'Quality of the session', hint: 'The session was not what you expected.', urgent: false, needsSession: true },
+  { key: 'payment_or_package', label: 'Payment, refund or package', hint: 'A charge, a refund or your session credits.', urgent: false, needsSession: false },
+  { key: 'app_problem', label: 'Problem with the app', hint: 'Something is not working.', urgent: false, needsSession: false },
+  { key: 'other', label: 'Something else', hint: 'Anything that is not in the list.', urgent: false, needsSession: false },
+];
+const mockComplaints: ComplaintDetail[] = [];
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -1005,6 +1018,63 @@ export const mockApi: Api = {
     const plan = { id: `party-${Date.now()}`, occasion: input.occasion, serviceSlug: input.serviceSlug, guests: input.guests, startsAt: input.startsAt, status: 'new' as const, createdAt: new Date().toISOString() };
     notify('Party request received', 'Thanks! Our team will call you soon to confirm the details and the price.', null);
     return plan;
+  },
+
+  async complaintCategories() {
+    await wait(200);
+    return MOCK_CATEGORIES;
+  },
+  async complaintSessions() {
+    await wait(200);
+    return bookingRecords.slice(0, 5).map((r) => ({ id: r.id, code: `ZV-${r.id.slice(-8).toUpperCase()}`, serviceName: r.serviceName, startsAt: r.startsAt ?? null, status: r.status }));
+  },
+  async listComplaints() {
+    await wait(250);
+    const summary = ({ messages: _messages, resolutionNote: _note, ...rest }: ComplaintDetail) => rest;
+    return { active: mockComplaints.filter((c) => c.status !== 'resolved').map(summary), past: mockComplaints.filter((c) => c.status === 'resolved').map(summary), unread: mockComplaints.filter((c) => c.unread).length };
+  },
+  async getComplaint(id) {
+    await wait(150);
+    const found = mockComplaints.find((c) => c.id === id);
+    if (!found) throw new ApiError('NOT_FOUND');
+    found.unread = false;
+    return { ...found, messages: [...found.messages] };
+  },
+  async createComplaint(input) {
+    await wait(400);
+    const existing = mockComplaints.find((c) => c.id === input.idempotencyKey);
+    if (existing) return { ...existing };
+    const category = MOCK_CATEGORIES.find((c) => c.key === input.category);
+    if (!category) throw new ApiError('INVALID_REQUEST');
+    const id = input.idempotencyKey;
+    const now = new Date().toISOString();
+    const record = input.bookingId ? bookingRecords.find((r) => r.id === input.bookingId) : undefined;
+    const code = `ZC-${id.replace(/[^a-z0-9]/gi, '').slice(-8).toUpperCase()}`;
+    const detail: ComplaintDetail = {
+      id, code, category: category.key, categoryLabel: category.label, subject: record ? `${category.label} · ZV-${record.id.slice(-8).toUpperCase()}` : category.label, status: 'open',
+      session: record ? { id: record.id, code: `ZV-${record.id.slice(-8).toUpperCase()}`, serviceName: record.serviceName, startsAt: record.startsAt ?? null, status: record.status } : null,
+      lastMessage: null, unread: false, createdAt: now, resolvedAt: null, canReply: true, resolutionNote: null,
+      messages: [
+        { id: `${id}-1`, from: 'you', body: input.message, createdAt: now },
+        { id: `${id}-2`, from: 'system', body: `Thank you. We have your complaint (reference ${code}). The Zoove team will reply here. You will get a notification when we do.`, createdAt: now },
+      ],
+    };
+    mockComplaints.unshift(detail);
+    return { ...detail };
+  },
+  async replyToComplaint(id, body) {
+    await wait(250);
+    const found = mockComplaints.find((c) => c.id === id);
+    if (!found) throw new ApiError('NOT_FOUND');
+    found.status = 'open';
+    found.messages.push({ id: `${id}-${found.messages.length + 1}`, from: 'you', body, createdAt: new Date().toISOString() });
+    // The "team" answers a few seconds later, as it would in the real app.
+    setTimeout(() => {
+      found.status = 'waiting_on_user';
+      found.unread = true;
+      found.messages.push({ id: `${id}-${found.messages.length + 1}`, from: 'team', body: 'Thanks for telling us. We are looking into this and will update you here.', createdAt: new Date().toISOString() });
+    }, 4000);
+    return { ...found, messages: [...found.messages] };
   },
 
   dev: {

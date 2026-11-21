@@ -6,6 +6,10 @@ import {
   type Address,
   type Api,
   type ApiErrorCode,
+  type ComplaintCategory,
+  type ComplaintDetail,
+  type ComplaintSession,
+  type MyComplaints,
   type AppNotification,
   type Booking,
   type BookingResult,
@@ -223,6 +227,12 @@ export const httpApi: Api = {
   getStreak: () => call<StreakData>('GET', '/v1/streak'),
 
   savePartyPlan: (input) => call<PartyPlan>('POST', '/v1/party-requests', input),
+  complaintCategories: () => call<ComplaintCategory[]>('GET', '/v1/complaints/categories'),
+  complaintSessions: () => call<ComplaintSession[]>('GET', '/v1/complaints/sessions'),
+  listComplaints: () => call<MyComplaints>('GET', '/v1/complaints'),
+  getComplaint: (id) => call<ComplaintDetail>('GET', `/v1/complaints/${encodeURIComponent(id)}`),
+  createComplaint: (input) => call<ComplaintDetail>('POST', '/v1/complaints', input),
+  replyToComplaint: (id, body) => call<ComplaintDetail>('POST', `/v1/complaints/${encodeURIComponent(id)}/messages`, { body }),
   getReferral: () => call<ReferralSummary>('GET', '/v1/referral'),
   async applyReferralCode(code) {
     await call<unknown>('POST', '/v1/referral/apply', { code });

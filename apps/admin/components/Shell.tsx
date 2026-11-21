@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
-import { getAttention, sessionSummary } from '@/lib/api';
+import { complaintSummary, getAttention, sessionSummary } from '@/lib/api';
 
 import { can, useMe } from './me';
 import { Icons, Wordmark, avatarTone, initials } from './ui';
@@ -104,11 +104,14 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
   const onRewards = path.startsWith('/rewards');
   const onAttention = path.startsWith('/attention');
   const onCustomers = path.startsWith('/customers');
-  const other = onAttention || onCustomers || onTeam || onCalc || onDiscounts || onParties || onPackages || onSessions || onOfferings || onAreas || onRewards;
+  const onComplaints = path.startsWith('/complaints');
+  const other = onComplaints || onAttention || onCustomers || onTeam || onCalc || onDiscounts || onParties || onPackages || onSessions || onOfferings || onAreas || onRewards;
   // Sessions waiting for a trainer, so a cancellation is noticed without opening the page.
   const [waiting, setWaiting] = useState(0);
   const [overdue, setOverdue] = useState(0);
   const canSessions = can(me, 'sessions.manage');
+  const canComplaints = can(me, 'complaints.customers') || can(me, 'complaints.trainers');
+  const [complaints, setComplaints] = useState({ open: 0, urgent: 0 });
   const daily = me !== null;
   const setup = can(me, 'catalog.manage') || can(me, 'discounts.manage') || can(me, 'rewards.manage');
   const admin = me?.isOwner === true || can(me, 'tools.economics');
@@ -130,6 +133,14 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
     const timer = setInterval(() => void tick(), 30_000);
     return () => { live = false; clearInterval(timer); };
   }, [canSessions, me]);
+  useEffect(() => {
+    if (!canComplaints || me === null) return;
+    let live = true;
+    const tick = () => complaintSummary().then((c) => { if (live) setComplaints(c); }).catch(() => undefined);
+    void tick();
+    const timer = setInterval(() => void tick(), 30_000);
+    return () => { live = false; clearInterval(timer); };
+  }, [canComplaints, me]);
   return (
     <div className="app">
       <aside className="side">
@@ -152,6 +163,13 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
               {Icons.sessions}
               Sessions
               {waiting ? <span className="badge" style={overdue ? { background: 'var(--red)', color: '#fff' } : undefined} title={overdue ? `${overdue} overdue` : undefined}>{waiting}</span> : null}
+            </Link>
+          ) : null}
+          {canComplaints ? (
+            <Link href="/complaints" aria-current={onComplaints ? 'page' : undefined}>
+              {Icons.chat}
+              Complaints
+              {complaints.open ? <span className="badge" style={complaints.urgent ? { background: 'var(--red)', color: '#fff' } : undefined} title={complaints.urgent ? `${complaints.urgent} about safety` : undefined}>{complaints.open}</span> : null}
             </Link>
           ) : null}
           {can(me, 'trainers.view') ? (

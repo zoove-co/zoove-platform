@@ -85,6 +85,7 @@ export const Icons = {
   out: icon(<><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4" /><path d="M16 8l4 4-4 4M20 12H9" /></>),
   customers: icon(<><circle cx="12" cy="8" r="3.4" /><path d="M5 20c.7-3.6 3.6-5.6 7-5.6s6.3 2 7 5.6" /></>),
   sessions: icon(<><rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></>),
+  chat: icon(<><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3.6V16h-.5A2.5 2.5 0 0 1 4 13.5v-7Z" /><path d="M8.5 9h7M8.5 12h4.5" /></>),
   complaints: icon(<><path d="M5 21V4M5 4h11l-2 4 2 4H5" /></>),
   team: icon(<><path d="M12 3 4.5 6v5.5c0 4.4 3.1 7.7 7.5 9.5 4.4-1.8 7.5-5.1 7.5-9.5V6L12 3Z" /><path d="m9 12 2.2 2.2L15.5 10" /></>),
   tag: icon(<><path d="M3.5 12.3V4.5a1 1 0 0 1 1-1h7.8a1 1 0 0 1 .7.3l7.7 7.7a1.5 1.5 0 0 1 0 2.1l-6.2 6.2a1.5 1.5 0 0 1-2.1 0l-7.6-7.7a1 1 0 0 1-.3-.7Z" /><circle cx="8" cy="8" r="1.3" /></>),

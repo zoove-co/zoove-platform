@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 
@@ -72,6 +73,9 @@ export default function Sessions() {
           <AppText variant="body">{`${job.serviceName} · ${job.formatName} · ${whoFor(job)}`}</AppText>
           <AppText variant="caption" color={colors.muted}>{`${job.customerFirstName} · Session ${job.sessionCode}`}</AppText>
           <SessionNote id={job.id} note={job.note} />
+          <View style={{ marginTop: 6 }}>
+            <Button label="Report a problem" small variant="ghost" onPress={() => router.push({ pathname: '/complaint/new', params: { bookingId: job.id } })} />
+          </View>
         </Card>
       )) : mine.map((job) => (
         <Card key={job.id}>
@@ -116,6 +120,10 @@ export default function Sessions() {
               </View>
             )
           ) : null}
+
+          <View style={{ marginTop: 6 }}>
+            <Button label="Report a problem" small variant="ghost" onPress={() => router.push({ pathname: '/complaint/new', params: { bookingId: job.id } })} />
+          </View>
         </Card>
       ))}
     </Screen>

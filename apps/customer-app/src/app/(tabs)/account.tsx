@@ -12,6 +12,7 @@ import { Icon } from '@/components/ui/Icon';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { track } from '@/lib/analytics/track';
 import { useDeleteAccount, useProfile } from '@/features/auth/hooks';
+import { useComplaints } from '@/features/complaints/hooks';
 import { deleteAccountErrorMessage } from '@/lib/api/errorMessage';
 import { useAuth } from '@/lib/auth/useAuth';
 import { FEATURES } from '@/lib/config';
@@ -23,6 +24,7 @@ export default function AccountScreen() {
   const queryClient = useQueryClient();
   const signOut = useAuth((state) => state.signOut);
   const { data: profile } = useProfile();
+  const complaints = useComplaints();
   const [confirmingLogout, setConfirmingLogout] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const deleteAccount = useDeleteAccount();
@@ -100,7 +102,7 @@ export default function AccountScreen() {
             router.push(FEATURES.referral ? '/referral' : { pathname: '/soon', params: { title: t('account.referral') } })
           } />
         <MenuRow icon="shield-checkmark-outline" label={t('account.policy')} onPress={() => router.push('/policies')} />
-        <MenuRow icon="help-circle-outline" label={t('account.support')} onPress={() => router.push('/help')} />
+        <MenuRow icon="help-circle-outline" label={t('account.support')} dot={(complaints.data?.unread ?? 0) > 0} onPress={() => router.push('/help')} />
         <MenuRow icon="log-out-outline" label={t('profile.logout')} onPress={() => setConfirmingLogout(true)} />
         <MenuRow
           icon="trash-outline"

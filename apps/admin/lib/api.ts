@@ -421,3 +421,42 @@ export type TrainerContactRequest = {
 export const listTrainerContactRequests = (status: ContactRequestStatus | 'all') => api<{ pending: number; requests: TrainerContactRequest[] }>(`/v1/admin/trainer-contact-requests?status=${status}`);
 export const approveContactRequest = (id: string, note?: string) => api<TrainerContactRequest>(`/v1/admin/trainer-contact-requests/${id}/approve`, { method: 'POST', json: note ? { note } : {} });
 export const rejectContactRequest = (id: string, note: string) => api<TrainerContactRequest>(`/v1/admin/trainer-contact-requests/${id}/reject`, { method: 'POST', json: { note } });
+
+// ---- Complaints (mirror the API) ----
+export type ComplaintSide = 'customer' | 'trainer';
+export type ComplaintStatus = 'open' | 'waiting_on_user' | 'resolved';
+export type ComplaintStatusFilter = 'active' | ComplaintStatus | 'all';
+export type ComplaintRow = {
+  id: string; code: string; side: ComplaintSide; category: string; categoryLabel: string; subject: string; status: ComplaintStatus; urgent: boolean;
+  personName: string; personPhone: string | null; sessionCode: string | null; assignedToId: string | null; assignedToName: string | null;
+  lastMessage: { from: 'user' | 'admin' | 'system'; body: string } | null; lastMessageAt: string; createdAt: string; resolvedAt: string | null;
+};
+export type ComplaintMessage = { id: string; from: 'user' | 'admin' | 'system'; internal: boolean; authorName: string | null; body: string; createdAt: string };
+export type ComplaintSession = {
+  id: string; code: string; serviceName: string; mode: string; status: string; startsAt: string | null; startedAt: string | null; completedAt: string | null; area: string | null;
+  customerName: string | null; customerPhone: string | null; trainerName: string | null; trainerPhone: string | null;
+};
+export type ComplaintDetail = ComplaintRow & {
+  messages: ComplaintMessage[]; resolutionNote: string | null; resolvedByName: string | null;
+  person: { id: string; name: string; phone: string | null; email: string | null; complaintsTotal: number; complaintsOpen: number };
+  session: ComplaintSession | null;
+  related: { id: string; code: string; side: ComplaintSide; status: ComplaintStatus; subject: string }[];
+};
+export type ComplaintLink = { id: string; code: string; side: ComplaintSide; status: ComplaintStatus; subject: string; createdAt?: string };
+export const listComplaints = (o: { side?: ComplaintSide | undefined; status: ComplaintStatusFilter; q: string; mine: boolean }) => {
+  const params = new URLSearchParams({ status: o.status });
+  if (o.side) params.set('side', o.side);
+  if (o.q.trim()) params.set('q', o.q.trim());
+  if (o.mine) params.set('mine', 'true');
+  return api<ComplaintRow[]>(`/v1/admin/complaints?${params.toString()}`);
+};
+export const complaintSummary = () => api<{ open: number; urgent: number }>('/v1/admin/complaints/summary');
+export const complaintAssignees = () => api<{ id: string; name: string }[]>('/v1/admin/complaints/assignees');
+export const getComplaint = (id: string) => api<ComplaintDetail>(`/v1/admin/complaints/${id}`);
+export const replyToComplaint = (id: string, body: string) => api<ComplaintDetail>(`/v1/admin/complaints/${id}/reply`, { method: 'POST', json: { body } });
+export const noteOnComplaint = (id: string, body: string) => api<ComplaintDetail>(`/v1/admin/complaints/${id}/note`, { method: 'POST', json: { body } });
+export const assignComplaint = (id: string, assigneeId: string | null) => api<ComplaintDetail>(`/v1/admin/complaints/${id}/assign`, { method: 'POST', json: { assigneeId } });
+export const resolveComplaint = (id: string, note: string) => api<ComplaintDetail>(`/v1/admin/complaints/${id}/resolve`, { method: 'POST', json: { note } });
+export const reopenComplaint = (id: string) => api<ComplaintDetail>(`/v1/admin/complaints/${id}/reopen`, { method: 'POST', json: {} });
+export const complaintsForSession = (bookingId: string) => api<ComplaintLink[]>(`/v1/admin/complaints/by-session/${bookingId}`);
+export const complaintsForPerson = (userId: string) => api<ComplaintLink[]>(`/v1/admin/complaints/by-person/${userId}`);

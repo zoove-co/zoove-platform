@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking, View } from 'react-native';
 
@@ -9,6 +10,7 @@ import { Screen } from '@/components/ui/Screen';
 import { TextField } from '@/components/ui/TextField';
 import { useAuth } from '@/lib/auth';
 import { SUPPORT_EMAIL } from '@/lib/support';
+import { useComplaintUnread } from '@/lib/useComplaints';
 import { APPLICATION_KEY, useApplication } from '@/lib/useApplication';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FALLBACK_SERVICES } from '@/lib/application';
@@ -118,6 +120,7 @@ function ContactChange({ onApproved }: { onApproved: () => void }) {
 // The profile the team approved. Changing it goes through the team, because it was checked against the documents.
 export default function Profile() {
   const application = useApplication();
+  const unreadComplaints = useComplaintUnread().data?.unread ?? 0;
   const queryClient = useQueryClient();
   const refreshApplication = useCallback(() => void queryClient.invalidateQueries({ queryKey: APPLICATION_KEY }), [queryClient]);
   const signOut = useAuth((state) => state.signOut);
@@ -162,6 +165,12 @@ export default function Profile() {
         <AppText variant="caption" color={colors.muted} style={{ marginTop: 10 }}>To change your name, services or area, contact the Zoove team. Email and mobile you can ask to change below.</AppText>
       </Card>
       <ContactChange onApproved={refreshApplication} />
+      <Card>
+        <AppText variant="heading">Something went wrong?</AppText>
+        <AppText variant="body" color={colors.muted}>Tell us about a session, a payout or the app. Our team replies in the app.</AppText>
+        <Button label={unreadComplaints > 0 ? `My complaints (${unreadComplaints} new)` : 'Report a problem'} onPress={() => router.push(unreadComplaints > 0 ? '/complaints' : '/complaint/new')} />
+        <Button label="My complaints" variant="soft" small onPress={() => router.push('/complaints')} />
+      </Card>
       <Button label={`Contact the team (${SUPPORT_EMAIL})`} variant="soft" onPress={() => void Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Trainer help')}`).catch(() => undefined)} />
       <Button label="Sign out" variant="ghost" onPress={() => void signOut()} />
       {confirming ? (

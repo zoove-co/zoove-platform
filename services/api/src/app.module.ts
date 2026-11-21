@@ -12,6 +12,7 @@ import { BookingsModule } from './bookings/bookings.module';
 import { AreasAdminModule } from './areas-admin/areas-admin.module';
 import { CustomersAdminModule } from './customers-admin/customers-admin.module';
 import { CatalogModule } from './catalog/catalog.module';
+import { ComplaintsModule } from './complaints/complaints.module';
 import { CustomerModule } from './customer/customer.module';
 import { DatabaseModule } from './database/database.module';
 import { DiscountsModule } from './discounts/discounts.module';
@@ -52,6 +53,7 @@ import { TrainersModule } from './trainers/trainers.module';
     DiscountsModule,
     PackagesModule,
     PartyModule,
+    ComplaintsModule,
     ReferralModule,
     BookingsModule,
     CustomersAdminModule,

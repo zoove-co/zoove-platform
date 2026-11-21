@@ -78,7 +78,23 @@ export async function unregisterFromPush(): Promise<void> {
   }
 }
 
-export const onNotificationTapped = (listener: () => void) => {
-  const subscription = Notifications.addNotificationResponseReceivedListener(() => listener());
+/** The complaint a push is about, when it is one (the server puts the id in the push data). */
+export const complaintIdFrom = (data: unknown): string | null => {
+  const d = data as { kind?: unknown; complaintId?: unknown } | undefined;
+  return d?.kind === 'complaint' && typeof d.complaintId === 'string' ? d.complaintId : null;
+};
+
+/** Runs when a notification is tapped. `complaintId` is set when the team replied to a complaint, otherwise it is a job alert. */
+export const onNotificationTapped = (listener: (complaintId: string | null) => void) => {
+  const subscription = Notifications.addNotificationResponseReceivedListener((response) => listener(complaintIdFrom(response.notification.request.content.data)));
+  return () => subscription.remove();
+};
+
+/** Runs when the team's reply to a complaint arrives while the app is open. */
+export const onComplaintPushReceived = (listener: (complaintId: string) => void) => {
+  const subscription = Notifications.addNotificationReceivedListener((notification) => {
+    const id = complaintIdFrom(notification.request.content.data);
+    if (id) listener(id);
+  });
   return () => subscription.remove();
 };
