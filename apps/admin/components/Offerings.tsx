@@ -58,7 +58,7 @@ export function Offerings({ signOut, expired }: { signOut: () => void; expired: 
   if (!can(me, 'catalog.manage')) {
     return (
       <Shell signOut={signOut}>
-        <div className="pagehead"><div><h1>Offerings</h1></div></div>
+        <div className="pagehead"><div><h1>Services &amp; prices</h1></div></div>
         <Banner tone="info">You do not have access to offerings. Ask an owner to turn it on for you.</Banner>
       </Shell>
     );
@@ -114,7 +114,7 @@ export function Offerings({ signOut, expired }: { signOut: () => void; expired: 
     <Shell signOut={signOut}>
       <div className="pagehead">
         <div>
-          <h1>Offerings</h1>
+          <h1>Services &amp; prices</h1>
           <p>Everything customers see and pay for. A change here shows in the app straight away and applies to new bookings only; sessions already booked keep their price.</p>
         </div>
         <button className="btn" type="button" onClick={() => { setFormError(null); setSvc(svcDraft()); }}>New service</button>

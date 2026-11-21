@@ -81,4 +81,25 @@ suite('ops hear about package orders, and see sessions stuck on an inactive trai
     await pool.query(`update trainers set status = 'suspended' where user_id = $1`, [trainerId]);
     expect(await keys()).toContain('trainer_inactive');
   });
+  it('lists a new unpaid package order in Needs attention at once, and urgent after a day', async () => {
+    const admin = await owner();
+    const pkg = (await http().get('/v1/packages').set(as(me)).expect(200)).body[0] as { id: string };
+    const order = (await http().post('/v1/me/packages').set(as(me)).send({ packageId: pkg.id, idempotencyKey: `alerts-p-${Date.now()}` }).expect(201)).body as { id: string };
+    const group = async () => ((await http().get('/v1/admin/attention').set(as(admin)).expect(200)).body.groups as { key: string; items: { id: string; urgent: boolean }[] }[]).find((g) => g.key === 'packages');
+    expect((await group())?.items).toEqual([expect.objectContaining({ id: order.id, urgent: false })]);
+    await pool.query(`update package_purchases set created_at = now() - interval '2 days' where id = $1`, [order.id]);
+    expect((await group())?.items[0]).toMatchObject({ id: order.id, urgent: true });
+    await pool.query(`update package_purchases set status = 'paid', paid_at = now() where id = $1`, [order.id]);
+    expect(await group()).toBeUndefined();
+  });
+
+  it('finds a session from the first letters of its code', async () => {
+    const admin = await owner();
+    const addressId = (await http().post('/v1/addresses').set(as(me)).send({ label: 'Home', line: `D-${(n += 1)}, Test Heights`, area: 'Bandra West', pincode: '400050' }).expect(201)).body.id as string;
+    const id = (await http().post('/v1/bookings').set(as(me)).send({ serviceSlug: 'yoga', formatSlug: 'power-yoga', mode: 'instant', addressId, idempotencyKey: `alerts-s-${Date.now()}` }).expect(201)).body.id as string;
+    const code = `ZV-${id.replace(/-/g, '').slice(-8).toUpperCase()}`;
+    const find = async (q: string) => { const body = (await http().get('/v1/admin/sessions').query({ filter: 'all', q }).set(as(admin)).expect(200)).body as { items?: { id: string }[] } | { id: string }[]; return Array.isArray(body) ? body : (body.items ?? []); };
+    for (const q of [code, code.slice(0, 7), code.slice(0, 10), code.slice(3, 7).toLowerCase()]) expect((await find(q)).map((x) => x.id)).toContain(id);
+    expect(await find('ZV-ZZZZ')).toEqual([]);
+  });
 });

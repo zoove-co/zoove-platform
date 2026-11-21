@@ -2,12 +2,13 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AddressPicker } from '@/components/booking/AddressPicker';
 import { SchedulePicker } from '@/components/booking/SchedulePicker';
 import { AppText } from '@/components/ui/AppText';
+import { FieldScrollContext, useFieldScroll } from '@/components/ui/fieldScroll';
 import { Icon } from '@/components/ui/Icon';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
@@ -33,6 +34,7 @@ export default function PartyScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const save = useSavePartyPlan();
+  const field = useFieldScroll();
 
   const [step, setStep] = useState(1);
   const [done, setDone] = useState(false);
@@ -104,7 +106,10 @@ export default function PartyScreen() {
           <View key={index} style={[styles.segment, index < step && styles.segmentOn]} />
         ))}
       </View>
+      <KeyboardAvoidingView style={styles.flex} behavior="padding">
+      <FieldScrollContext.Provider value={field.reveal}>
       <ScrollView
+        {...field.scrollProps}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.content}>
@@ -218,6 +223,7 @@ export default function PartyScreen() {
           </>
         ) : null}
       </ScrollView>
+      </FieldScrollContext.Provider>
 
       <View style={styles.footer}>
         <AppText variant="micro" color={colors.muted} style={styles.center}>
@@ -237,6 +243,7 @@ export default function PartyScreen() {
           </View>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -277,6 +284,7 @@ function Row({ label, value, last = false }: { label: string; value: string; las
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.white },
+  flex: { flex: 1 },
   progress: { flexDirection: 'row', gap: 6, paddingHorizontal: 18, paddingBottom: 6 },
   segment: { flex: 1, height: 4, borderRadius: 2, backgroundColor: colors.lavender },
   segmentOn: { backgroundColor: colors.purple },

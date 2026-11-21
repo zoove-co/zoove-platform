@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/AppText';
@@ -9,6 +9,7 @@ import { FitnessLoader } from '@/components/ui/FitnessLoader';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import { FieldScrollContext, useFieldScroll } from '@/components/ui/fieldScroll';
 import { TextField } from '@/components/ui/TextField';
 import { useProgressProfile, useSaveProgressProfile } from '@/features/booking/hooks';
 import { track } from '@/lib/analytics/track';
@@ -44,6 +45,7 @@ function ProgressForm({ initial }: { initial: ProgressProfile }) {
   const { t } = useTranslation();
   const router = useRouter();
   const save = useSaveProgressProfile();
+  const field = useFieldScroll();
   const [goal, setGoal] = useState<FitnessGoal | null>(initial.goal);
   const [days, setDays] = useState<number | null>(initial.targetDaysPerWeek);
   const [consent, setConsent] = useState(initial.healthConsent);
@@ -70,7 +72,9 @@ function ProgressForm({ initial }: { initial: ProgressProfile }) {
   };
 
   return (
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+    <KeyboardAvoidingView style={styles.flex} behavior="padding">
+      <FieldScrollContext.Provider value={field.reveal}>
+      <ScrollView {...field.scrollProps} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
         <AppText color={colors.muted}>{t('progress.lead')}</AppText>
 
         <AppText variant="heading">{t('progress.goalTitle')}</AppText>
@@ -107,11 +111,14 @@ function ProgressForm({ initial }: { initial: ProgressProfile }) {
         {save.isError ? <AppText color={colors.danger}>{t('progress.saveError')}</AppText> : null}
         <PrimaryButton label={t('progress.save')} disabled={!valid} loading={save.isPending} onPress={onSave} />
       </ScrollView>
+      </FieldScrollContext.Provider>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  flex: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.xxl },
   content: { padding: spacing.xl, gap: spacing.lg },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },

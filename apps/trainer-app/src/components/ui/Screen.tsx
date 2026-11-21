@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { FieldScrollContext, useFieldScroll } from '@/components/ui/fieldScroll';
 import { colors, spacing } from '@/theme';
 
 type Props = {
@@ -15,15 +16,19 @@ type Props = {
 // Every screen: safe area, scrolling, keyboard handling and an optional pinned footer.
 export function Screen({ children, footer, refreshing, onRefresh }: Props) {
   const insets = useSafeAreaInsets();
+  const { reveal, scrollProps } = useFieldScroll();
   return (
     <KeyboardAvoidingView style={styles.fill} behavior="padding">
+      <FieldScrollContext.Provider value={reveal}>
       <ScrollView
+        {...scrollProps}
         style={styles.fill}
         contentContainerStyle={{ paddingTop: insets.top + spacing.lg, paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl, gap: spacing.lg }}
         keyboardShouldPersistTaps="handled"
         {...(onRefresh ? { refreshControl: <RefreshControl refreshing={refreshing === true} onRefresh={onRefresh} /> } : {})}>
         {children}
       </ScrollView>
+      </FieldScrollContext.Provider>
       {footer ? <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>{footer}</View> : null}
     </KeyboardAvoidingView>
   );

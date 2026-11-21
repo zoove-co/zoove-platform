@@ -90,10 +90,12 @@ export class AttentionService {
     }
 
     if (can('packages.manage')) {
-      const rows = (await this.db.query<{ id: string; name: string; total_paise: number; created_at: Date }>(
-        `select id, name, total_paise, created_at from package_purchases where status = 'awaiting_payment' and created_at < now() - interval '1 day' order by created_at limit ${LIMIT}`)).rows;
-      groups.push({ key: 'packages', title: 'Package orders unpaid for over a day', hint: 'Follow up with the customer, or leave if they changed their mind.', href: '/packages',
-        items: rows.map((r) => ({ id: r.id, title: r.name, detail: `₹${Math.round(r.total_paise / 100).toLocaleString('en-IN')} awaiting payment`, since: r.created_at.toISOString(), href: '/packages', urgent: false })) });
+      // Every unpaid order shows at once, so ops can match it with the money. It turns urgent when it has waited over a day.
+      const rows = (await this.db.query<{ id: string; name: string; total_paise: number; created_at: Date; customer: string | null }>(
+        `select p.id, p.name, p.total_paise, p.created_at, coalesce(nullif(trim(concat_ws(' ', u.first_name, u.last_name)), ''), u.email, u.phone_e164) as customer
+           from package_purchases p join users u on u.id = p.user_id where p.status = 'awaiting_payment' order by p.created_at limit ${LIMIT}`)).rows;
+      groups.push({ key: 'packages', title: 'Package orders waiting for payment', hint: 'When the money has arrived, open Packages and mark the order paid. After a day, follow up with the customer.', href: '/packages',
+        items: rows.map((r) => ({ id: r.id, title: r.name, detail: `${r.customer ?? 'A customer'} · ₹${Math.round(r.total_paise / 100).toLocaleString('en-IN')} awaiting payment`, since: r.created_at.toISOString(), href: '/packages', urgent: now.getTime() - r.created_at.getTime() > 86_400_000 })) });
     }
 
     // Owners only: delivery problems are about the system, not about a customer.

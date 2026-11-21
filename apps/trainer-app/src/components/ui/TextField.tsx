@@ -1,6 +1,8 @@
+import { useContext, useRef } from 'react';
 import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
+import { FieldScrollContext, type FieldNode } from '@/components/ui/fieldScroll';
 import { colors, fonts, radius } from '@/theme';
 
 type Props = Pick<TextInputProps, 'keyboardType' | 'autoCapitalize' | 'autoComplete' | 'autoCorrect' | 'maxLength' | 'multiline' | 'placeholder' | 'textContentType'> & {
@@ -15,8 +17,10 @@ type Props = Pick<TextInputProps, 'keyboardType' | 'autoCapitalize' | 'autoCompl
 };
 
 export function TextField({ label, value, onChangeText, onBlur, hint, error, editable = true, prefix, multiline, ...rest }: Props) {
+  const wrap = useRef<FieldNode>(null);
+  const reveal = useContext(FieldScrollContext);
   return (
-    <View style={styles.wrap}>
+    <View ref={wrap} collapsable={false} style={styles.wrap}>
       <AppText variant="bodyStrong">{label}</AppText>
       <View style={[styles.box, error ? styles.boxError : null, !editable && styles.boxOff]}>
         {prefix ? (
@@ -29,6 +33,7 @@ export function TextField({ label, value, onChangeText, onBlur, hint, error, edi
           value={value}
           onChangeText={onChangeText}
           onBlur={onBlur}
+          onFocus={() => { if (reveal) setTimeout(() => reveal(wrap.current), 300); }}
           editable={editable}
           multiline={multiline}
           placeholderTextColor="rgba(8, 11, 15, 0.3)"

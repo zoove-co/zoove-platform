@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, Share, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/AppText';
 import { FitnessLoader } from '@/components/ui/FitnessLoader';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import { FieldScrollContext, useFieldScroll } from '@/components/ui/fieldScroll';
 import { TextField } from '@/components/ui/TextField';
 import { useApplyReferralCode, useReferral } from '@/features/booking/hooks';
 import { ApiError } from '@/lib/api';
@@ -21,6 +22,7 @@ export default function ReferralScreen() {
   const { data, isPending } = useReferral();
   const code = data?.code;
   const apply = useApplyReferralCode();
+  const field = useFieldScroll();
   const [friendCode, setFriendCode] = useState('');
   const applyMessage = apply.error instanceof ApiError ? (apply.error.code === 'NOT_FOUND' ? t('referral.codeInvalid') : t('referral.codeRefused')) : apply.isError ? t('referral.codeRefused') : null;
 
@@ -41,7 +43,9 @@ export default function ReferralScreen() {
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <ScreenHeader title={t('referral.title')} />
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+    <KeyboardAvoidingView style={styles.flex} behavior="padding">
+      <FieldScrollContext.Provider value={field.reveal}>
+      <ScrollView {...field.scrollProps} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
         <AppText variant="screenTitle">{t('referral.heading')}</AppText>
         <AppText color={colors.muted}>{t('referral.body')}</AppText>
         {data?.offer.referrer ? <AppText color={colors.muted}>{t('referral.offerReferrer', { worth: data.offer.referrer.worth, days: data.offer.referrer.validDays })}</AppText> : null}
@@ -101,6 +105,8 @@ export default function ReferralScreen() {
           <AppText color={colors.success}>{t('referral.applied')}</AppText>
         ) : null}
       </ScrollView>
+      </FieldScrollContext.Provider>
+    </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -113,6 +119,7 @@ const styles = StyleSheet.create({
   reward: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, padding: spacing.lg, borderRadius: radius.xl, backgroundColor: colors.lavender },
   rewardText: { flexShrink: 1, gap: 2 },
   screen: { flex: 1, backgroundColor: colors.background },
+  flex: { flex: 1 },
   content: { padding: spacing.xl, gap: spacing.lg },
   codeCard: {
     gap: spacing.sm,

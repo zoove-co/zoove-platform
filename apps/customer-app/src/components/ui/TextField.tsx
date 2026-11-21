@@ -1,6 +1,8 @@
+import { useContext, useRef } from 'react';
 import { StyleSheet, TextInput, View, type KeyboardTypeOptions, type TextInputProps } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
+import { FieldScrollContext, type FieldNode } from '@/components/ui/fieldScroll';
 import { colors, fonts, radius } from '@/theme';
 
 type Props = {
@@ -28,8 +30,10 @@ export function TextField({
   autoComplete,
   editable = true,
 }: Props) {
+  const wrap = useRef<FieldNode>(null);
+  const reveal = useContext(FieldScrollContext);
   return (
-    <View style={styles.wrap}>
+    <View ref={wrap} collapsable={false} style={styles.wrap}>
       <AppText variant="micro" color={colors.muted}>
         {label}
       </AppText>
@@ -38,6 +42,7 @@ export function TextField({
         value={value}
         onChangeText={onChangeText}
         onBlur={onBlur}
+        onFocus={() => { if (reveal) setTimeout(() => reveal(wrap.current), 300); }}
         placeholder={placeholder}
         placeholderTextColor="rgba(8, 11, 15, 0.3)"
         keyboardType={keyboardType}

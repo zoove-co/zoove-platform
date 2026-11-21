@@ -13,10 +13,6 @@ import { Icons, Wordmark, avatarTone, initials } from './ui';
 const THEME_KEY = 'zoove.admin.theme';
 
 // Planned sections. They are shown so the team can see where the panel is going; none of them open yet.
-const SOON: [string, ReactNode][] = [
-  ['Complaints', Icons.complaints],
-];
-
 function ThemeToggle() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
@@ -113,6 +109,9 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
   const [waiting, setWaiting] = useState(0);
   const [overdue, setOverdue] = useState(0);
   const canSessions = can(me, 'sessions.manage');
+  const daily = me !== null;
+  const setup = can(me, 'catalog.manage') || can(me, 'discounts.manage') || can(me, 'rewards.manage');
+  const admin = me?.isOwner === true || can(me, 'tools.economics');
   // The number on the "Needs attention" tab: everything waiting for the team, red when something is urgent.
   const [attention, setAttention] = useState({ total: 0, urgent: 0 });
   useEffect(() => {
@@ -139,11 +138,20 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
           <span className="tag">admin</span>
         </Link>
         <nav className="nav" aria-label="Main">
+          {/* Daily work first, set-up that changes rarely after it. A heading shows only when the person can use something under it. */}
+          {daily ? <div className="navhead">Daily work</div> : null}
           {me !== null ? (
             <Link href="/attention" aria-current={onAttention ? 'page' : undefined}>
               {Icons.complaints}
               Needs attention
               {attention.total ? <span className="badge" style={attention.urgent ? { background: 'var(--red)', color: '#fff' } : undefined} title={attention.urgent ? `${attention.urgent} urgent` : undefined}>{attention.total}</span> : null}
+            </Link>
+          ) : null}
+          {canSessions ? (
+            <Link href="/sessions" aria-current={onSessions ? 'page' : undefined}>
+              {Icons.sessions}
+              Sessions
+              {waiting ? <span className="badge" style={overdue ? { background: 'var(--red)', color: '#fff' } : undefined} title={overdue ? `${overdue} overdue` : undefined}>{waiting}</span> : null}
             </Link>
           ) : null}
           {can(me, 'trainers.view') ? (
@@ -159,32 +167,6 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
               Customers
             </Link>
           ) : null}
-          {SOON.map(([label, icon]) => (
-            <span key={label} className="soonitem" aria-disabled="true" title="Coming soon">
-              {icon}
-              {label}
-              <span className="soontag">Soon</span>
-            </span>
-          ))}
-          {canSessions ? (
-            <Link href="/sessions" aria-current={onSessions ? 'page' : undefined}>
-              {Icons.sessions}
-              Sessions
-              {waiting ? <span className="badge" style={overdue ? { background: 'var(--red)', color: '#fff' } : undefined} title={overdue ? `${overdue} overdue` : undefined}>{waiting}</span> : null}
-            </Link>
-          ) : null}
-          {can(me, 'catalog.manage') ? (
-            <Link href="/offerings" aria-current={onOfferings ? 'page' : undefined}>
-              {Icons.card}
-              Offerings
-            </Link>
-          ) : null}
-          {can(me, 'catalog.manage') ? (
-            <Link href="/areas" aria-current={onAreas ? 'page' : undefined}>
-              {Icons.pin}
-              Areas
-            </Link>
-          ) : null}
           {can(me, 'parties.manage') ? (
             <Link href="/parties" aria-current={onParties ? 'page' : undefined}>
               {Icons.sessions}
@@ -197,10 +179,18 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
               Packages
             </Link>
           ) : null}
-          {can(me, 'rewards.manage') ? (
-            <Link href="/rewards" aria-current={onRewards ? 'page' : undefined}>
-              {Icons.gift}
-              Rewards
+
+          {setup ? <div className="navhead">Set-up</div> : null}
+          {can(me, 'catalog.manage') ? (
+            <Link href="/offerings" aria-current={onOfferings ? 'page' : undefined}>
+              {Icons.card}
+              Services &amp; prices
+            </Link>
+          ) : null}
+          {can(me, 'catalog.manage') ? (
+            <Link href="/areas" aria-current={onAreas ? 'page' : undefined}>
+              {Icons.pin}
+              Areas
             </Link>
           ) : null}
           {can(me, 'discounts.manage') ? (
@@ -209,6 +199,14 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
               Discount codes
             </Link>
           ) : null}
+          {can(me, 'rewards.manage') ? (
+            <Link href="/rewards" aria-current={onRewards ? 'page' : undefined}>
+              {Icons.gift}
+              Rewards
+            </Link>
+          ) : null}
+
+          {admin ? <div className="navhead">Admin</div> : null}
           {me?.isOwner ? (
             <Link href="/team" aria-current={onTeam ? 'page' : undefined}>
               {Icons.team}
@@ -218,7 +216,7 @@ export function Shell({ signOut, pending, children }: { signOut: () => void; pen
           {can(me, 'tools.economics') ? (
             <Link href="/economics" aria-current={onCalc ? 'page' : undefined}>
               {Icons.calc}
-              Calculator
+              Economics calculator
             </Link>
           ) : null}
         </nav>
